@@ -26,3 +26,14 @@ The app focuses on safety-aware routing, area safety insights, and fast SOS broa
 - Route safety scoring based on historical and community data
 
 ---
+
+## Tech Stack
+
+**Backend**
+- Go (Golang)
+- REST APIs
+
+**Mobile App**
+- React Native (Android & iOS)
+
+---
