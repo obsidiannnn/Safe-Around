@@ -1,0 +1,80 @@
+# =============================================================================
+# SafeAround Backend – .gitignore
+# =============================================================================
+
+# ── Go binaries & build artifacts ────────────────────────────────────────────
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/bin/
+/dist/
+safearound-backend
+
+# ── Go module cache ───────────────────────────────────────────────────────────
+/vendor/
+
+# ── Air hot-reload tmp directory ─────────────────────────────────────────────
+/tmp/
+
+# ── Environment & secrets ────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+*.pem
+*.key
+*.cert
+
+# ── IDE – VSCode ─────────────────────────────────────────────────────────────
+.vscode/
+*.code-workspace
+
+# ── IDE – JetBrains / GoLand ─────────────────────────────────────────────────
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# ── OS – macOS ───────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ── OS – Windows ─────────────────────────────────────────────────────────────
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ── Log files ────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Database files ───────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.sql.gz
+
+# ── Test coverage ────────────────────────────────────────────────────────────
+coverage.out
+coverage.html
+*.coverprofile
+
+# ── Docker ───────────────────────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ── Profiling ────────────────────────────────────────────────────────────────
+*.prof
+cpu.out
+mem.out
