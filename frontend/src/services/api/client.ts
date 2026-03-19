@@ -1,6 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { API_URL } from '@/config/env';
-import { useAuthStore } from '@/store/authStore';
 
 export const apiClient = axios.create({
   baseURL: API_URL,
@@ -13,6 +12,7 @@ export const apiClient = axios.create({
 // Request interceptor - Add JWT token
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    const { useAuthStore } = require('@/store/authStore');
     const token = useAuthStore.getState().accessToken;
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -33,8 +33,11 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        await useAuthStore.getState().refreshAccessToken();
-        const newToken = useAuthStore.getState().accessToken;
+        const { useAuthStore } = require('@/store/authStore');
+        const authStore = useAuthStore.getState();
+        
+        await authStore.refreshAccessToken();
+        const newToken = authStore.accessToken;
         
         if (newToken && originalRequest.headers) {
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
@@ -42,6 +45,7 @@ apiClient.interceptors.response.use(
         
         return apiClient(originalRequest);
       } catch (refreshError) {
+        const { useAuthStore } = require('@/store/authStore');
         useAuthStore.getState().logOut();
         return Promise.reject(refreshError);
       }
