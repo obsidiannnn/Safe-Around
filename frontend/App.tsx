@@ -5,15 +5,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { theme } from './src/theme/theme';
-import { useAuth } from './src/hooks/useAuth';
 
 export default function App() {
-  const { loadStoredAuth } = useAuth();
-
-  useEffect(() => {
-    loadStoredAuth();
-  }, []);
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>

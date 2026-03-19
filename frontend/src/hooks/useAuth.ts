@@ -1,53 +1,53 @@
+import { useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
-import { authService } from '@/services/api/authService';
-import { LoginRequest, RegisterRequest } from '@/types/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LoginFormData, RegisterFormData } from '@/utils/validation';
 
+/**
+ * Custom hook for authentication operations
+ * Wraps authStore and provides auto-refresh token functionality
+ */
 export const useAuth = () => {
-  const { user, token, isAuthenticated, setUser, setToken, logout: logoutStore } = useAuthStore();
+  const {
+    user,
+    accessToken,
+    isAuthenticated,
+    isLoading,
+    error,
+    signUp,
+    logIn,
+    logOut,
+    refreshAccessToken,
+    updateProfile,
+    loadPersistedAuth,
+    setError,
+  } = useAuthStore();
 
-  const login = async (credentials: LoginRequest) => {
-    const response = await authService.login(credentials);
-    setUser(response.user);
-    setToken(response.token);
-    await AsyncStorage.setItem('token', response.token);
-    await AsyncStorage.setItem('refreshToken', response.refreshToken);
-  };
+  // Load persisted auth on mount
+  useEffect(() => {
+    loadPersistedAuth();
+  }, []);
 
-  const register = async (data: RegisterRequest) => {
-    const response = await authService.register(data);
-    setUser(response.user);
-    setToken(response.token);
-    await AsyncStorage.setItem('token', response.token);
-    await AsyncStorage.setItem('refreshToken', response.refreshToken);
-  };
+  // Auto-refresh token before expiry (every 50 minutes if token expires in 60 minutes)
+  useEffect(() => {
+    if (!isAuthenticated || !accessToken) return;
 
-  const logout = async () => {
-    try {
-      await authService.logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      logoutStore();
-      await AsyncStorage.removeItem('token');
-      await AsyncStorage.removeItem('refreshToken');
-    }
-  };
+    const refreshInterval = setInterval(() => {
+      refreshAccessToken();
+    }, 50 * 60 * 1000); // 50 minutes
 
-  const loadStoredAuth = async () => {
-    const storedToken = await AsyncStorage.getItem('token');
-    if (storedToken) {
-      setToken(storedToken);
-    }
-  };
+    return () => clearInterval(refreshInterval);
+  }, [isAuthenticated, accessToken]);
 
   return {
     user,
-    token,
+    accessToken,
     isAuthenticated,
-    login,
-    register,
-    logout,
-    loadStoredAuth,
+    isLoading,
+    error,
+    signUp,
+    logIn,
+    logOut,
+    updateProfile,
+    clearError: () => setError(null),
   };
 };
