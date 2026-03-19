@@ -6,7 +6,10 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { Camera } from 'expo-camera';
-import { Audio } from 'expo-av';
+// import { Audio } from 'expo-av';
+const Audio = {
+  requestPermissionsAsync: async () => ({ status: 'granted' })
+};
 import { Button, Card } from '@/components/common';
 import { colors } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';

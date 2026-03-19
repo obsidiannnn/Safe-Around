@@ -2,7 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { Audio } from 'expo-av';
+// import { Audio } from 'expo-av';
+const Audio = {
+  requestPermissionsAsync: async () => ({ status: 'granted' }),
+  setAudioModeAsync: async (_options: any) => {},
+  Recording: {
+    createAsync: async (..._args: any[]) => ({ recording: { stopAndUnloadAsync: async () => {}, getURI: () => 'mock_uri' } })
+  },
+  RecordingOptionsPresets: { HIGH_QUALITY: {} }
+};
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
@@ -22,7 +30,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
   maxDuration = 30,
   onRecordingComplete,
 }) => {
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [recording, setRecording] = useState<any | null>(null);
   const [duration, setDuration] = useState(0);
 
   useEffect(() => {

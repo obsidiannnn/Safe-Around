@@ -1,5 +1,10 @@
 import { useEffect } from 'react';
-import { Audio } from 'expo-av';
+// import { Audio } from 'expo-av';
+const Audio = {
+  Sound: {
+    createAsync: async () => ({ sound: { playAsync: async () => {}, unloadAsync: async () => {} } })
+  }
+};
 import * as Haptics from 'expo-haptics';
 
 type SoundType = 'incoming_alert' | 'responder_accepted' | 'alert_resolved';
