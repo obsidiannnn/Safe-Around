@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, TextInput, StyleSheet, Pressable, Text } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '@/theme/colors';
-import { spacing, borderRadius } from '@/theme/spacing';
+import { spacing, borderRadius, shadows } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
 
 type InputType = 'text' | 'email' | 'phone' | 'password';
@@ -71,7 +71,14 @@ export const Input: React.FC<InputProps> = ({
     <View style={styles.container}>
       {label && <Text style={styles.label}>{label}</Text>}
       
-      <View style={[styles.inputContainer, { borderColor: getBorderColor() }, disabled && styles.disabledContainer]}>
+      <View
+        style={[
+          styles.inputContainer,
+          isFocused && styles.inputFocused,
+          { borderColor: getBorderColor() },
+          disabled && styles.disabledContainer,
+        ]}
+      >
         {leftIcon && (
           <Icon name={leftIcon} size={20} color={colors.textSecondary} style={styles.leftIcon} />
         )}
@@ -135,9 +142,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
+    minHeight: 52,
+    ...shadows.small,
+  },
+  inputFocused: {
+    backgroundColor: '#FFFDFD',
   },
   disabledContainer: {
     backgroundColor: colors.background,
