@@ -88,7 +88,7 @@ func setupRouter() *gin.Engine {
 	rdb := redis.NewClient(&redis.Options{})
 	twClient := twilio.NewClient("mock", "mock")
 
-	h := handlers.NewAuthHandler(mockRepo, rdb, twClient)
+	h := handlers.NewAuthHandler(mockRepo, nil, rdb, twClient)
 	api := r.Group("/api/v1")
 	routes.SetupAuthRoutes(api, h)
 

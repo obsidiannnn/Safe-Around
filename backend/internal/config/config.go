@@ -22,6 +22,7 @@ type Config struct {
 		SSLMode  string
 	}
 	Redis struct {
+		URL      string // Cloud Redis URL (e.g. Upstash) - takes priority
 		Host     string
 		Port     string
 		Password string
@@ -60,7 +61,8 @@ func LoadConfig() (*Config, error) {
 		cfg.DB.SSLMode = "disable"
 	}
 
-	// Redis
+	// Redis - supports cloud URL (Upstash) or local Host:Port
+	cfg.Redis.URL = os.Getenv("REDIS_URL")
 	cfg.Redis.Host = os.Getenv("REDIS_HOST")
 	cfg.Redis.Port = os.Getenv("REDIS_PORT")
 	cfg.Redis.Password = os.Getenv("REDIS_PASSWORD")
@@ -88,8 +90,8 @@ func validate(cfg *Config) error {
 	if cfg.DB.Host == "" || cfg.DB.User == "" || cfg.DB.Password == "" || cfg.DB.Name == "" {
 		return errors.New("missing db config")
 	}
-	if cfg.Redis.Host == "" {
-		return errors.New("missing redis config")
+	if cfg.Redis.URL == "" && cfg.Redis.Host == "" {
+		return errors.New("missing redis config: set REDIS_URL or REDIS_HOST")
 	}
 	if cfg.JWT.Secret == "" {
 		return errors.New("missing jwt secret")

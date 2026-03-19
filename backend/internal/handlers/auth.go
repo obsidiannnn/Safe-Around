@@ -14,16 +14,18 @@ import (
 )
 
 type AuthHandler struct {
-	repo   repository.UserRepo
-	redis  *redis.Client
-	twilio *twilio.Client
+	repo        repository.UserRepo
+	sessionRepo repository.SessionRepo
+	redis       *redis.Client
+	twilio      *twilio.Client
 }
 
-func NewAuthHandler(repo repository.UserRepo, rdb *redis.Client, twClient *twilio.Client) *AuthHandler {
+func NewAuthHandler(repo repository.UserRepo, sessionRepo repository.SessionRepo, rdb *redis.Client, twClient *twilio.Client) *AuthHandler {
 	return &AuthHandler{
-		repo:   repo,
-		redis:  rdb,
-		twilio: twClient,
+		repo:        repo,
+		sessionRepo: sessionRepo,
+		redis:       rdb,
+		twilio:      twClient,
 	}
 }
 
@@ -39,6 +41,21 @@ type setupProfileInput struct {
 	Password string `json:"password" binding:"required,min=6"`
 }
 
+// verifySID is the Twilio Verify Service SID
+const verifySID = "VAec453b0a41cbb20d1577c8c7ffe8ce64"
+
+// saveSession persists a refresh token to PostgreSQL for durability
+func (h *AuthHandler) saveSession(c *gin.Context, userID uint, refreshToken string) error {
+	session := &models.UserSession{
+		UserID:       userID,
+		RefreshToken: refreshToken,
+		UserAgent:    c.GetHeader("User-Agent"),
+		ClientIP:     c.ClientIP(),
+		ExpiresAt:    time.Now().Add(7 * 24 * time.Hour), // 7 days
+	}
+	return h.sessionRepo.Create(session)
+}
+
 // SendOTP handles generating and sending an SMS securely
 func (h *AuthHandler) SendOTP(c *gin.Context) {
 	var input authInput
@@ -49,7 +66,7 @@ func (h *AuthHandler) SendOTP(c *gin.Context) {
 
 	ctx := context.Background()
 	rlKey := "rl:otp:send:" + input.Phone
-	
+
 	// Rate Limiting: max 3 OTP requests per 10 minutes
 	attempts, _ := h.redis.Get(ctx, rlKey).Int()
 	if attempts >= 3 {
@@ -57,16 +74,15 @@ func (h *AuthHandler) SendOTP(c *gin.Context) {
 		return
 	}
 
-	// Extract Twilio Verify Service SID from environment mapped globally
-	verifySID := "VAec453b0a41cbb20d1577c8c7ffe8ce64"
+	h.redis.Incr(ctx, rlKey)
+	h.redis.Expire(ctx, rlKey, 10*time.Minute)
 
-	// Dispatch Twilio Verify OTP Request natively
 	_, err := h.twilio.SendOTP(input.Phone, verifySID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send otp via SMS"})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{"message": "otp sent successfully"})
 }
 
@@ -78,9 +94,7 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 		return
 	}
 
-	verifySID := "VAec453b0a41cbb20d1577c8c7ffe8ce64"
 	isValid, err := h.twilio.VerifyOTP(input.Phone, input.OTP, verifySID)
-	
 	if err != nil || !isValid {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired otp"})
 		return
@@ -98,7 +112,6 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 			return
 		}
 	} else {
-		// Existing user might be re-verifying
 		if !u.IsPhoneVerified {
 			u.IsPhoneVerified = true
 			h.repo.Update(u)
@@ -113,10 +126,13 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 	access, _ := utils.GenerateToken(u.ID, u.Email)
 	refresh, _ := utils.GenerateRefreshToken(u.ID, u.Email)
 
+	// ✅ Persist session to PostgreSQL (survives Redis restart)
+	_ = h.saveSession(c, u.ID, refresh)
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "verified successfully",
 		"user":    u,
-		"tokens": gin.H{"access": access, "refresh": refresh},
+		"tokens":  gin.H{"access": access, "refresh": refresh},
 	})
 }
 
@@ -173,7 +189,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	ctx := context.Background()
 	rlKey := "rl:login:" + input.Phone
-	
+
 	attempts, _ := h.redis.Get(ctx, rlKey).Int()
 	if attempts >= 5 {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many attempts, chill for a bit"})
@@ -196,15 +212,16 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	access, _ := utils.GenerateToken(u.ID, u.Email)
 	refresh, _ := utils.GenerateRefreshToken(u.ID, u.Email)
 
+	// ✅ Persist session to PostgreSQL
+	_ = h.saveSession(c, u.ID, refresh)
+
 	c.JSON(http.StatusOK, gin.H{
-		"user": u,
-		"tokens": gin.H{
-			"access":  access,
-			"refresh": refresh,
-		},
+		"user":   u,
+		"tokens": gin.H{"access": access, "refresh": refresh},
 	})
 }
 
+// Refresh validates the refresh token against PostgreSQL and issues a new access token
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var input struct {
 		Token string `json:"refresh_token" binding:"required"`
@@ -214,14 +231,17 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
-	ctx := context.Background()
-	if bl, _ := h.redis.Get(ctx, "bl:"+input.Token).Result(); bl == "1" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "token revoked"})
+	// ✅ Validate against PostgreSQL (not just Redis blacklist)
+	session, err := h.sessionRepo.GetByRefreshToken(input.Token)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "session not found or expired"})
 		return
 	}
 
 	claims, err := utils.ValidateToken(input.Token)
 	if err != nil {
+		// Revoke bad session
+		_ = h.sessionRepo.Revoke(input.Token)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 		return
 	}
@@ -232,26 +252,46 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
+	// Rotate refresh token for security
 	newAccess, _ := utils.GenerateToken(u.ID, u.Email)
-	c.JSON(http.StatusOK, gin.H{"access_token": newAccess})
+	newRefresh, _ := utils.GenerateRefreshToken(u.ID, u.Email)
+
+	// Revoke old session, create new one
+	_ = h.sessionRepo.Revoke(input.Token)
+	_ = h.saveSession(c, u.ID, newRefresh)
+
+	_ = session // suppress unused warning
+
+	c.JSON(http.StatusOK, gin.H{
+		"tokens": gin.H{"access": newAccess, "refresh": newRefresh},
+	})
 }
 
+// Logout revokes the session from PostgreSQL and blacklists the access token in Redis
 func (h *AuthHandler) Logout(c *gin.Context) {
+	// Get refresh token from body (best practice) or header
+	var body struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	_ = c.ShouldBindJSON(&body)
+
+	// Revoke session in PostgreSQL
+	if body.RefreshToken != "" {
+		_ = h.sessionRepo.Revoke(body.RefreshToken)
+	}
+
+	// Also blacklist the access token in Redis (short-lived, cheap)
 	token := c.GetHeader("Authorization")
 	if len(token) > 7 {
-		token = token[7:] // remove "Bearer "
-	}
-
-	claims, err := utils.ValidateToken(token)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"message": "logged out"}) // ignore err, just say ok
-		return
-	}
-
-	ctx := context.Background()
-	ttl := time.Until(claims.ExpiresAt.Time)
-	if ttl > 0 {
-		h.redis.Set(ctx, "bl:"+token, "1", ttl)
+		token = token[7:]
+		claims, err := utils.ValidateToken(token)
+		if err == nil {
+			ctx := context.Background()
+			ttl := time.Until(claims.ExpiresAt.Time)
+			if ttl > 0 {
+				h.redis.Set(ctx, "bl:"+token, "1", ttl)
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "logged out"})

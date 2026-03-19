@@ -60,10 +60,11 @@ func main() {
 
 	// 4. Setup Repositories & Services
 	userRepo := repository.NewUserRepo(db)
+	sessionRepo := repository.NewSessionRepo(db)
 	notifSvc := services.NewNotificationService(fcmClient, twilioClient, db, rdb)
 
 	// 5. Setup Handlers
-	authHandler := handlers.NewAuthHandler(userRepo, rdb, twilioClient)
+	authHandler := handlers.NewAuthHandler(userRepo, sessionRepo, rdb, twilioClient)
 	healthHandler := handlers.NewHealthHandler(db, rdb, cfg)
 	notifHandler := handlers.NewNotificationHandler(notifSvc)
 
