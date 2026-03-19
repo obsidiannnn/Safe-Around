@@ -14,6 +14,10 @@ export type RootStackParamList = {
   AlertHistory: undefined;
   AlertDetail: { alertId: string };
   ResponderList: undefined;
+  SafeRoute: undefined;
+  Navigation: { route: any };
+  LocationHistory: undefined;
+  CrimeDetails: { zoneId: string };
 };
 
 export type AuthStackParamList = {

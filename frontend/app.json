@@ -17,8 +17,11 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "SafeAround needs your location to show nearby safe zones and alert your emergency contacts.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "SafeAround needs background location access to provide continuous safety monitoring.",
+        "NSLocationAlwaysUsageDescription": "SafeAround needs background location access to provide continuous safety monitoring and geofencing alerts.",
+        "NSMotionUsageDescription": "SafeAround uses motion detection for shake-to-alert emergency feature.",
         "NSCameraUsageDescription": "SafeAround needs camera access to capture emergency photos.",
-        "NSMicrophoneUsageDescription": "SafeAround needs microphone access to record emergency audio."
+        "NSMicrophoneUsageDescription": "SafeAround needs microphone access to record emergency audio.",
+        "UIBackgroundModes": ["location", "fetch"]
       },
       "minimumOsVersion": "13.0"
     },
@@ -34,9 +37,13 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "ACTIVITY_RECOGNITION",
         "CAMERA",
         "RECORD_AUDIO",
-        "VIBRATE"
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
       ],
       "minSdkVersion": 24
     },

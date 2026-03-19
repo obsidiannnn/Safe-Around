@@ -70,7 +70,7 @@ export const useLocation = () => {
   useEffect(() => {
     if (!isTracking) return;
 
-    const subscription = locationService.watchLocation((location) => {
+    const subscription = locationService.watchPosition((location) => {
       setCurrentLocation(location);
       addToHistory(location);
       if (location.heading !== undefined) {

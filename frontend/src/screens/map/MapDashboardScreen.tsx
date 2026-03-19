@@ -14,13 +14,17 @@ import { MapSearchBar } from '@/components/map/MapSearchBar';
 import { MapTypeSwitch } from '@/components/map/MapTypeSwitch';
 import { NearbyUsersLayer } from '@/components/map/NearbyUsersLayer';
 import { Badge } from '@/components/common';
+import { DangerZoneAlert } from '@/components/location/DangerZoneAlert';
+import { BackgroundLocationIndicator } from '@/components/location/BackgroundLocationIndicator';
 import { useLocationStore } from '@/store/locationStore';
 import { useMapStore } from '@/store/mapStore';
 import { useLocation } from '@/hooks/useLocation';
+import { useGeofencing } from '@/hooks/useGeofencing';
 import { heatmapService } from '@/services/api/heatmapService';
 import { DangerZone, AreaStats } from '@/types/models';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
+import { useNavigation } from '@react-navigation/native';
 
 /**
  * Main map dashboard screen with crime heatmap
@@ -28,9 +32,11 @@ import { spacing, borderRadius, shadows } from '@/theme/spacing';
  */
 export const MapDashboardScreen = () => {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const mapRef = useRef<MapView>(null);
-  const { currentLocation, startTracking } = useLocation();
+  const { currentLocation, startTracking, isTracking } = useLocation();
   const { mapType, setMapType, currentStats, setCurrentStats } = useMapStore();
+  const { isInDangerZone, currentZone } = useGeofencing();
   
   const [region, setRegion] = useState<Region>({
     latitude: 37.78825,
@@ -41,10 +47,17 @@ export const MapDashboardScreen = () => {
   const [dangerZones, setDangerZones] = useState<DangerZone[]>([]);
   const [showStatsCard, setShowStatsCard] = useState(false);
   const [notificationCount, setNotificationCount] = useState(3);
+  const [showDangerAlert, setShowDangerAlert] = useState(false);
 
   useEffect(() => {
     startTracking();
   }, []);
+
+  useEffect(() => {
+    if (isInDangerZone && currentZone) {
+      setShowDangerAlert(true);
+    }
+  }, [isInDangerZone, currentZone]);
 
   useEffect(() => {
     if (currentLocation) {
@@ -134,6 +147,12 @@ export const MapDashboardScreen = () => {
           <Icon name="menu" size={24} color={colors.textPrimary} />
         </Pressable>
 
+        <BackgroundLocationIndicator
+          isActive={isTracking}
+          batteryImpact="low"
+          onPress={() => navigation.navigate('LocationHistory' as never)}
+        />
+
         <Pressable style={styles.notificationButton}>
           <Icon name="notifications" size={24} color={colors.textPrimary} />
           {notificationCount > 0 && (
@@ -177,9 +196,26 @@ export const MapDashboardScreen = () => {
         onClose={() => setShowStatsCard(false)}
         stats={currentStats}
         onViewCrimeHistory={() => console.log('View crime history')}
-        onPlanSafeRoute={() => console.log('Plan safe route')}
+        onPlanSafeRoute={() => navigation.navigate('SafeRoute' as never)}
         onReportIncident={() => console.log('Report incident')}
       />
+
+      {/* Danger zone alert */}
+      {currentZone && (
+        <DangerZoneAlert
+          visible={showDangerAlert}
+          zone={currentZone}
+          onDismiss={() => setShowDangerAlert(false)}
+          onEnableSafeRoute={() => {
+            setShowDangerAlert(false);
+            navigation.navigate('SafeRoute' as never);
+          }}
+          onAlertContacts={() => {
+            setShowDangerAlert(false);
+            // TODO: Alert emergency contacts
+          }}
+        />
+      )}
     </View>
   );
 };
