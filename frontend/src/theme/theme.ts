@@ -1,7 +1,7 @@
 import { MD3LightTheme as DefaultTheme } from 'react-native-paper';
 import { colors } from './colors';
 import { spacing, borderRadius, shadows } from './spacing';
-import { typography } from './typography';
+import { typography, fontSizes, fontWeights } from './typography';
 
 export const theme = {
   ...DefaultTheme,
@@ -23,7 +23,11 @@ export const theme = {
   spacing,
   borderRadius,
   shadows,
-  typography,
+  typography: {
+    ...typography,
+    sizes: fontSizes,
+    weights: fontWeights,
+  },
 };
 
 export type AppTheme = typeof theme;
