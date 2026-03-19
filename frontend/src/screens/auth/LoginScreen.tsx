@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Button, Input, Alert } from '@/components/common';
 import { useAuth } from '@/hooks/useAuth';
 import { colors } from '@/theme/colors';
-import { spacing } from '@/theme/spacing';
+import { spacing, borderRadius, shadows } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
 
 /**
@@ -39,7 +39,7 @@ export const LoginScreen = () => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Text style={styles.logo}>🛡️</Text>
           <Text style={styles.title}>Welcome Back</Text>
@@ -110,12 +110,11 @@ export const LoginScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
-  content: { padding: spacing['2xl'] },
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { flexGrow: 1, padding: spacing['2xl'], justifyContent: 'center' },
   header: {
     alignItems: 'center',
-    marginTop: spacing['4xl'],
-    marginBottom: spacing['3xl'],
+    marginBottom: spacing['2xl'],
   },
   logo: { fontSize: 64, marginBottom: spacing.md },
   title: {
@@ -124,8 +123,14 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
-  subtitle: { fontSize: fontSizes.md, color: colors.textSecondary },
-  form: { marginBottom: spacing['2xl'] },
+  subtitle: { fontSize: fontSizes.md, color: colors.textSecondary, textAlign: 'center' },
+  form: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    marginBottom: spacing['2xl'],
+    ...shadows.medium,
+  },
   forgotPassword: {
     fontSize: fontSizes.sm,
     color: colors.primary,

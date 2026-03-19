@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Button, Input, Alert } from '@/components/common';
 import { useAuth } from '@/hooks/useAuth';
 import { colors } from '@/theme/colors';
-import { spacing } from '@/theme/spacing';
+import { spacing, borderRadius, shadows } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
 
 type ResetStep = 'phone' | 'otp' | 'password';
@@ -78,7 +78,7 @@ export const PasswordResetScreen = () => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Text style={styles.title}>Reset Password</Text>
           <Text style={styles.subtitle}>
@@ -177,9 +177,9 @@ export const PasswordResetScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
-  content: { padding: spacing['2xl'] },
-  header: { marginTop: spacing['4xl'], marginBottom: spacing['3xl'] },
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { flexGrow: 1, padding: spacing['2xl'], justifyContent: 'center' },
+  header: { marginBottom: spacing['2xl'] },
   title: {
     fontSize: fontSizes['3xl'],
     fontWeight: '700',
@@ -187,7 +187,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   subtitle: { fontSize: fontSizes.md, color: colors.textSecondary, lineHeight: 22 },
-  form: { marginBottom: spacing['2xl'] },
+  form: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    marginBottom: spacing['2xl'],
+    ...shadows.medium,
+  },
   mismatch: {
     fontSize: fontSizes.xs,
     color: colors.error,
