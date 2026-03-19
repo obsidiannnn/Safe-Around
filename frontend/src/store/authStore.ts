@@ -1,8 +1,7 @@
 import { create } from 'zustand';
 import { MMKV } from 'react-native-mmkv';
-import { User } from '@/types/models';
+import { BackendUser, LoginRequest, SetupProfileRequest } from '@/types/api';
 import { authService } from '@/services/api/authService';
-import { LoginFormData, RegisterFormData } from '@/utils/validation';
 
 const storage = new MMKV({
   id: 'auth-storage',
@@ -10,20 +9,32 @@ const storage = new MMKV({
 });
 
 interface AuthState {
-  user: User | null;
+  user: BackendUser | null;
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  setUser: (user: User | null) => void;
+
+  setUser: (user: BackendUser | null) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
-  signUp: (data: RegisterFormData) => Promise<void>;
-  logIn: (data: LoginFormData) => Promise<void>;
+
+  // OTP Flow Step 1: send OTP to phone
+  sendOTP: (phone: string) => Promise<void>;
+
+  // OTP Flow Step 2: verify OTP → creates/logs in user, returns JWT
+  verifyOTP: (phone: string, otp: string) => Promise<void>;
+
+  // OTP Flow Step 3 (optional): set name/email/password
+  setupProfile: (data: SetupProfileRequest) => Promise<void>;
+
+  // Direct password login (returning users who set a password)
+  logIn: (data: LoginRequest) => Promise<void>;
+
   logOut: () => Promise<void>;
   refreshAccessToken: () => Promise<void>;
-  updateProfile: (data: Partial<User>) => Promise<void>;
   loadPersistedAuth: () => void;
+  clearError: () => void;
   setError: (error: string | null) => void;
 }
 
@@ -50,23 +61,46 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     storage.set('refreshToken', refreshToken);
   },
 
-  signUp: async (data) => {
+  sendOTP: async (phone) => {
     try {
       set({ isLoading: true, error: null });
-      const response = await authService.register({
-        email: data.email,
-        password: data.password,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phoneNumber: data.phoneNumber,
-      });
-      
-      get().setTokens(response.token, response.refreshToken);
+      await authService.sendOTP(phone);
+    } catch (error: any) {
+      const msg = error.response?.data?.error || 'Failed to send OTP';
+      set({ error: msg });
+      throw new Error(msg);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  verifyOTP: async (phone, otp) => {
+    try {
+      set({ isLoading: true, error: null });
+      const response = await authService.verifyOTP(phone, otp);
+      // Backend: { tokens: { access, refresh }, user: BackendUser }
+      get().setTokens(response.tokens.access, response.tokens.refresh);
       get().setUser(response.user);
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Sign up failed';
-      set({ error: errorMessage });
-      throw new Error(errorMessage);
+      const msg = error.response?.data?.error || 'OTP verification failed';
+      set({ error: msg });
+      throw new Error(msg);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  setupProfile: async (data) => {
+    try {
+      set({ isLoading: true, error: null });
+      const token = get().accessToken;
+      if (!token) throw new Error('Not authenticated');
+      const result = await authService.setupProfile(data, token);
+      get().setUser(result.user);
+    } catch (error: any) {
+      const msg = error.response?.data?.error || 'Profile setup failed';
+      set({ error: msg });
+      throw new Error(msg);
     } finally {
       set({ isLoading: false });
     }
@@ -76,13 +110,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       const response = await authService.login(data);
-      
-      get().setTokens(response.token, response.refreshToken);
+      // Backend: { tokens: { access, refresh }, user: BackendUser }
+      get().setTokens(response.tokens.access, response.tokens.refresh);
       get().setUser(response.user);
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Login failed';
-      set({ error: errorMessage });
-      throw new Error(errorMessage);
+      const msg = error.response?.data?.error || 'Login failed';
+      set({ error: msg });
+      throw new Error(msg);
     } finally {
       set({ isLoading: false });
     }
@@ -105,29 +139,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const currentRefreshToken = get().refreshToken;
       if (!currentRefreshToken) throw new Error('No refresh token');
-
-      const response = await authService.refreshToken(currentRefreshToken);
-      get().setTokens(response.token, response.refreshToken);
+      const tokens = await authService.refreshToken(currentRefreshToken);
+      get().setTokens(tokens.access, tokens.refresh);
     } catch (error) {
       console.error('Token refresh failed:', error);
       get().logOut();
-    }
-  },
-
-  updateProfile: async (data) => {
-    try {
-      set({ isLoading: true, error: null });
-      const currentUser = get().user;
-      if (!currentUser) throw new Error('No user logged in');
-
-      const updatedUser = { ...currentUser, ...data };
-      get().setUser(updatedUser);
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Profile update failed';
-      set({ error: errorMessage });
-      throw new Error(errorMessage);
-    } finally {
-      set({ isLoading: false });
     }
   },
 
@@ -139,12 +155,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (userStr && accessToken && refreshToken) {
         const user = JSON.parse(userStr);
-        set({
-          user,
-          accessToken,
-          refreshToken,
-          isAuthenticated: true,
-        });
+        set({ user, accessToken, refreshToken, isAuthenticated: true });
       }
     } catch (error) {
       console.error('Failed to load persisted auth:', error);
@@ -153,5 +164,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
+  clearError: () => set({ error: null }),
   setError: (error) => set({ error }),
 }));

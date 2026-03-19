@@ -3,9 +3,9 @@ import { z } from 'zod';
 // Base schemas
 export const emailSchema = z.string().email('Invalid email address');
 
-export const phoneNumberSchema = z
+export const phoneSchema = z
   .string()
-  .regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number')
+  .regex(/^\+?[1-9]\d{9,14}$/, 'Enter a valid phone number with country code (e.g. +919119759509)')
   .min(10, 'Phone number must be at least 10 digits');
 
 export const passwordSchema = z
@@ -20,35 +20,42 @@ export const fullNameSchema = z
   .max(50, 'Name must be less than 50 characters')
   .regex(/^[a-zA-Z\s]+$/, 'Name can only contain letters and spaces');
 
-// Form schemas
-export const loginSchema = z.object({
-  email: emailSchema,
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+// ── Auth Form Schemas (aligned to backend) ──────────────────────────────────
+
+// Step 1 of OTP flow: just phone
+export const sendOTPSchema = z.object({
+  phone: phoneSchema,
 });
 
-export const registerSchema = z.object({
+// Step 2 of OTP flow: phone + otp
+export const verifyOTPSchema = z.object({
+  phone: phoneSchema,
+  otp: z.string().length(6, 'OTP must be exactly 6 digits').regex(/^\d+$/, 'OTP must be numeric'),
+});
+
+// Profile setup after OTP verify (POST /auth/password/setup)
+export const setupProfileSchema = z.object({
+  name: fullNameSchema,
   email: emailSchema,
   password: passwordSchema,
   confirmPassword: z.string(),
-  firstName: fullNameSchema,
-  lastName: fullNameSchema,
-  phoneNumber: phoneNumberSchema,
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ['confirmPassword'],
 });
 
-export const emergencyContactSchema = z.object({
-  name: fullNameSchema,
-  phoneNumber: phoneNumberSchema,
-  relationship: z.string().min(2, 'Relationship is required'),
+// Direct login: phone + password (POST /auth/login)
+export const loginSchema = z.object({
+  phone: phoneSchema,
+  password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
-export const profileUpdateSchema = z.object({
-  firstName: fullNameSchema.optional(),
-  lastName: fullNameSchema.optional(),
-  phoneNumber: phoneNumberSchema.optional(),
-  email: emailSchema.optional(),
+// ── Other Schemas ────────────────────────────────────────────────────────────
+
+export const emergencyContactSchema = z.object({
+  name: fullNameSchema,
+  phone: phoneSchema,
+  relationship: z.string().min(2, 'Relationship is required'),
 });
 
 export const changePasswordSchema = z.object({
@@ -60,9 +67,15 @@ export const changePasswordSchema = z.object({
   path: ['confirmPassword'],
 });
 
-// Type exports
+// ── Type Exports ─────────────────────────────────────────────────────────────
+export type SendOTPFormData = z.infer<typeof sendOTPSchema>;
+export type VerifyOTPFormData = z.infer<typeof verifyOTPSchema>;
+export type SetupProfileFormData = z.infer<typeof setupProfileSchema>;
 export type LoginFormData = z.infer<typeof loginSchema>;
-export type RegisterFormData = z.infer<typeof registerSchema>;
 export type EmergencyContactFormData = z.infer<typeof emergencyContactSchema>;
-export type ProfileUpdateFormData = z.infer<typeof profileUpdateSchema>;
 export type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
+
+// Legacy aliases for backward compat with any still-existing imports
+export const registerSchema = setupProfileSchema;
+export type RegisterFormData = SetupProfileFormData;
+export const phoneNumberSchema = phoneSchema;

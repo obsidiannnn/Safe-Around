@@ -1,69 +1,95 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Text, Checkbox } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { Button, Input, Alert } from '@/components/common';
-import { PhoneInput } from '@/components/forms';
 import { useAuth } from '@/hooks/useAuth';
-import { registerSchema, RegisterFormData } from '@/utils/validation';
 import { colors } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
 
+type SignupStep = 'phone' | 'otp' | 'profile';
+
 /**
- * Sign up screen with form validation and password strength indicator
+ * Signup screen - 3 step OTP flow matching backend:
+ * Step 1: Enter phone → POST /auth/otp/send
+ * Step 2: Enter OTP  → POST /auth/otp/verify (creates user + JWT)
+ * Step 3: Setup name/email/password → POST /auth/password/setup
  */
 export const SignupScreen = () => {
   const navigation = useNavigation();
-  const { signUp, error, clearError } = useAuth();
+  const { sendOTP, verifyOTP, setupProfile, error, clearError } = useAuth();
+
+  const [step, setStep] = useState<SignupStep>('phone');
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const {
-    control,
-    handleSubmit,
-    watch,
-    formState: { errors },
-  } = useForm<RegisterFormData>({
-    resolver: zodResolver(registerSchema),
-    mode: 'onBlur',
-  });
+  // Step 1: Send OTP
+  const handleSendOTP = async () => {
+    if (!phone) return;
+    try {
+      setIsSubmitting(true);
+      clearError();
+      await sendOTP(phone);
+      setStep('otp');
+    } catch (err) {
+      // error handled by store
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-  const password = watch('password');
+  // Step 2: Verify OTP
+  const handleVerifyOTP = async () => {
+    if (otp.length !== 6) return;
+    try {
+      setIsSubmitting(true);
+      clearError();
+      await verifyOTP(phone, otp);
+      setStep('profile');
+    } catch (err) {
+      // error handled by store
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-  const getPasswordStrength = (pwd: string): { strength: string; color: string } => {
+  // Step 3: Setup profile
+  const handleSetupProfile = async () => {
+    if (!acceptedTerms || password !== confirmPassword) return;
+    try {
+      setIsSubmitting(true);
+      clearError();
+      await setupProfile({ name, email, password });
+      navigation.navigate('Permissions' as never);
+    } catch (err) {
+      // error handled by store
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getPasswordStrength = (pwd: string) => {
     if (!pwd) return { strength: '', color: colors.textSecondary };
     if (pwd.length < 8) return { strength: 'Weak', color: colors.error };
-    
-    const hasUpper = /[A-Z]/.test(pwd);
-    const hasNumber = /[0-9]/.test(pwd);
-    const hasSpecial = /[!@#$%^&*]/.test(pwd);
-    
-    const score = [hasUpper, hasNumber, hasSpecial].filter(Boolean).length;
-    
+    const score = [/[A-Z]/, /[0-9]/, /[!@#$%^&*]/].filter((r) => r.test(pwd)).length;
     if (score === 3 && pwd.length >= 12) return { strength: 'Strong', color: colors.success };
     if (score >= 2) return { strength: 'Medium', color: colors.warning };
     return { strength: 'Weak', color: colors.error };
   };
 
-  const passwordStrength = getPasswordStrength(password);
+  const pwdStrength = getPasswordStrength(password);
 
-  const onSubmit = async (data: RegisterFormData) => {
-    if (!acceptedTerms) {
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      await signUp(data);
-      navigation.navigate('Permissions' as never);
-    } catch (err) {
-      // Error is handled by store
-    } finally {
-      setIsSubmitting(false);
-    }
+  const stepTitles = {
+    phone: { title: 'Create Account', subtitle: 'Enter your phone number to get started' },
+    otp: { title: 'Verify Phone', subtitle: `Enter the 6-digit code sent to ${phone}` },
+    profile: { title: 'Set Up Profile', subtitle: 'Complete your account setup' },
   };
 
   return (
@@ -73,147 +99,146 @@ export const SignupScreen = () => {
     >
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join SafeAround to protect yourself and your loved ones</Text>
+          <Text style={styles.title}>{stepTitles[step].title}</Text>
+          <Text style={styles.subtitle}>{stepTitles[step].subtitle}</Text>
         </View>
 
-        {error && (
-          <Alert type="error" message={error} onDismiss={clearError} />
-        )}
+        {error && <Alert type="error" message={error} onDismiss={clearError} />}
 
         <View style={styles.form}>
-          <Controller
-            control={control}
-            name="phoneNumber"
-            render={({ field: { onChange, value } }) => (
-              <PhoneInput
+
+          {/* ── Step 1: Phone ── */}
+          {step === 'phone' && (
+            <>
+              <Input
                 label="Phone Number"
-                value={value}
-                onChangeText={onChange}
-                error={errors.phoneNumber?.message}
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="+919119759509"
+                leftIcon="phone"
+                keyboardType="phone-pad"
+                autoFocus
               />
-            )}
-          />
+              <Button
+                variant="primary"
+                size="large"
+                fullWidth
+                onPress={handleSendOTP}
+                loading={isSubmitting}
+              >
+                Send OTP
+              </Button>
+              <View style={styles.signInContainer}>
+                <Text style={styles.signInText}>Already have an account? </Text>
+                <Text
+                  style={styles.signInLink}
+                  onPress={() => navigation.navigate('Login' as never)}
+                >
+                  Sign In
+                </Text>
+              </View>
+            </>
+          )}
 
-          <Controller
-            control={control}
-            name="firstName"
-            render={({ field: { onChange, onBlur, value } }) => (
+          {/* ── Step 2: OTP ── */}
+          {step === 'otp' && (
+            <>
               <Input
-                label="First Name"
-                value={value}
-                onChangeText={onChange}
-                placeholder="John"
-                error={errors.firstName?.message}
-                leftIcon="person"
+                label="Verification Code"
+                value={otp}
+                onChangeText={setOtp}
+                placeholder="6-digit OTP"
+                leftIcon="lock"
+                keyboardType="number-pad"
+                maxLength={6}
+                autoFocus
               />
-            )}
-          />
+              <Button
+                variant="primary"
+                size="large"
+                fullWidth
+                onPress={handleVerifyOTP}
+                loading={isSubmitting}
+              >
+                Verify OTP
+              </Button>
+              <Button
+                variant="ghost"
+                size="medium"
+                fullWidth
+                onPress={handleSendOTP}
+              >
+                Resend Code
+              </Button>
+            </>
+          )}
 
-          <Controller
-            control={control}
-            name="lastName"
-            render={({ field: { onChange, onBlur, value } }) => (
+          {/* ── Step 3: Profile Setup ── */}
+          {step === 'profile' && (
+            <>
               <Input
-                label="Last Name"
-                value={value}
-                onChangeText={onChange}
-                placeholder="Doe"
-                error={errors.lastName?.message}
+                label="Full Name"
+                value={name}
+                onChangeText={setName}
+                placeholder="Aditya Kumar"
                 leftIcon="person"
+                autoFocus
               />
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="email"
-            render={({ field: { onChange, onBlur, value } }) => (
               <Input
                 type="email"
                 label="Email (Optional)"
-                value={value}
-                onChangeText={onChange}
-                placeholder="john.doe@example.com"
-                error={errors.email?.message}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="aditya@example.com"
                 leftIcon="email"
               />
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="password"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <View>
-                <Input
-                  type="password"
-                  label="Password"
-                  value={value}
-                  onChangeText={onChange}
-                  placeholder="Enter password"
-                  error={errors.password?.message}
-                  leftIcon="lock"
-                />
-                {password && (
-                  <Text style={[styles.passwordStrength, { color: passwordStrength.color }]}>
-                    Strength: {passwordStrength.strength}
-                  </Text>
-                )}
-              </View>
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="confirmPassword"
-            render={({ field: { onChange, onBlur, value } }) => (
+              <Input
+                type="password"
+                label="Password"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Create a password"
+                leftIcon="lock"
+              />
+              {password.length > 0 && (
+                <Text style={[styles.passwordStrength, { color: pwdStrength.color }]}>
+                  Strength: {pwdStrength.strength}
+                </Text>
+              )}
               <Input
                 type="password"
                 label="Confirm Password"
-                value={value}
-                onChangeText={onChange}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
                 placeholder="Re-enter password"
-                error={errors.confirmPassword?.message}
                 leftIcon="lock"
               />
-            )}
-          />
+              <View style={styles.termsContainer}>
+                <Checkbox
+                  status={acceptedTerms ? 'checked' : 'unchecked'}
+                  onPress={() => setAcceptedTerms(!acceptedTerms)}
+                  color={colors.primary}
+                />
+                <Text style={styles.termsText}>
+                  I agree to the{' '}
+                  <Text style={styles.termsLink}>Terms of Service</Text>
+                  {' '}and{' '}
+                  <Text style={styles.termsLink}>Privacy Policy</Text>
+                </Text>
+              </View>
+              <Button
+                variant="primary"
+                size="large"
+                fullWidth
+                onPress={handleSetupProfile}
+                loading={isSubmitting}
+                disabled={!acceptedTerms || password !== confirmPassword}
+              >
+                Complete Sign Up
+              </Button>
+            </>
+          )}
 
-          <View style={styles.termsContainer}>
-            <Checkbox
-              status={acceptedTerms ? 'checked' : 'unchecked'}
-              onPress={() => setAcceptedTerms(!acceptedTerms)}
-              color={colors.primary}
-            />
-            <Text style={styles.termsText}>
-              I agree to the{' '}
-              <Text style={styles.termsLink}>Terms of Service</Text>
-              {' '}and{' '}
-              <Text style={styles.termsLink}>Privacy Policy</Text>
-            </Text>
-          </View>
-
-          <Button
-            variant="primary"
-            size="large"
-            fullWidth
-            onPress={handleSubmit(onSubmit)}
-            loading={isSubmitting}
-            disabled={!acceptedTerms}
-          >
-            Sign Up
-          </Button>
-
-          <View style={styles.signInContainer}>
-            <Text style={styles.signInText}>Already have an account? </Text>
-            <Text
-              style={styles.signInLink}
-              onPress={() => navigation.navigate('Login' as never)}
-            >
-              Sign In
-            </Text>
-          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -221,31 +246,17 @@ export const SignupScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface,
-  },
-  content: {
-    padding: spacing['2xl'],
-  },
-  header: {
-    marginTop: spacing['2xl'],
-    marginBottom: spacing['3xl'],
-  },
+  container: { flex: 1, backgroundColor: colors.surface },
+  content: { padding: spacing['2xl'] },
+  header: { marginTop: spacing['2xl'], marginBottom: spacing['3xl'] },
   title: {
     fontSize: fontSizes['3xl'],
     fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
-  subtitle: {
-    fontSize: fontSizes.md,
-    color: colors.textSecondary,
-    lineHeight: 22,
-  },
-  form: {
-    marginBottom: spacing['2xl'],
-  },
+  subtitle: { fontSize: fontSizes.md, color: colors.textSecondary, lineHeight: 22 },
+  form: { marginBottom: spacing['2xl'] },
   passwordStrength: {
     fontSize: fontSizes.xs,
     marginTop: -spacing.md,
@@ -263,19 +274,13 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginLeft: spacing.sm,
   },
-  termsLink: {
-    color: colors.primary,
-    fontWeight: '600',
-  },
+  termsLink: { color: colors.primary, fontWeight: '600' },
   signInContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: spacing.lg,
   },
-  signInText: {
-    fontSize: fontSizes.sm,
-    color: colors.textSecondary,
-  },
+  signInText: { fontSize: fontSizes.sm, color: colors.textSecondary },
   signInLink: {
     fontSize: fontSizes.sm,
     color: colors.primary,
