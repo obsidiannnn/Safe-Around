@@ -1,7 +1,7 @@
 import { useAuthStore } from '@/store/authStore';
 import { useWebSocketStore } from '@/store/websocketStore';
 import { locationService } from '@/services/location/locationService';
-import { notificationService } from '@/services/notifications/NotificationService';
+import { notificationService } from '@/services/notifications/notificationService';
 import { notificationApiService } from '@/services/api/notificationService';
 import { Platform } from 'react-native';
 

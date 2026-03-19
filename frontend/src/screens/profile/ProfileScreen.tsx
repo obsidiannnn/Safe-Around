@@ -41,13 +41,12 @@ export const ProfileScreen: React.FC = () => {
       <View style={styles.header}>
         <Avatar
           size="large"
-          imageUrl={user?.profilePicture}
-          name={`${user?.firstName} ${user?.lastName}`}
+          name={user?.name ?? 'User'}
         />
         <View style={styles.headerInfo}>
           <View style={styles.nameRow}>
             <Text style={styles.name}>
-              {user?.firstName} {user?.lastName}
+              {user?.name ?? 'User'}
             </Text>
             <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
           </View>

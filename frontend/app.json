@@ -21,7 +21,10 @@
         "NSMotionUsageDescription": "SafeAround uses motion detection for shake-to-alert emergency feature.",
         "NSCameraUsageDescription": "SafeAround needs camera access to capture emergency photos.",
         "NSMicrophoneUsageDescription": "SafeAround needs microphone access to record emergency audio.",
-        "UIBackgroundModes": ["location", "fetch"]
+        "UIBackgroundModes": [
+          "location",
+          "fetch"
+        ]
       },
       "minimumOsVersion": "13.0"
     },
@@ -60,7 +63,8 @@
         {
           "googleMapsApiKey": "GOOGLE_MAPS_API_KEY"
         }
-      ]
+      ],
+      "expo-maps"
     ],
     "extra": {
       "eas": {
