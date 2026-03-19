@@ -8,6 +8,12 @@ export type RootStackParamList = {
   Permissions: undefined;
   EmergencyContacts: undefined;
   OnboardingTutorial: undefined;
+  EmergencyActive: undefined;
+  EmergencyResolution: undefined;
+  ResponderNavigation: { alertId: string };
+  AlertHistory: undefined;
+  AlertDetail: { alertId: string };
+  ResponderList: undefined;
 };
 
 export type AuthStackParamList = {
