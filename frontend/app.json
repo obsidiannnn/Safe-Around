@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "SafeAround",
+    "slug": "safearound-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#D32F2F"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.safearound.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "SafeAround needs your location to show nearby safe zones and alert your emergency contacts.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "SafeAround needs background location access to provide continuous safety monitoring.",
+        "NSCameraUsageDescription": "SafeAround needs camera access to capture emergency photos.",
+        "NSMicrophoneUsageDescription": "SafeAround needs microphone access to record emergency audio."
+      },
+      "minimumOsVersion": "13.0"
+    },
+    "android": {
+      "package": "com.safearound.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#D32F2F",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "CAMERA",
+        "RECORD_AUDIO",
+        "VIBRATE"
+      ],
+      "minSdkVersion": 24
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-location",
+      "expo-notifications",
+      "expo-camera",
+      "expo-av",
+      [
+        "react-native-maps",
+        {
+          "googleMapsApiKey": "GOOGLE_MAPS_API_KEY"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "safearound-mobile"
+      }
+    }
+  }
+}
