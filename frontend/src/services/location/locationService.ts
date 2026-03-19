@@ -21,6 +21,7 @@ export const locationService = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
         accuracy: location.coords.accuracy || undefined,
+        heading: location.coords.heading || undefined,
         timestamp: location.timestamp,
       };
     } catch (error) {
@@ -43,6 +44,7 @@ export const locationService = {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
           accuracy: location.coords.accuracy || undefined,
+          heading: location.coords.heading || undefined,
           timestamp: location.timestamp,
         });
       }
@@ -53,5 +55,27 @@ export const locationService = {
     return {
       remove: () => subscription?.remove(),
     };
+  },
+
+  getAddressFromCoordinates: async (
+    latitude: number,
+    longitude: number
+  ): Promise<string> => {
+    try {
+      const addresses = await ExpoLocation.reverseGeocodeAsync({
+        latitude,
+        longitude,
+      });
+      
+      if (addresses.length > 0) {
+        const addr = addresses[0];
+        return `${addr.street || ''} ${addr.city || ''}, ${addr.region || ''}`.trim();
+      }
+      
+      return 'Unknown location';
+    } catch (error) {
+      console.error('Error getting address:', error);
+      return 'Unknown location';
+    }
   },
 };

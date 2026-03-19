@@ -24,6 +24,7 @@ export interface Location {
   longitude: number;
   accuracy?: number;
   timestamp?: number;
+  heading?: number;
 }
 
 export interface Alert {
@@ -46,4 +47,41 @@ export interface Notification {
   data?: Record<string, any>;
   isRead: boolean;
   createdAt: string;
+}
+
+export interface DangerZone {
+  id: string;
+  location: Location;
+  safetyScore: number;
+  crimeCount: number;
+  mostCommonCrimeType: string;
+  radius: number;
+  recentIncidents: Crime[];
+}
+
+export interface Crime {
+  id: string;
+  type: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  location: Location;
+  description: string;
+  date: string;
+  source: 'police' | 'user';
+  verified: boolean;
+}
+
+export interface HeatmapTile {
+  z: number;
+  x: number;
+  y: number;
+  url: string;
+  data?: number[][];
+}
+
+export interface AreaStats {
+  safetyScore: number;
+  nearbyUsers: number;
+  recentAlerts: number;
+  crimeRate: number;
+  lastUpdated: string;
 }

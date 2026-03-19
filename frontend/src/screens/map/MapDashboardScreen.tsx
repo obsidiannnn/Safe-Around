@@ -1,0 +1,240 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { View, StyleSheet, Pressable } from 'react-native';
+import MapView, { Region, PROVIDER_GOOGLE } from 'react-native-maps';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { HeatmapLayer } from '@/components/map/HeatmapLayer';
+import { HeatmapLegend } from '@/components/map/HeatmapLegend';
+import { UserLocationMarker } from '@/components/map/UserLocationMarker';
+import { DangerZoneMarker } from '@/components/map/DangerZoneMarker';
+import { CurrentLocationButton } from '@/components/map/CurrentLocationButton';
+import { EmergencySOSButton } from '@/components/map/EmergencySOSButton';
+import { QuickStatsCard } from '@/components/map/QuickStatsCard';
+import { MapSearchBar } from '@/components/map/MapSearchBar';
+import { MapTypeSwitch } from '@/components/map/MapTypeSwitch';
+import { NearbyUsersLayer } from '@/components/map/NearbyUsersLayer';
+import { Badge } from '@/components/common';
+import { useLocationStore } from '@/store/locationStore';
+import { useMapStore } from '@/store/mapStore';
+import { useLocation } from '@/hooks/useLocation';
+import { heatmapService } from '@/services/api/heatmapService';
+import { DangerZone, AreaStats } from '@/types/models';
+import { colors } from '@/theme/colors';
+import { spacing, borderRadius, shadows } from '@/theme/spacing';
+
+/**
+ * Main map dashboard screen with crime heatmap
+ * Shows user location, danger zones, and area statistics
+ */
+export const MapDashboardScreen = () => {
+  const insets = useSafeAreaInsets();
+  const mapRef = useRef<MapView>(null);
+  const { currentLocation, startTracking } = useLocation();
+  const { mapType, setMapType, currentStats, setCurrentStats } = useMapStore();
+  
+  const [region, setRegion] = useState<Region>({
+    latitude: 37.78825,
+    longitude: -122.4324,
+    latitudeDelta: 0.0922,
+    longitudeDelta: 0.0421,
+  });
+  const [dangerZones, setDangerZones] = useState<DangerZone[]>([]);
+  const [showStatsCard, setShowStatsCard] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(3);
+
+  useEffect(() => {
+    startTracking();
+  }, []);
+
+  useEffect(() => {
+    if (currentLocation) {
+      const newRegion = {
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      };
+      setRegion(newRegion);
+      mapRef.current?.animateToRegion(newRegion, 1000);
+      fetchAreaStats(currentLocation.latitude, currentLocation.longitude);
+    }
+  }, [currentLocation]);
+
+  const fetchAreaStats = async (lat: number, lng: number) => {
+    try {
+      const stats = await heatmapService.getStatistics(lat, lng);
+      setCurrentStats(stats);
+    } catch (error) {
+      console.error('Error fetching area stats:', error);
+    }
+  };
+
+  const handleRegionChange = (newRegion: Region) => {
+    setRegion(newRegion);
+    fetchAreaStats(newRegion.latitude, newRegion.longitude);
+  };
+
+  const handleCenterLocation = () => {
+    if (currentLocation) {
+      const newRegion = {
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      };
+      mapRef.current?.animateToRegion(newRegion, 1000);
+    }
+  };
+
+  const handleEmergencyTrigger = () => {
+    // TODO: Trigger emergency alert
+    console.log('Emergency SOS triggered!');
+  };
+
+  const handleDangerZonePress = (zone: DangerZone) => {
+    // TODO: Show danger zone details in bottom sheet
+    console.log('Danger zone pressed:', zone);
+  };
+
+  return (
+    <View style={styles.container}>
+      <MapView
+        ref={mapRef}
+        style={styles.map}
+        provider={PROVIDER_GOOGLE}
+        mapType={mapType}
+        initialRegion={region}
+        onRegionChangeComplete={handleRegionChange}
+        showsUserLocation={false}
+        showsMyLocationButton={false}
+        showsCompass
+        showsScale
+      >
+        <HeatmapLayer region={region} />
+        
+        {currentLocation && (
+          <>
+            <UserLocationMarker location={currentLocation} />
+            <NearbyUsersLayer userLocation={currentLocation} />
+          </>
+        )}
+
+        {dangerZones.map((zone) => (
+          <DangerZoneMarker
+            key={zone.id}
+            zone={zone}
+            onPress={handleDangerZonePress}
+          />
+        ))}
+      </MapView>
+
+      {/* Top bar */}
+      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
+        <Pressable style={styles.menuButton}>
+          <Icon name="menu" size={24} color={colors.textPrimary} />
+        </Pressable>
+
+        <Pressable style={styles.notificationButton}>
+          <Icon name="notifications" size={24} color={colors.textPrimary} />
+          {notificationCount > 0 && (
+            <View style={styles.notificationBadge}>
+              <Badge variant="notification" count={notificationCount} color="red" />
+            </View>
+          )}
+        </Pressable>
+      </View>
+
+      {/* Search bar */}
+      <MapSearchBar
+        onSelectLocation={(location) => {
+          mapRef.current?.animateToRegion(
+            {
+              ...location.location,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            },
+            1000
+          );
+        }}
+      />
+
+      {/* Map controls */}
+      <HeatmapLegend />
+      <MapTypeSwitch currentType={mapType} onTypeChange={setMapType} />
+      <CurrentLocationButton onPress={handleCenterLocation} />
+      <EmergencySOSButton onEmergencyTrigger={handleEmergencyTrigger} />
+
+      {/* Quick stats */}
+      <Pressable
+        style={styles.statsToggle}
+        onPress={() => setShowStatsCard(!showStatsCard)}
+      >
+        <Icon name="info" size={20} color={colors.surface} />
+      </Pressable>
+
+      <QuickStatsCard
+        visible={showStatsCard}
+        onClose={() => setShowStatsCard(false)}
+        stats={currentStats}
+        onViewCrimeHistory={() => console.log('View crime history')}
+        onPlanSafeRoute={() => console.log('Plan safe route')}
+        onReportIncident={() => console.log('Report incident')}
+      />
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  topBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  menuButton: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.pill,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...shadows.medium,
+  },
+  notificationButton: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.pill,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...shadows.medium,
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+  },
+  statsToggle: {
+    position: 'absolute',
+    bottom: 120,
+    left: spacing.lg,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...shadows.medium,
+  },
+});
