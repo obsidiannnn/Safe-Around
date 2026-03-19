@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
-import { LoginFormData, RegisterFormData } from '@/utils/validation';
 
 /**
  * Custom hook for authentication operations
@@ -13,12 +12,14 @@ export const useAuth = () => {
     isAuthenticated,
     isLoading,
     error,
-    signUp,
+    sendOTP,
+    verifyOTP,
+    setupProfile,
     logIn,
     logOut,
     refreshAccessToken,
-    updateProfile,
     loadPersistedAuth,
+    clearError,
     setError,
   } = useAuthStore();
 
@@ -27,13 +28,13 @@ export const useAuth = () => {
     loadPersistedAuth();
   }, []);
 
-  // Auto-refresh token before expiry (every 50 minutes if token expires in 60 minutes)
+  // Auto-refresh token every 50 minutes (tokens expire in ~60-168 min)
   useEffect(() => {
     if (!isAuthenticated || !accessToken) return;
 
     const refreshInterval = setInterval(() => {
       refreshAccessToken();
-    }, 50 * 60 * 1000); // 50 minutes
+    }, 50 * 60 * 1000);
 
     return () => clearInterval(refreshInterval);
   }, [isAuthenticated, accessToken]);
@@ -44,10 +45,14 @@ export const useAuth = () => {
     isAuthenticated,
     isLoading,
     error,
-    signUp,
+    // OTP-based auth flow
+    sendOTP,
+    verifyOTP,
+    setupProfile,
+    // Direct login with phone + password
     logIn,
     logOut,
-    updateProfile,
-    clearError: () => setError(null),
+    clearError,
+    setError,
   };
 };
