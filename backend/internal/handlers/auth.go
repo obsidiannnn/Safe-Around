@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -41,6 +42,17 @@ type setupProfileInput struct {
 	Password string `json:"password" binding:"required,min=6"`
 }
 
+func normalizePhone(phone string) string {
+	phone = strings.TrimSpace(phone)
+	if len(phone) == 10 {
+		return "+91" + phone
+	}
+	if !strings.HasPrefix(phone, "+") {
+		return "+" + phone
+	}
+	return phone
+}
+
 // verifySID is the Twilio Verify Service SID
 const verifySID = "VAec453b0a41cbb20d1577c8c7ffe8ce64"
 
@@ -63,6 +75,8 @@ func (h *AuthHandler) SendOTP(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "phone number is required"})
 		return
 	}
+
+	input.Phone = normalizePhone(input.Phone)
 
 	ctx := context.Background()
 	rlKey := "rl:otp:send:" + input.Phone
@@ -93,6 +107,8 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "phone and otp are required"})
 		return
 	}
+
+	input.Phone = normalizePhone(input.Phone)
 
 	isValid, err := h.twilio.VerifyOTP(input.Phone, input.OTP, verifySID)
 	if err != nil || !isValid {
@@ -186,6 +202,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "phone and password required"})
 		return
 	}
+
+	input.Phone = normalizePhone(input.Phone)
 
 	ctx := context.Background()
 	rlKey := "rl:login:" + input.Phone

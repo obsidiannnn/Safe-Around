@@ -57,20 +57,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   sendOTP: async (phone) => {
     try {
-      set({ isLoading: true, error: null });
+      set({ error: null });
       await authService.sendOTP(phone);
     } catch (error: any) {
       const msg = error.response?.data?.error || 'Failed to send OTP';
       set({ error: msg });
       throw new Error(msg);
-    } finally {
-      set({ isLoading: false });
     }
   },
 
   verifyOTP: async (phone, otp) => {
     try {
-      set({ isLoading: true, error: null });
+      set({ error: null });
       const response = await authService.verifyOTP(phone, otp);
       get().setTokens(response.tokens.access, response.tokens.refresh);
       get().setUser(response.user);
@@ -78,14 +76,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const msg = error.response?.data?.error || 'OTP verification failed';
       set({ error: msg });
       throw new Error(msg);
-    } finally {
-      set({ isLoading: false });
     }
   },
 
   setupProfile: async (data) => {
     try {
-      set({ isLoading: true, error: null });
+      set({ error: null });
       const token = get().accessToken;
       if (!token) throw new Error('Not authenticated');
       const result = await authService.setupProfile(data, token);
@@ -94,14 +90,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const msg = error.response?.data?.error || 'Profile setup failed';
       set({ error: msg });
       throw new Error(msg);
-    } finally {
-      set({ isLoading: false });
     }
   },
 
   logIn: async (data) => {
     try {
-      set({ isLoading: true, error: null });
+      set({ error: null });
       const response = await authService.login(data);
       get().setTokens(response.tokens.access, response.tokens.refresh);
       get().setUser(response.user);
@@ -109,8 +103,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const msg = error.response?.data?.error || 'Login failed';
       set({ error: msg });
       throw new Error(msg);
-    } finally {
-      set({ isLoading: false });
     }
   },
 
