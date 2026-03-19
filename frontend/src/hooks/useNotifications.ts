@@ -1,32 +1,82 @@
-import { useEffect } from 'react';
-import { notificationService } from '@/services/notifications/notificationService';
+import { useEffect, useState, useCallback } from 'react';
+import * as Notifications from 'expo-notifications';
+import { notificationService, NotificationCategory } from '@/services/notifications/NotificationService';
+import { useNavigation } from '@react-navigation/native';
 
 export const useNotifications = () => {
+  const [hasPermission, setHasPermission] = useState(false);
+  const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
+  const navigation = useNavigation();
+
   useEffect(() => {
-    const notificationListener = notificationService.addNotificationListener((notification) => {
-      console.log('Notification received:', notification);
+    checkPermission();
+    setupNotificationListeners();
+  }, []);
+
+  const checkPermission = async () => {
+    const { status } = await Notifications.getPermissionsAsync();
+    setHasPermission(status === 'granted');
+  };
+
+  const requestPermission = useCallback(async (): Promise<boolean> => {
+    const granted = await notificationService.requestPermission();
+    setHasPermission(granted);
+    
+    if (granted) {
+      const token = await notificationService.getToken();
+      setExpoPushToken(token);
+    }
+    
+    return granted;
+  }, []);
+
+  const scheduleNotification = useCallback(
+    async (title: string, body: string, data: any, category?: NotificationCategory): Promise<string> => {
+      return await notificationService.scheduleNotification(title, body, data, category);
+    },
+    []
+  );
+
+  const setupNotificationListeners = () => {
+    // Handle notification received while app is foregrounded
+    const foregroundSubscription = Notifications.addNotificationReceivedListener((notification) => {
+      console.log('Notification received in foreground:', notification);
     });
 
-    const responseListener = notificationService.addNotificationResponseListener((response) => {
-      console.log('Notification response:', response);
+    // Handle notification tap
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data;
+      handleNotificationTap(data);
     });
 
     return () => {
-      notificationListener.remove();
-      responseListener.remove();
+      foregroundSubscription.remove();
+      responseSubscription.remove();
     };
-  }, []);
-
-  const requestPermissions = async () => {
-    return await notificationService.requestPermissions();
   };
 
-  const getPushToken = async () => {
-    return await notificationService.getPushToken();
+  const handleNotificationTap = (data: any) => {
+    const { category, alert_id, zone_id, crime_id } = data;
+
+    switch (category) {
+      case NotificationCategory.EMERGENCY_ALERT:
+        navigation.navigate('ResponderNavigation' as never, { alertId: alert_id } as never);
+        break;
+      case NotificationCategory.DANGER_ZONE:
+        navigation.navigate('CrimeDetails' as never, { zoneId: zone_id } as never);
+        break;
+      case NotificationCategory.CRIME_REPORT:
+        navigation.navigate('CrimeDetails' as never, { zoneId: crime_id } as never);
+        break;
+      default:
+        break;
+    }
   };
 
   return {
-    requestPermissions,
-    getPushToken,
+    hasPermission,
+    expoPushToken,
+    requestPermission,
+    scheduleNotification,
   };
 };
