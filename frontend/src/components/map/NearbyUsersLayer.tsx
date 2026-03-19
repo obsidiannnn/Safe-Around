@@ -4,7 +4,7 @@ import { Marker } from 'react-native-maps';
 import { Text } from 'react-native-paper';
 import { Location } from '@/types/models';
 import { colors } from '@/theme/colors';
-import { spacing } from '@/theme/spacing';
+import { spacing, borderRadius } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
 
 interface NearbyUser {
