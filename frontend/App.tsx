@@ -1,42 +1,42 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppNavigator } from './src/navigation/AppNavigator';
+import { ErrorBoundary } from './src/components/common/ErrorBoundary';
+import { LoadingOverlay } from './src/components/common/LoadingOverlay';
+import { OfflineBar } from './src/components/common/OfflineBar';
 import { theme } from './src/theme/theme';
-import { useAuthStore } from './src/store/authStore';
-import { useWebSocketStore } from './src/store/websocketStore';
-import { locationUploadService } from './src/services/location/LocationUploadService';
+import { initializeApp } from './src/utils/initializeApp';
 
 export default function App() {
-  const { accessToken, isAuthenticated } = useAuthStore();
-  const { connect, disconnect } = useWebSocketStore();
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    if (isAuthenticated && accessToken) {
-      connect(accessToken);
-      locationUploadService.startUploading();
-    } else {
-      disconnect();
-      locationUploadService.stopUploading();
-    }
-
-    return () => {
-      disconnect();
-      locationUploadService.stopUploading();
+    const init = async () => {
+      await initializeApp();
+      setIsInitializing(false);
     };
-  }, [isAuthenticated, accessToken]);
+    init();
+  }, []);
+
+  if (isInitializing) {
+    return <LoadingOverlay visible={true} message="Initializing SafeAround..." />;
+  }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <PaperProvider theme={theme}>
-          <StatusBar style="light" backgroundColor={theme.colors.primary} />
-          <AppNavigator />
-        </PaperProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <PaperProvider theme={theme}>
+            <StatusBar style="light" backgroundColor={theme.colors.primary} />
+            <OfflineBar />
+            <AppNavigator />
+          </PaperProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
 
