@@ -1,12 +1,14 @@
 import { create } from 'zustand';
-import { MMKV } from 'react-native-mmkv';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BackendUser, LoginRequest, SetupProfileRequest } from '@/types/api';
 import { authService } from '@/services/api/authService';
 
-const storage = new MMKV({
-  id: 'auth-storage',
-  encryptionKey: 'safearound-secure-key',
-});
+// AsyncStorage keys
+const KEYS = {
+  user: 'auth:user',
+  accessToken: 'auth:accessToken',
+  refreshToken: 'auth:refreshToken',
+};
 
 interface AuthState {
   user: BackendUser | null;
@@ -19,21 +21,13 @@ interface AuthState {
   setUser: (user: BackendUser | null) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
 
-  // OTP Flow Step 1: send OTP to phone
   sendOTP: (phone: string) => Promise<void>;
-
-  // OTP Flow Step 2: verify OTP → creates/logs in user, returns JWT
   verifyOTP: (phone: string, otp: string) => Promise<void>;
-
-  // OTP Flow Step 3 (optional): set name/email/password
   setupProfile: (data: SetupProfileRequest) => Promise<void>;
-
-  // Direct password login (returning users who set a password)
   logIn: (data: LoginRequest) => Promise<void>;
-
   logOut: () => Promise<void>;
   refreshAccessToken: () => Promise<void>;
-  loadPersistedAuth: () => void;
+  loadPersistedAuth: () => Promise<void>;
   clearError: () => void;
   setError: (error: string | null) => void;
 }
@@ -49,16 +43,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setUser: (user) => {
     set({ user, isAuthenticated: !!user });
     if (user) {
-      storage.set('user', JSON.stringify(user));
+      AsyncStorage.setItem(KEYS.user, JSON.stringify(user));
     } else {
-      storage.delete('user');
+      AsyncStorage.removeItem(KEYS.user);
     }
   },
 
   setTokens: (accessToken, refreshToken) => {
     set({ accessToken, refreshToken });
-    storage.set('accessToken', accessToken);
-    storage.set('refreshToken', refreshToken);
+    AsyncStorage.setItem(KEYS.accessToken, accessToken);
+    AsyncStorage.setItem(KEYS.refreshToken, refreshToken);
   },
 
   sendOTP: async (phone) => {
@@ -78,7 +72,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       const response = await authService.verifyOTP(phone, otp);
-      // Backend: { tokens: { access, refresh }, user: BackendUser }
       get().setTokens(response.tokens.access, response.tokens.refresh);
       get().setUser(response.user);
     } catch (error: any) {
@@ -110,7 +103,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       const response = await authService.login(data);
-      // Backend: { tokens: { access, refresh }, user: BackendUser }
       get().setTokens(response.tokens.access, response.tokens.refresh);
       get().setUser(response.user);
     } catch (error: any) {
@@ -129,9 +121,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       console.error('Logout error:', error);
     } finally {
       set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
-      storage.delete('user');
-      storage.delete('accessToken');
-      storage.delete('refreshToken');
+      await AsyncStorage.multiRemove([KEYS.user, KEYS.accessToken, KEYS.refreshToken]);
     }
   },
 
@@ -147,15 +137,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  loadPersistedAuth: () => {
+  loadPersistedAuth: async () => {
     try {
-      const userStr = storage.getString('user');
-      const accessToken = storage.getString('accessToken');
-      const refreshToken = storage.getString('refreshToken');
+      const [userStr, accessToken, refreshToken] = await AsyncStorage.multiGet([
+        KEYS.user,
+        KEYS.accessToken,
+        KEYS.refreshToken,
+      ]);
 
-      if (userStr && accessToken && refreshToken) {
-        const user = JSON.parse(userStr);
-        set({ user, accessToken, refreshToken, isAuthenticated: true });
+      const user = userStr[1] ? JSON.parse(userStr[1]) : null;
+      const access = accessToken[1];
+      const refresh = refreshToken[1];
+
+      if (user && access && refresh) {
+        set({ user, accessToken: access, refreshToken: refresh, isAuthenticated: true });
       }
     } catch (error) {
       console.error('Failed to load persisted auth:', error);

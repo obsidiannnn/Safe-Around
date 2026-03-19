@@ -1,8 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { MMKV } from 'react-native-mmkv';
-
-const storage = new MMKV();
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type LocationSharingMode = 'always' | 'alerts_only' | 'never';
 
@@ -32,11 +30,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'settings-storage',
-      storage: createJSONStorage(() => ({
-        getItem: (name) => storage.getString(name) ?? null,
-        setItem: (name, value) => storage.set(name, value),
-        removeItem: (name) => storage.delete(name),
-      })),
+      storage: createJSONStorage(() => AsyncStorage),
     }
   )
 );
