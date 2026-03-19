@@ -63,7 +63,7 @@ export const WelcomeScreen = () => {
           variant="primary"
           size="large"
           fullWidth
-          onPress={() => navigation.navigate('Signup' as never)}
+          onPress={() => (navigation as any).navigate('Auth', { screen: 'Signup' })}
         >
           Get Started
         </Button>
@@ -72,7 +72,7 @@ export const WelcomeScreen = () => {
           <Text style={styles.signInText}>Already have an account? </Text>
           <Text
             style={styles.signInLink}
-            onPress={() => navigation.navigate('Login' as never)}
+            onPress={() => (navigation as any).navigate('Auth', { screen: 'Login' })}
           >
             Sign In
           </Text>
