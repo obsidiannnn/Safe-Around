@@ -8,8 +8,9 @@ import { Button } from '@/components/common';
 import { AlertTimeline } from '@/components/emergency/AlertTimeline';
 import { useAlertStore } from '@/store/alertStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useRealtimeLocation } from '@/hooks/useRealtimeLocation';
 import { colors } from '@/theme/colors';
-import { spacing } from '@/theme/spacing';
+import { spacing, borderRadius } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
 
 interface RadiusExpansion {
@@ -26,7 +27,8 @@ interface RadiusExpansion {
 export const EmergencyActiveScreen = () => {
   const navigation = useNavigation();
   const { activeAlert, currentRadius, respondersCount, resolveAlert, cancelAlert } = useAlertStore();
-  const { on, off } = useWebSocket();
+  const { subscribe, unsubscribe } = useWebSocket();
+  const { isStreaming } = useRealtimeLocation(activeAlert?.id || null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [expansions, setExpansions] = useState<RadiusExpansion[]>([
     { radius: 100, time: 0, status: 'completed', usersNotified: 8 },
@@ -55,19 +57,29 @@ export const EmergencyActiveScreen = () => {
 
   useEffect(() => {
     // Listen for WebSocket updates
-    on('alert:responder', (data) => {
+    const handleResponder = (data: any) => {
       console.log('New responder:', data);
-    });
+    };
 
-    on('alert:radius-expanded', (data) => {
+    const handleRadiusExpanded = (data: any) => {
       console.log('Radius expanded:', data);
-    });
+      setExpansions((prev) =>
+        prev.map((exp) =>
+          exp.radius === data.new_radius
+            ? { ...exp, status: 'completed', usersNotified: data.users_notified }
+            : exp
+        )
+      );
+    };
+
+    subscribe('responder_accepted', handleResponder);
+    subscribe('radius_expanded', handleRadiusExpanded);
 
     return () => {
-      off('alert:responder');
-      off('alert:radius-expanded');
+      unsubscribe('responder_accepted', handleResponder);
+      unsubscribe('radius_expanded', handleRadiusExpanded);
     };
-  }, []);
+  }, [subscribe, unsubscribe]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],

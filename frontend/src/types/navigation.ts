@@ -18,6 +18,7 @@ export type RootStackParamList = {
   Navigation: { route: any };
   LocationHistory: undefined;
   CrimeDetails: { zoneId: string };
+  Chat: { alertId: string; roomId: string };
 };
 
 export type AuthStackParamList = {

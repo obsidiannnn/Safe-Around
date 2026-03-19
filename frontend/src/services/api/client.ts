@@ -1,5 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { API_URL } from '@/utils/constants';
+import { API_URL } from '@/config/env';
 import { useAuthStore } from '@/store/authStore';
 
 export const apiClient = axios.create({

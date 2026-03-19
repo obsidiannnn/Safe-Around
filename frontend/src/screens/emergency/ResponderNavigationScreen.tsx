@@ -7,6 +7,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { BottomSheet, Button } from '@/components/common';
 import { useLocationStore } from '@/store/locationStore';
 import { useLocation } from '@/hooks/useLocation';
+import { useRealtimeLocation } from '@/hooks/useRealtimeLocation';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
@@ -18,10 +19,11 @@ import { fontSizes } from '@/theme/typography';
 export const ResponderNavigationScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  // const alertId = route.params?.alertId;
+  const alertId = (route.params as any)?.alertId || '';
   
   const { currentLocation } = useLocationStore();
   const { calculateDistance } = useLocation();
+  const { isStreaming } = useRealtimeLocation(alertId);
   const [victimLocation] = useState({ latitude: 37.78825, longitude: -122.4324 }); // Mock
   const [distance, setDistance] = useState(0);
   const [eta, setEta] = useState(0);
