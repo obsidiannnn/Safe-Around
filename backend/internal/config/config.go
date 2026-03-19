@@ -19,6 +19,7 @@ type Config struct {
 		User     string
 		Password string
 		Name     string
+		SSLMode  string
 	}
 	Redis struct {
 		Host     string
@@ -54,6 +55,10 @@ func LoadConfig() (*Config, error) {
 	cfg.DB.User = os.Getenv("DB_USER")
 	cfg.DB.Password = os.Getenv("DB_PASSWORD")
 	cfg.DB.Name = os.Getenv("DB_NAME")
+	cfg.DB.SSLMode = os.Getenv("DB_SSLMODE")
+	if cfg.DB.SSLMode == "" {
+		cfg.DB.SSLMode = "disable"
+	}
 
 	// Redis
 	cfg.Redis.Host = os.Getenv("REDIS_HOST")
@@ -76,6 +81,10 @@ func LoadConfig() (*Config, error) {
 }
 
 func validate(cfg *Config) error {
+	// Let test env bypass strict checks to allow unit tests
+	if cfg.Server.Env == "testing" {
+		return nil
+	}
 	if cfg.DB.Host == "" || cfg.DB.User == "" || cfg.DB.Password == "" || cfg.DB.Name == "" {
 		return errors.New("missing db config")
 	}

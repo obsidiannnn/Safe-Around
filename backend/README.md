@@ -9,6 +9,15 @@ SafeAround Backend is the core API and worker service for the SafeAround platfor
 - **Database:** PostgreSQL with PostGIS extension (for spatial queries)
 - **Cache:** Redis
 - **Architecture:** Clean Architecture principles
+- **External APIs:** Twilio Verify V2 (Authentication), Google Maps (Geocoding), Firebase (FCM)
+
+## Authentication Flow
+
+SafeAround utilizes a robust **Hybrid OTP/Password** authentication architecture:
+1. **Signup/Login via Phone:** Users enter their phone number to receive a secure 6-digit OTP via Twilio Verify API.
+2. **Session Generation:** Upon verification, the user is issued a secure JWT access & refresh token.
+3. **Password Configuration:** Once authenticated via OTP, users have the option to set a permanent password and bind an email.
+4. **Direct Login:** Returning users can choose to bypass the OTP flow if they've designated a password inside their profile.
 
 ## Prerequisites
 

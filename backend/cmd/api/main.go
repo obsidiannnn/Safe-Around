@@ -2,24 +2,24 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/config"
+	"github.com/obsidiannnn/Safe-Around/backend/internal/database"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/handlers"
-	"github.com/obsidiannnn/Safe-Around/backend/internal/models"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/repository"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/routes"
-	"github.com/redis/go-redis/v9"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
+	"github.com/obsidiannnn/Safe-Around/backend/internal/services"
+	"github.com/obsidiannnn/Safe-Around/backend/pkg/fcm"
+	"github.com/obsidiannnn/Safe-Around/backend/pkg/logger"
+	"github.com/obsidiannnn/Safe-Around/backend/pkg/twilio"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -28,60 +28,47 @@ func main() {
 		log.Fatalf("config error: %v", err)
 	}
 
+	// Initialize Custom Structured Logger
+	logger.InitLogger(cfg.Server.Env, cfg.Server.Env == "development")
+
 	if cfg.Server.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
 	// 1. Database Connection
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
-		cfg.DB.Host, cfg.DB.User, cfg.DB.Password, cfg.DB.Name, cfg.DB.Port)
-	
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := database.NewPostgresDB(cfg)
 	if err != nil {
-		log.Fatalf("failed to connect database: %v", err)
+		logger.Fatal("failed to connect database", zap.Error(err))
 	}
 	
-	// Auto Migrate
-	err = db.AutoMigrate(&models.User{})
-	if err != nil {
-		log.Fatalf("failed to migrate database: %v", err)
+	// Auto Migrate existing models
+	if err := database.RunMigrations(db); err != nil {
+		logger.Fatal("failed to migrate database", zap.Error(err))
 	}
-	log.Println("database connected and migrated")
+	logger.Info("database connected and migrated")
 
 	// 2. Redis Connection
-	dbInt := 0
-	if cfg.Redis.DB != "" {
-		dbInt, _ = strconv.Atoi(cfg.Redis.DB)
+	rdb, err := database.NewRedisClient(cfg)
+	if err != nil {
+		logger.Fatal("failed to connect redis", zap.Error(err))
 	}
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port),
-		Password: cfg.Redis.Password,
-		DB:       dbInt,
-	})
-	if err := rdb.Ping(context.Background()).Err(); err != nil {
-		log.Fatalf("failed to connect redis: %v", err)
-	}
-	log.Println("redis connected")
+	logger.Info("redis connected")
 
-	// 3. Setup Repositories & Handlers
+	// 3. External Integrations
+	fcmClient := fcm.NewClient(os.Getenv("FCM_SERVER_KEY"))
+	twilioClient := twilio.NewClient(os.Getenv("TWILIO_ACCOUNT_SID"), os.Getenv("TWILIO_AUTH_TOKEN"))
+
+	// 4. Setup Repositories & Services
 	userRepo := repository.NewUserRepo(db)
-	authHandler := handlers.NewAuthHandler(userRepo, rdb)
+	notifSvc := services.NewNotificationService(fcmClient, twilioClient, db, rdb)
 
-	r := gin.New()
+	// 5. Setup Handlers
+	authHandler := handlers.NewAuthHandler(userRepo, rdb, twilioClient)
+	healthHandler := handlers.NewHealthHandler(db, rdb, cfg)
+	notifHandler := handlers.NewNotificationHandler(notifSvc)
 
-	// Middlewares
-	r.Use(gin.Logger())
-	r.Use(gin.Recovery())
-	r.Use(corsMiddleware())
-
-	// Health
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
-	})
-
-	// 4. Routes
-	api := r.Group("/api/v1")
-	routes.SetupAuthRoutes(api, authHandler)
+	// 6. Setup Routes
+	r := routes.SetupRouter(authHandler, healthHandler, notifHandler, rdb)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Server.Port,
@@ -109,20 +96,4 @@ func main() {
 	}
 
 	log.Println("server exited properly")
-}
-
-func corsMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-
-		c.Next()
-	}
 }

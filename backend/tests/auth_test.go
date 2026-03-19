@@ -13,6 +13,7 @@ import (
 	"github.com/obsidiannnn/Safe-Around/backend/internal/repository"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/routes"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/utils"
+	"github.com/obsidiannnn/Safe-Around/backend/pkg/twilio"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 )
@@ -85,61 +86,53 @@ func setupRouter() *gin.Engine {
 
 	mockRepo := newMockUserRepo()
 	rdb := redis.NewClient(&redis.Options{})
+	twClient := twilio.NewClient("mock", "mock")
 
-	h := handlers.NewAuthHandler(mockRepo, rdb)
+	h := handlers.NewAuthHandler(mockRepo, rdb, twClient)
 	api := r.Group("/api/v1")
 	routes.SetupAuthRoutes(api, h)
 
 	return r
 }
 
-func TestSignup(t *testing.T) {
+func TestSendOTP(t *testing.T) {
 	router := setupRouter()
 
-	t.Run("Valid Signup", func(t *testing.T) {
+	t.Run("Valid Phone", func(t *testing.T) {
 		body := map[string]string{
-			"name":     "Test User",
-			"phone":    "1234567890",
-			"email":    "test@example.com",
-			"password": "securepassword",
+			"phone": "1234567890",
 		}
 		
 		jsonData, _ := json.Marshal(body)
-		req, _ := http.NewRequest("POST", "/api/v1/auth/signup", bytes.NewBuffer(jsonData))
+		req, _ := http.NewRequest("POST", "/api/v1/auth/otp/send", bytes.NewBuffer(jsonData))
 		req.Header.Set("Content-Type", "application/json")
 
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusCreated, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code)
 		
 		var resp map[string]interface{}
 		json.Unmarshal(w.Body.Bytes(), &resp)
 		
-		assert.Equal(t, "welcome!", resp["message"])
-		assert.IsType(t, map[string]interface{}{}, resp["tokens"])
+		assert.Contains(t, resp["message"], "otp sent successfully")
 	})
 
-	t.Run("Duplicate Phone", func(t *testing.T) {
-		body := map[string]string{
-			"name":     "Another User",
-			"phone":    "1234567890",
-			"email":    "another@example.com",
-			"password": "securepassword2",
-		}
+	t.Run("Missing Phone", func(t *testing.T) {
+		body := map[string]string{}
 		
 		jsonData, _ := json.Marshal(body)
-		req, _ := http.NewRequest("POST", "/api/v1/auth/signup", bytes.NewBuffer(jsonData))
+		req, _ := http.NewRequest("POST", "/api/v1/auth/otp/send", bytes.NewBuffer(jsonData))
 		req.Header.Set("Content-Type", "application/json")
 
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusConflict, w.Code)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 		
 		var resp map[string]interface{}
 		json.Unmarshal(w.Body.Bytes(), &resp)
-		assert.Equal(t, "phone already in use", resp["error"])
+		assert.Equal(t, "phone number is required", resp["error"])
 	})
 }
 
