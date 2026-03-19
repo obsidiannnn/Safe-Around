@@ -4,7 +4,7 @@ import { Text } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { colors } from '@/theme/colors';
-import { spacing, borderRadius } from '@/theme/spacing';
+import { spacing, borderRadius, shadows } from '@/theme/spacing';
 import { fontSizes, fontWeights } from '@/theme/typography';
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
@@ -19,6 +19,7 @@ interface ButtonProps {
   disabled?: boolean;
   icon?: string;
   fullWidth?: boolean;
+  style?: ViewStyle | ViewStyle[];
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -36,6 +37,7 @@ export const Button: React.FC<ButtonProps> = ({
   disabled = false,
   icon,
   fullWidth = false,
+  style,
 }) => {
   const scale = useSharedValue(1);
 
@@ -54,9 +56,9 @@ export const Button: React.FC<ButtonProps> = ({
   const buttonStyle = [
     styles.button,
     styles[variant],
-    styles[size],
     fullWidth && styles.fullWidth,
     (disabled || loading) && styles.disabled,
+    style,
   ];
 
   const textColor = getTextColor(variant, disabled || loading);
@@ -116,17 +118,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
   },
   primary: {
     backgroundColor: colors.primary,
+    ...shadows.small,
   },
   secondary: {
     backgroundColor: colors.secondary,
+    ...shadows.small,
   },
   outline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
     borderColor: colors.primary,
   },
   ghost: {
@@ -136,19 +140,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.error,
   },
   small: {
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    minHeight: 36,
+    minHeight: 40,
   },
   medium: {
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,
-    minHeight: 44,
+    minHeight: 48,
   },
   large: {
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing['2xl'],
-    minHeight: 52,
+    minHeight: 54,
   },
   fullWidth: {
     width: '100%',
