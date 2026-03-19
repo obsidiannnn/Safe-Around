@@ -28,8 +28,12 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    // Handle 401 - Unauthorized
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Handle 401 - Unauthorized, but ignore if the request was for auth endpoints to prevent infinite loops
+    const isAuthEndpoint = originalRequest.url?.includes('auth/logout') || 
+                           originalRequest.url?.includes('auth/refresh') || 
+                           originalRequest.url?.includes('auth/login');
+                           
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
 
       try {
