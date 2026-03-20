@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Polyline, Marker } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '@/components/common/Button';
@@ -21,6 +21,7 @@ interface Route {
 
 export const SafeRouteScreen: React.FC = () => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const { currentLocation } = useLocationStore();
   const [destination, setDestination] = useState('');
   const [mode, setMode] = useState<'walking' | 'driving' | 'transit'>('walking');
@@ -69,13 +70,13 @@ export const SafeRouteScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconButton}>
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Safe Route</Text>
-        <View style={{ width: 24 }} />
+        <View style={styles.headerIconButtonPlaceholder} />
       </View>
 
       <View style={styles.searchContainer}>
@@ -154,7 +155,7 @@ export const SafeRouteScreen: React.FC = () => {
         ))}
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, theme.spacing.md) }]}>
         <Button
           variant="primary"
           size="large"
@@ -178,6 +179,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: theme.spacing.md,
+    minHeight: 56,
+  },
+  headerIconButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerIconButtonPlaceholder: {
+    width: 44,
+    height: 44,
   },
   headerTitle: {
     fontSize: theme.typography.sizes.xl,
@@ -274,5 +286,6 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
   },
 });

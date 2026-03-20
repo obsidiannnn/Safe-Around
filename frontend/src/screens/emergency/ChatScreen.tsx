@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Input } from '@/components/common/Input';
 import { Button } from '@/components/common/Button';
 import { MessageBubble } from '@/components/chat/MessageBubble';
@@ -34,6 +34,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
   const [isTyping, setIsTyping] = useState(false);
   const [typingUser, setTypingUser] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     send('join_room', { room_id: roomId, user_role: 'victim' });
@@ -97,7 +98,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ConnectionStatusBar status={connectionStatus} />
       
       <KeyboardAvoidingView
@@ -123,7 +124,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
 
         <QuickReplyButtons onSelect={handleQuickReply} />
 
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, theme.spacing.sm) }]}>
           <Input
             value={inputText}
             onChangeText={setInputText}
@@ -155,6 +156,8 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
     backgroundColor: theme.colors.surface,
     gap: theme.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
   },
   input: {
     flex: 1,

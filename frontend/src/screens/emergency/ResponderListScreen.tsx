@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Card, Avatar, Button } from '@/components/common';
@@ -66,13 +67,14 @@ export const ResponderListScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.header}>
         <Text style={styles.title}>Responders</Text>
         <Text style={styles.subtitle}>{responders.length} people on their way</Text>
       </View>
 
-      {responders.map((responder) => (
+        {responders.map((responder) => (
         <Card key={responder.id} variant="elevated" padding="lg" style={styles.responderCard}>
           <View style={styles.responderHeader}>
             <Avatar name={responder.name} size="large" showStatus isOnline />
@@ -118,16 +120,17 @@ export const ResponderListScreen = () => {
         </Card>
       ))}
 
-      {responders.length === 0 && (
-        <View style={styles.emptyState}>
-          <Icon name="people-outline" size={64} color={colors.textSecondary} />
-          <Text style={styles.emptyText}>No responders yet</Text>
-          <Text style={styles.emptyDescription}>
-            Nearby users are being notified of your emergency
-          </Text>
-        </View>
-      )}
-    </ScrollView>
+        {responders.length === 0 && (
+          <View style={styles.emptyState}>
+            <Icon name="people-outline" size={64} color={colors.textSecondary} />
+            <Text style={styles.emptyText}>No responders yet</Text>
+            <Text style={styles.emptyDescription}>
+              Nearby users are being notified of your emergency
+            </Text>
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -138,6 +141,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
+    paddingBottom: spacing['3xl'],
   },
   header: {
     marginBottom: spacing.xl,

@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card } from '@/components/common';
 import { Crime } from '@/types/models';
 import { colors } from '@/theme/colors';
@@ -58,13 +59,15 @@ export const CrimeDetailsScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-back" size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Incident Details</Text>
-      </View>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.header}>
+          <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Icon name="arrow-back" size={24} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Incident Details</Text>
+          <View style={styles.headerPlaceholder} />
+        </View>
 
       <Card variant="elevated" padding="lg" style={styles.card}>
         <View style={styles.iconContainer}>
@@ -150,7 +153,8 @@ export const CrimeDetailsScreen = () => {
           Share Warning
         </Button>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -159,19 +163,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  contentContainer: {
+    paddingBottom: spacing['3xl'],
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     padding: spacing.lg,
     backgroundColor: colors.surface,
   },
   backButton: {
-    marginRight: spacing.md,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: fontSizes.xl,
     fontWeight: '600',
     color: colors.textPrimary,
+  },
+  headerPlaceholder: {
+    width: 44,
+    height: 44,
   },
   card: {
     margin: spacing.lg,

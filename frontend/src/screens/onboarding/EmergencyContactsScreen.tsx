@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Checkbox } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { useForm, Controller } from 'react-hook-form';
@@ -66,22 +67,23 @@ export const EmergencyContactsScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.header}>
         <Text style={styles.title}>Emergency Contacts</Text>
         <Text style={styles.subtitle}>
           Add trusted contacts who will be notified during emergencies (1-5 contacts)
         </Text>
       </View>
 
-      {contacts.length === 0 && !showForm && (
-        <Alert
-          type="info"
-          message="Add at least one emergency contact to continue"
-        />
-      )}
+        {contacts.length === 0 && !showForm && (
+          <Alert
+            type="info"
+            message="Add at least one emergency contact to continue"
+          />
+        )}
 
-      {contacts.map((contact) => (
+        {contacts.map((contact) => (
         <Card key={contact.id} variant="outlined" padding="md" style={styles.contactCard}>
           <ListItem
             title={contact.name}
@@ -103,7 +105,7 @@ export const EmergencyContactsScreen = () => {
         </Card>
       ))}
 
-      {showForm && (
+        {showForm && (
         <Card variant="elevated" padding="lg" style={styles.formCard}>
           <Text style={styles.formTitle}>Add Emergency Contact</Text>
 
@@ -186,7 +188,7 @@ export const EmergencyContactsScreen = () => {
         </Card>
       )}
 
-      {!showForm && contacts.length < 5 && (
+        {!showForm && contacts.length < 5 && (
         <Button
           variant="outline"
           size="large"
@@ -199,7 +201,7 @@ export const EmergencyContactsScreen = () => {
         </Button>
       )}
 
-      <View style={styles.footer}>
+        <View style={styles.footer}>
         <Button
           variant="primary"
           size="large"
@@ -218,8 +220,9 @@ export const EmergencyContactsScreen = () => {
         >
           Skip for now
         </Button>
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -230,6 +233,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing['2xl'],
+    paddingBottom: spacing['4xl'],
   },
   header: {
     marginTop: spacing.xl,

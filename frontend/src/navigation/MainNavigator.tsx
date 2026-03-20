@@ -6,6 +6,7 @@ import { MapScreen } from '@/screens/map/MapScreen';
 import { EmergencyScreen } from '@/screens/emergency/EmergencyScreen';
 import { ProfileScreen } from '@/screens/profile/ProfileScreen';
 import { colors } from '@/theme/colors';
+import { borderRadius, spacing } from '@/theme/spacing';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -16,6 +17,20 @@ export const MainNavigator = () => {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
+        tabBarStyle: {
+          height: 68,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing.sm,
+          borderTopColor: colors.border,
+          borderTopWidth: 1,
+          backgroundColor: colors.surface,
+          borderTopLeftRadius: borderRadius.lg,
+          borderTopRightRadius: borderRadius.lg,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+        },
       }}
     >
       <Tab.Screen

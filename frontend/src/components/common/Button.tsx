@@ -56,6 +56,7 @@ export const Button: React.FC<ButtonProps> = ({
   const buttonStyle = [
     styles.button,
     styles[variant],
+    styles[size],
     fullWidth && styles.fullWidth,
     (disabled || loading) && styles.disabled,
     style,
