@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/models"
+	customWS "github.com/obsidiannnn/Safe-Around/backend/internal/websocket"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -25,11 +26,11 @@ type AlertService struct {
 	redis               *redis.Client
 	geofencingService   *GeofencingService
 	notificationService NotificationService
-	websocketHub        *WebSocketHub
+	websocketHub        *customWS.Hub
 	schedulers          sync.Map // alert_id -> *time.Timer
 }
 
-func NewAlertService(db *gorm.DB, rdb *redis.Client, gs *GeofencingService, ns NotificationService, wh *WebSocketHub) *AlertService {
+func NewAlertService(db *gorm.DB, rdb *redis.Client, gs *GeofencingService, ns NotificationService, wh *customWS.Hub) *AlertService {
 	return &AlertService{
 		db:                  db,
 		redis:               rdb,

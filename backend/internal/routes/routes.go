@@ -15,6 +15,7 @@ func SetupRouter(
 	notifHandler *handlers.NotificationHandler,
 	alertHandler *handlers.AlertHandler,
 	heatmapHandler *handlers.HeatmapHandler,
+	wsHandler *handlers.WebSocketHandler,
 	rdb *redis.Client,
 ) *gin.Engine {
 	r := gin.New()
@@ -30,6 +31,9 @@ func SetupRouter(
 		healthGroup.GET("/ping", healthHandler.GetPing)
 		healthGroup.GET("/readiness", healthHandler.GetReadiness)
 	}
+
+	// WebSockets Upgrade Endpoint
+	r.GET("/ws", wsHandler.HandleWebSocket)
 
 	// API Endpoints - applying global rate limit of 100 requests / minute initially
 	api := r.Group("/api/v1")

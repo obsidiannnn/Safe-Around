@@ -16,6 +16,7 @@ import (
 	"github.com/obsidiannnn/Safe-Around/backend/internal/repository"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/routes"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/services"
+	customWS "github.com/obsidiannnn/Safe-Around/backend/internal/websocket"
 	"github.com/obsidiannnn/Safe-Around/backend/pkg/fcm"
 	"github.com/obsidiannnn/Safe-Around/backend/pkg/logger"
 	"github.com/obsidiannnn/Safe-Around/backend/pkg/twilio"
@@ -64,7 +65,10 @@ func main() {
 	notifSvc := services.NewNotificationService(fcmClient, twilioClient, db, rdb)
 
 	geoSvc := services.NewGeofencingService(db, rdb, notifSvc)
-	wsHub := services.NewWebSocketHub()
+	
+	wsHub := customWS.NewHub()
+	go wsHub.Run()
+
 	alertSvc := services.NewAlertService(db, rdb, geoSvc, notifSvc, wsHub)
 	heatmapSvc := services.NewHeatmapService(db, rdb, nil) // S3 stub natively implemented
 
@@ -74,9 +78,10 @@ func main() {
 	notifHandler := handlers.NewNotificationHandler(notifSvc)
 	alertHandler := handlers.NewAlertHandler(alertSvc)
 	heatmapHandler := handlers.NewHeatmapHandler(heatmapSvc)
+	wsHandler := handlers.NewWebSocketHandler(wsHub)
 
 	// 6. Setup Routes
-	r := routes.SetupRouter(authHandler, healthHandler, notifHandler, alertHandler, heatmapHandler, rdb)
+	r := routes.SetupRouter(authHandler, healthHandler, notifHandler, alertHandler, heatmapHandler, wsHandler, rdb)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Server.Port,
