@@ -1,0 +1,45 @@
+# Node modules (frontend)
+node_modules/
+frontend/node_modules/
+
+# Expo
+frontend/.expo/
+frontend/.expo-shared/
+frontend/dist/
+frontend/web-build/
+frontend/npm-debug.*
+
+# Environment files (secrets - NEVER commit these)
+.env
+.env.local
+.env*.local
+backend/.env
+frontend/.env
+
+# Go build outputs
+backend/safearound-api
+backend/*.exe
+backend/bin/
+
+# Secrets and keys
+*.key
+*.pem
+*.p12
+*.p8
+*.jks
+*.mobileprovision
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+
+# Temp files
+/tmp/
