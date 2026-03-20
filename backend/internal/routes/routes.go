@@ -13,6 +13,7 @@ func SetupRouter(
 	authHandler *handlers.AuthHandler,
 	healthHandler *handlers.HealthHandler,
 	notifHandler *handlers.NotificationHandler,
+	alertHandler *handlers.AlertHandler,
 	rdb *redis.Client,
 ) *gin.Engine {
 	r := gin.New()
@@ -45,6 +46,19 @@ func SetupRouter(
 			// Standard history fetches
 			notifs.GET("/history", notifHandler.GetNotificationHistory)
 			notifs.PUT("/:id/read", notifHandler.UpdateNotificationStatus)
+		}
+
+		// Emergency Alerts domain
+		alerts := api.Group("/alerts")
+		alerts.Use(middleware.AuthRequired())
+		{
+			alerts.POST("", alertHandler.CreateAlert)
+			alerts.GET("/:id", alertHandler.GetAlertDetails)
+			alerts.POST("/:id/respond", alertHandler.RespondToAlert)
+			alerts.PATCH("/:id/status", alertHandler.UpdateAlertStatus)
+			alerts.POST("/:id/escalate", alertHandler.EscalateAlert)
+			alerts.GET("/active", alertHandler.GetActiveAlerts)
+			alerts.GET("/history", alertHandler.GetAlertHistory)
 		}
 	}
 
