@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, TextInput, StyleSheet, Pressable, Text } from 'react-native';
+import { View, TextInput, StyleSheet, Pressable, Text, KeyboardTypeOptions, ViewStyle, TextStyle } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
@@ -22,6 +22,9 @@ interface InputProps {
   autoFocus?: boolean;
   validationState?: ValidationState;
   disabled?: boolean;
+  keyboardType?: KeyboardTypeOptions;
+  style?: ViewStyle | ViewStyle[];
+  inputStyle?: TextStyle | TextStyle[];
 }
 
 /**
@@ -42,6 +45,9 @@ export const Input: React.FC<InputProps> = ({
   autoFocus = false,
   validationState = 'default',
   disabled = false,
+  keyboardType,
+  style,
+  inputStyle,
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -68,7 +74,7 @@ export const Input: React.FC<InputProps> = ({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, style]}>
       {label && <Text style={styles.label}>{label}</Text>}
       
       <View
@@ -84,13 +90,13 @@ export const Input: React.FC<InputProps> = ({
         )}
         
         <TextInput
-          style={[styles.input, leftIcon && styles.inputWithLeftIcon]}
+          style={[styles.input, leftIcon && styles.inputWithLeftIcon, inputStyle]}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
           placeholderTextColor={colors.textSecondary}
           secureTextEntry={secureTextEntry}
-          keyboardType={getKeyboardType()}
+          keyboardType={keyboardType || getKeyboardType()}
           autoCapitalize={type === 'email' ? 'none' : 'sentences'}
           autoCorrect={false}
           maxLength={maxLength}

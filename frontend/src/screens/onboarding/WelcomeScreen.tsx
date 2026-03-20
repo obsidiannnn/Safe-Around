@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -33,8 +34,9 @@ export const WelcomeScreen = () => {
   const navigation = useNavigation();
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.header}>
         <Text style={styles.logo}>🛡️</Text>
         <Text style={styles.title}>SafeAround</Text>
         <Text style={styles.tagline}>Your Personal Safety Network</Text>
@@ -58,7 +60,7 @@ export const WelcomeScreen = () => {
         />
       </View>
 
-      <View style={styles.actions}>
+        <View style={styles.actions}>
         <Button
           variant="primary"
           size="large"
@@ -77,8 +79,9 @@ export const WelcomeScreen = () => {
             Sign In
           </Text>
         </View>
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -89,6 +92,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing['3xl'],
+    paddingBottom: spacing['4xl'],
   },
   header: {
     alignItems: 'center',

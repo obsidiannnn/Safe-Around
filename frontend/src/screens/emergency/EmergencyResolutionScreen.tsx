@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -38,8 +39,9 @@ export const EmergencyResolutionScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.header}>
         <View style={styles.iconContainer}>
           <Icon name="check-circle" size={80} color={colors.success} />
         </View>
@@ -47,7 +49,7 @@ export const EmergencyResolutionScreen = () => {
         <Text style={styles.subtitle}>Emergency alert has been resolved</Text>
       </View>
 
-      <Card variant="elevated" padding="lg" style={styles.summaryCard}>
+        <Card variant="elevated" padding="lg" style={styles.summaryCard}>
         <Text style={styles.cardTitle}>Alert Summary</Text>
 
         <View style={styles.summaryRow}>
@@ -69,7 +71,7 @@ export const EmergencyResolutionScreen = () => {
         </View>
       </Card>
 
-      {responders.length > 0 && (
+        {responders.length > 0 && (
         <Card variant="elevated" padding="lg" style={styles.respondersCard}>
           <Text style={styles.cardTitle}>Responders Who Helped</Text>
           {responders.map((responder) => (
@@ -93,7 +95,7 @@ export const EmergencyResolutionScreen = () => {
         </Card>
       )}
 
-      <Card variant="elevated" padding="lg" style={styles.ratingCard}>
+        <Card variant="elevated" padding="lg" style={styles.ratingCard}>
         <Text style={styles.cardTitle}>Rate Your Experience</Text>
 
         <View style={styles.starsContainer}>
@@ -137,7 +139,7 @@ export const EmergencyResolutionScreen = () => {
         </View>
       </Card>
 
-      <View style={styles.actions}>
+        <View style={styles.actions}>
         <Button
           variant="outline"
           size="large"
@@ -158,8 +160,9 @@ export const EmergencyResolutionScreen = () => {
         >
           Submit & Close
         </Button>
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -170,6 +173,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing['2xl'],
+    paddingBottom: spacing['4xl'],
   },
   header: {
     alignItems: 'center',

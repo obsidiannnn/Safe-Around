@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import { Button } from '@/components/common';
@@ -26,6 +27,7 @@ interface RadiusExpansion {
  */
 export const EmergencyActiveScreen = () => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const { activeAlert, currentRadius, respondersCount, resolveAlert, cancelAlert } = useAlertStore();
   const { subscribe, unsubscribe } = useWebSocket();
   const { isStreaming } = useRealtimeLocation(activeAlert?.id || null);
@@ -114,7 +116,7 @@ export const EmergencyActiveScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Animated.View style={animatedStyle}>
           <Icon name="warning" size={80} color={colors.surface} />
@@ -123,7 +125,7 @@ export const EmergencyActiveScreen = () => {
         <Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
       </View>
 
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.radiusCard}>
           <Text style={styles.radiusTitle}>Notifying users within</Text>
           <Text style={styles.radiusValue}>{currentRadius}m</Text>
@@ -188,9 +190,9 @@ export const EmergencyActiveScreen = () => {
             <Text style={styles.statLabel}>Notified</Text>
           </View>
         </View>
-      </View>
+      </ScrollView>
 
-      <View style={styles.actions}>
+      <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
         <Button
           variant="primary"
           size="large"
@@ -211,7 +213,7 @@ export const EmergencyActiveScreen = () => {
           Cancel Alert
         </Button>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -222,7 +224,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingTop: spacing['5xl'],
+    paddingTop: spacing['2xl'],
     paddingBottom: spacing['3xl'],
   },
   title: {
@@ -239,11 +241,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   content: {
-    flex: 1,
     backgroundColor: colors.surface,
     borderTopLeftRadius: spacing['2xl'],
     borderTopRightRadius: spacing['2xl'],
     padding: spacing['2xl'],
+    paddingBottom: spacing['3xl'],
   },
   radiusCard: {
     backgroundColor: colors.background,

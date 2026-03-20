@@ -33,3 +33,10 @@ func AuthRequired() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// GetCurrentUserID extracts the authenticated userID from the Gin context.
+func GetCurrentUserID(c *gin.Context) uint {
+	val, _ := c.Get("user_id")
+	id, _ := val.(uint)
+	return id
+}

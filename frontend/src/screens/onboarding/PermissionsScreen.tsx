@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -108,15 +109,16 @@ export const PermissionsScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.header}>
         <Text style={styles.title}>Enable Permissions</Text>
         <Text style={styles.subtitle}>
           SafeAround needs these permissions to keep you safe
         </Text>
       </View>
 
-      {permissions.map((permission) => (
+        {permissions.map((permission) => (
         <Card key={permission.id} variant="outlined" padding="lg" style={styles.card}>
           <View style={styles.permissionContent}>
             <View style={[styles.iconContainer, permission.granted && styles.iconGranted]}>
@@ -149,7 +151,7 @@ export const PermissionsScreen = () => {
         </Card>
       ))}
 
-      <Button
+        <Button
         variant="primary"
         size="large"
         fullWidth
@@ -160,12 +162,13 @@ export const PermissionsScreen = () => {
         Continue
       </Button>
 
-      {!allRequiredGranted && (
-        <Text style={styles.warningText}>
-          Please grant all required permissions to continue
-        </Text>
-      )}
-    </ScrollView>
+        {!allRequiredGranted && (
+          <Text style={styles.warningText}>
+            Please grant all required permissions to continue
+          </Text>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -176,6 +179,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing['2xl'],
+    paddingBottom: spacing['4xl'],
   },
   header: {
     marginTop: spacing.xl,

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from '@/components/common/Avatar';
@@ -37,7 +37,7 @@ export const ProfileScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Avatar
           size="large"
@@ -86,7 +86,7 @@ export const ProfileScreen: React.FC = () => {
         ))}
       </View>
 
-      <ScrollView style={styles.content}>{renderContent()}</ScrollView>
+      <View style={styles.content}>{renderContent()}</View>
     </SafeAreaView>
   );
 };

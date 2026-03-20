@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { View, StyleSheet, Pressable, Image, ImageSourcePropType } from 'react-native';
+import { View, StyleSheet, Pressable, Image, ImageSourcePropType, ViewStyle } from 'react-native';
 import { Text } from 'react-native-paper';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
@@ -14,6 +14,7 @@ interface CardProps {
   image?: ImageSourcePropType;
   padding?: keyof typeof spacing;
   onPress?: () => void;
+  style?: ViewStyle | ViewStyle[];
 }
 
 /**
@@ -28,11 +29,13 @@ export const Card: React.FC<CardProps> = ({
   image,
   padding = 'lg',
   onPress,
+  style,
 }) => {
   const cardStyle = [
     styles.card,
     styles[variant],
     { padding: spacing[padding] },
+    style,
   ];
 
   const content = (

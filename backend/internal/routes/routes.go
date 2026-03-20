@@ -14,6 +14,9 @@ func SetupRouter(
 	healthHandler *handlers.HealthHandler,
 	notifHandler *handlers.NotificationHandler,
 	alertHandler *handlers.AlertHandler,
+	heatmapHandler *handlers.HeatmapHandler,
+	wsHandler *handlers.WebSocketHandler,
+	locationHandler *handlers.LocationHandler,
 	rdb *redis.Client,
 ) *gin.Engine {
 	r := gin.New()
@@ -29,6 +32,9 @@ func SetupRouter(
 		healthGroup.GET("/ping", healthHandler.GetPing)
 		healthGroup.GET("/readiness", healthHandler.GetReadiness)
 	}
+
+	// WebSockets Upgrade Endpoint
+	r.GET("/ws", wsHandler.HandleWebSocket)
 
 	// API Endpoints - applying global rate limit of 100 requests / minute initially
 	api := r.Group("/api/v1")
@@ -59,6 +65,21 @@ func SetupRouter(
 			alerts.POST("/:id/escalate", alertHandler.EscalateAlert)
 			alerts.GET("/active", alertHandler.GetActiveAlerts)
 			alerts.GET("/history", alertHandler.GetAlertHistory)
+		}
+
+		// Heatmap domain
+		heatmap := api.Group("/heatmap")
+		{
+			heatmap.GET("/:z/:x/:y", heatmapHandler.GetTile)
+		}
+
+		// Location domain
+		location := api.Group("/location")
+		location.Use(middleware.AuthRequired())
+		{
+			location.POST("", locationHandler.UpdateLocation)
+			location.GET("/me", locationHandler.GetCurrentLocation)
+			location.GET("/nearby", locationHandler.GetNearbyUsers)
 		}
 	}
 
