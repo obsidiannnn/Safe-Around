@@ -54,7 +54,7 @@ export const LoginScreen = () => {
         <View style={styles.form}>
           <View style={styles.phoneRow}>
             <View style={styles.prefixBox}>
-              <RNText style={styles.prefixText}>🇮🇳 +91</RNText>
+              <RNText style={styles.prefixText}>+91</RNText>
             </View>
             <View style={styles.phoneInput}>
               <Input
