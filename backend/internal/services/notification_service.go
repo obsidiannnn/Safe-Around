@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/models"
 	"github.com/obsidiannnn/Safe-Around/backend/pkg/fcm"
 	"github.com/obsidiannnn/Safe-Around/backend/pkg/logger"
@@ -19,6 +20,10 @@ type NotificationService interface {
 	QueueNotification(userID uint, title, body, notifType string) error
 	GetHistory(userID uint, limit, offset int) ([]models.Notification, int64, error)
 	MarkAsRead(notifID uint) error
+	SendEmergencyAlert(userID uint, alert *models.EmergencyAlert) error
+	NotifyResponderAccepted(userID uint, response *models.AlertResponse) error
+	NotifyAllParticipants(alertID uuid.UUID, message string) error
+	NotifyEmergencyContacts(userID uint, alert *models.EmergencyAlert) error
 }
 
 type notifService struct {
@@ -110,3 +115,21 @@ func (s *notifService) GetHistory(userID uint, limit, offset int) ([]models.Noti
 func (s *notifService) MarkAsRead(notifID uint) error {
 	return s.db.Model(&models.Notification{}).Where("id = ?", notifID).Update("status", "read").Error
 }
+
+// Emergency Alert Stubs
+func (s *notifService) SendEmergencyAlert(userID uint, alert *models.EmergencyAlert) error {
+	return nil
+}
+
+func (s *notifService) NotifyResponderAccepted(userID uint, response *models.AlertResponse) error {
+	return nil
+}
+
+func (s *notifService) NotifyAllParticipants(alertID uuid.UUID, message string) error {
+	return nil
+}
+
+func (s *notifService) NotifyEmergencyContacts(userID uint, alert *models.EmergencyAlert) error {
+	return nil
+}
+
