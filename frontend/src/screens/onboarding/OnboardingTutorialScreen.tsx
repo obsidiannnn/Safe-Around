@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, StyleSheet, ScrollView, Dimensions, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { Button } from '@/components/common';
 import { colors } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';

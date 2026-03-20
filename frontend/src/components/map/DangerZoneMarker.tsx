@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Marker } from 'react-native-maps';
 import { Text } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { DangerZone } from '@/types/models';
 import { colors } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';

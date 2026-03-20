@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card } from '@/components/common';
 import { Crime } from '@/types/models';

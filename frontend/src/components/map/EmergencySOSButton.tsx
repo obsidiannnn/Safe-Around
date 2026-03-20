@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Pressable, Vibration } from 'react-native';
 import { Text } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import { Modal, Button } from '@/components/common';
 import { colors } from '@/theme/colors';
@@ -107,22 +107,23 @@ export const EmergencySOSButton: React.FC<EmergencySOSButtonProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 50, // Slightly higher to clear the new floating tab bar
     alignSelf: 'center',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 20,
   },
   pulse: {
     position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     backgroundColor: colors.error,
   },
   button: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     backgroundColor: colors.error,
     justifyContent: 'center',
     alignItems: 'center',
@@ -132,12 +133,14 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     transform: [{ scale: 0.95 }],
+    backgroundColor: '#b71c1c', // Darker red on press
   },
   text: {
-    fontSize: fontSizes.sm,
-    fontWeight: '700',
+    fontSize: fontSizes.md,
+    fontWeight: '800',
     color: colors.surface,
     marginTop: spacing.xs,
+    letterSpacing: 1,
   },
   modalContent: {
     alignItems: 'center',
