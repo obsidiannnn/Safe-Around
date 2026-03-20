@@ -63,7 +63,7 @@ func main() {
 	sessionRepo := repository.NewSessionRepo(db)
 	notifSvc := services.NewNotificationService(fcmClient, twilioClient, db, rdb)
 
-	geoSvc := services.NewGeofencingService(db)
+	geoSvc := services.NewGeofencingService(db, rdb, notifSvc)
 	wsHub := services.NewWebSocketHub()
 	alertSvc := services.NewAlertService(db, rdb, geoSvc, notifSvc, wsHub)
 
