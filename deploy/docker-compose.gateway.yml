@@ -1,0 +1,87 @@
+version: "3.9"
+
+# =============================================================================
+# SafeAround API Gateway Stack
+# Kong Gateway (DB-less declarative mode) + Konga Admin UI
+#
+# Usage:
+#   docker compose -f docker-compose.gateway.yml up -d
+# =============================================================================
+
+volumes:
+  kong_data: {}
+
+networks:
+  gateway:
+    driver: bridge
+
+services:
+
+  # --------------------------------------------------------------------------
+  # Kong Gateway (DB-less mode – config from kong.yml)
+  # --------------------------------------------------------------------------
+  kong:
+    image: kong/kong-gateway:3.6
+    container_name: safearound-kong
+    restart: unless-stopped
+    networks: [gateway]
+    ports:
+      - "8000:8000"   # HTTP proxy (forward to backend)
+      - "8443:8443"   # HTTPS proxy
+      - "8001:8001"   # Admin API (restrict to private network in prod)
+      - "8444:8444"   # Admin API HTTPS
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001, 0.0.0.0:8444 ssl"
+      KONG_PLUGINS: "bundled"
+      # Redis for rate limiting
+      KONG_NGINX_WORKER_PROCESSES: "auto"
+    volumes:
+      - ./kong.yml:/kong/declarative/kong.yml:ro
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # --------------------------------------------------------------------------
+  # Konga – Kong Admin UI
+  # --------------------------------------------------------------------------
+  konga:
+    image: pantsel/konga:latest
+    container_name: safearound-konga
+    restart: unless-stopped
+    networks: [gateway]
+    ports:
+      - "1337:1337"
+    environment:
+      NODE_ENV: production
+      KONGA_HOOK_TIMEOUT: 120000
+      DB_ADAPTER: "postgres"
+      DB_HOST: konga-db
+      DB_PORT: 5432
+      DB_USER: konga
+      DB_PASSWORD: ${KONGA_DB_PASSWORD:-konga123}
+      DB_DATABASE: konga
+    depends_on: [konga-db, kong]
+
+  # --------------------------------------------------------------------------
+  # Konga Postgres DB
+  # --------------------------------------------------------------------------
+  konga-db:
+    image: postgres:15-alpine
+    container_name: safearound-konga-db
+    restart: unless-stopped
+    networks: [gateway]
+    environment:
+      POSTGRES_USER: konga
+      POSTGRES_PASSWORD: ${KONGA_DB_PASSWORD:-konga123}
+      POSTGRES_DB: konga
+    volumes:
+      - kong_data:/var/lib/postgresql/data
