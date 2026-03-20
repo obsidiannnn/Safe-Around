@@ -18,7 +18,10 @@ export const geofencingApiService = {
         params: { lat, lng },
       });
       return response.data.data || null;
-    } catch (error) {
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return null; // Not an error, just no danger zones nearby
+      }
       console.error('Error checking danger zone:', error);
       return null;
     }

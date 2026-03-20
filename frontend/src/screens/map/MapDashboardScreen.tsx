@@ -165,6 +165,7 @@ export const MapDashboardScreen = () => {
 
       {/* Search bar */}
       <MapSearchBar
+        topOffset={insets.top + 68}
         onSelectLocation={(location) => {
           mapRef.current?.animateToRegion(
             {

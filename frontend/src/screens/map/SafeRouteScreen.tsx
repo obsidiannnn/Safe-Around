@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from '
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import { Button } from '@/components/common/Button';
 import { SearchBar } from '@/components/common/SearchBar';
 import { useLocationStore } from '@/store/locationStore';
@@ -120,21 +121,60 @@ export const SafeRouteScreen: React.FC = () => {
         <View style={styles.headerIconButtonPlaceholder} />
       </View>
 
-      <View style={styles.searchContainer}>
-        <SearchBar
-          placeholder="Enter destination"
-          value={destination}
-          onChangeText={setDestination}
-          onSubmitEditing={fetchDirections}
-          loading={loading}
+      <View style={[styles.searchContainer, { zIndex: 999 }]}>
+        <GooglePlacesAutocomplete
+          placeholder="Enter destination..."
+          fetchDetails={true}
+          onPress={(data, details = null) => {
+            if (details?.geometry?.location) {
+              const coords = `${details.geometry.location.lat},${details.geometry.location.lng}`;
+              setDestination(coords);
+            } else {
+              setDestination(data.description);
+            }
+          }}
+          query={{
+            key: GOOGLE_MAPS_API_KEY,
+            language: 'en',
+          }}
+          styles={{
+            container: { flex: 0 },
+            textInput: {
+              height: 48,
+              color: theme.colors.text,
+              fontSize: 16,
+              backgroundColor: theme.colors.surface,
+              borderRadius: 8,
+              paddingHorizontal: 16,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            },
+            listView: {
+              backgroundColor: theme.colors.surface,
+              borderRadius: 8,
+              marginTop: 4,
+              elevation: 4,
+              position: 'absolute',
+              top: 52,
+              left: 0,
+              right: 0,
+            },
+            row: { padding: 12, backgroundColor: theme.colors.surface },
+            description: { color: theme.colors.text },
+            separator: { height: 1, backgroundColor: theme.colors.border },
+          }}
+          textInputProps={{
+            onChangeText: (text) => setDestination(text),
+          }}
         />
         <Button 
-          variant="outline" 
+          variant="primary" 
           size="small" 
           onPress={fetchDirections} 
           style={{ marginTop: 8 }}
+          disabled={loading || !destination}
         >
-          Get Directions
+          {loading ? 'Calculating...' : 'Get Directions'}
         </Button>
       </View>
 
