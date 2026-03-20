@@ -14,6 +14,7 @@ func SetupRouter(
 	healthHandler *handlers.HealthHandler,
 	notifHandler *handlers.NotificationHandler,
 	alertHandler *handlers.AlertHandler,
+	heatmapHandler *handlers.HeatmapHandler,
 	rdb *redis.Client,
 ) *gin.Engine {
 	r := gin.New()
@@ -59,6 +60,13 @@ func SetupRouter(
 			alerts.POST("/:id/escalate", alertHandler.EscalateAlert)
 			alerts.GET("/active", alertHandler.GetActiveAlerts)
 			alerts.GET("/history", alertHandler.GetAlertHistory)
+		}
+
+		// Heatmap domain
+		heatmap := api.Group("/heatmap")
+		// Optional: heatmap.Use(middleware.AuthRequired()) depending on visibility requirements
+		{
+			heatmap.GET("/:z/:x/:y", heatmapHandler.GetTile)
 		}
 	}
 

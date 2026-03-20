@@ -66,15 +66,17 @@ func main() {
 	geoSvc := services.NewGeofencingService(db, rdb, notifSvc)
 	wsHub := services.NewWebSocketHub()
 	alertSvc := services.NewAlertService(db, rdb, geoSvc, notifSvc, wsHub)
+	heatmapSvc := services.NewHeatmapService(db, rdb, nil) // S3 stub natively implemented
 
 	// 5. Setup Handlers
 	authHandler := handlers.NewAuthHandler(userRepo, sessionRepo, rdb, twilioClient)
 	healthHandler := handlers.NewHealthHandler(db, rdb, cfg)
 	notifHandler := handlers.NewNotificationHandler(notifSvc)
 	alertHandler := handlers.NewAlertHandler(alertSvc)
+	heatmapHandler := handlers.NewHeatmapHandler(heatmapSvc)
 
 	// 6. Setup Routes
-	r := routes.SetupRouter(authHandler, healthHandler, notifHandler, alertHandler, rdb)
+	r := routes.SetupRouter(authHandler, healthHandler, notifHandler, alertHandler, heatmapHandler, rdb)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Server.Port,
