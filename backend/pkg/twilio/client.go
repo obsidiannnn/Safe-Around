@@ -74,6 +74,18 @@ func (c *Client) MakeCall(to, from, twimlURL string) (string, error) {
 	return c.executeRequest(endpoint, data)
 }
 
+// SendSMS sends an SMS message via the Twilio Messages API.
+func (c *Client) SendSMS(to, from, body string) (string, error) {
+	endpoint := c.baseURL + "/Messages.json"
+
+	data := url.Values{}
+	data.Set("To", to)
+	data.Set("From", from)
+	data.Set("Body", body)
+
+	return c.executeRequest(endpoint, data)
+}
+
 // VerifyOTP checks an OTP token against the Twilio Verify API
 func (c *Client) VerifyOTP(toPhone, code, serviceSID string) (bool, error) {
 	if c.accountSID == "mock" {

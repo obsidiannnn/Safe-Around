@@ -10,6 +10,8 @@ type UserSession struct {
 	ID           uint           `gorm:"primaryKey" json:"id"`
 	UserID       uint           `gorm:"index;not null" json:"user_id"`
 	RefreshToken string         `gorm:"not null;uniqueIndex" json:"refresh_token"`
+	FCMToken     string         `gorm:"type:text" json:"fcm_token,omitempty"`
+	APNsToken    string         `gorm:"type:text" json:"apns_token,omitempty"`
 	UserAgent    string         `json:"user_agent"`
 	ClientIP     string         `json:"client_ip"`
 	IsRevoked    bool           `gorm:"default:false" json:"is_revoked"`
