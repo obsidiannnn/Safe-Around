@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Text as RNText } from 'react-native';
 import { Text, Checkbox } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { Button, Input, Alert } from '@/components/common';
@@ -21,7 +21,8 @@ export const SignupScreen = () => {
   const { sendOTP, verifyOTP, setupProfile, error, clearError } = useAuth();
 
   const [step, setStep] = useState<SignupStep>('phone');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(''); // user types 10-digit number
+  const fullPhone = `+91${phone}`;         // computed E.164 format
   const [otp, setOtp] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -32,11 +33,11 @@ export const SignupScreen = () => {
 
   // Step 1: Send OTP
   const handleSendOTP = async () => {
-    if (!phone) return;
+    if (!phone || phone.length !== 10) return;
     try {
       setIsSubmitting(true);
       clearError();
-      await sendOTP(phone);
+      await sendOTP(fullPhone);
       setStep('otp');
     } catch (err) {
       // error handled by store
@@ -51,7 +52,7 @@ export const SignupScreen = () => {
     try {
       setIsSubmitting(true);
       clearError();
-      await verifyOTP(phone, otp);
+      await verifyOTP(fullPhone, otp);
       setStep('profile');
     } catch (err) {
       // error handled by store
@@ -88,7 +89,7 @@ export const SignupScreen = () => {
 
   const stepTitles = {
     phone: { title: 'Create Account', subtitle: 'Enter your phone number to get started' },
-    otp: { title: 'Verify Phone', subtitle: `Enter the 6-digit code sent to ${phone}` },
+    otp: { title: 'Verify Phone', subtitle: `Enter the 6-digit code sent to ${fullPhone}` },
     profile: { title: 'Set Up Profile', subtitle: 'Complete your account setup' },
   };
 
@@ -110,15 +111,23 @@ export const SignupScreen = () => {
           {/* ── Step 1: Phone ── */}
           {step === 'phone' && (
             <>
-              <Input
-                label="Phone Number"
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="+919119759509"
-                leftIcon="phone"
-                keyboardType="phone-pad"
-                autoFocus
-              />
+              <View style={styles.phoneRow}>
+                <View style={styles.prefixBox}>
+                  <RNText style={styles.prefixText}>🇮🇳 +91</RNText>
+                </View>
+                <View style={styles.phoneInput}>
+                  <Input
+                    label=""
+                    value={phone}
+                    onChangeText={(t) => setPhone(t.replace(/[^0-9]/g, '').slice(0, 10))}
+                    placeholder="10-digit number"
+                    leftIcon="phone"
+                    keyboardType="number-pad"
+                    maxLength={10}
+                    autoFocus
+                  />
+                </View>
+              </View>
               <Button
                 variant="primary"
                 size="large"
@@ -291,5 +300,27 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     color: colors.primary,
     fontWeight: '600',
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  prefixBox: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.lg,
+    marginRight: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  prefixText: {
+    fontSize: fontSizes.md,
+    color: colors.textPrimary,
+    fontWeight: '600',
+  },
+  phoneInput: {
+    flex: 1,
   },
 });

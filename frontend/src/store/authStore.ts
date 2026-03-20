@@ -8,7 +8,13 @@ const KEYS = {
   user: 'auth:user',
   accessToken: 'auth:accessToken',
   refreshToken: 'auth:refreshToken',
+  version: 'auth:version',
 };
+
+// Bump this number whenever you want to force-clear old sessions
+// (e.g. after major auth changes, schema updates, etc.)
+const AUTH_VERSION = '3';
+
 
 interface AuthState {
   user: BackendUser | null;
@@ -131,6 +137,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   loadPersistedAuth: async () => {
     try {
+      // ── STEP 0: Version-based flush ──────────────────────────────────────────
+      // If AUTH_VERSION changed (e.g. dev token flush, schema change), wipe everything
+      const storedVersion = await AsyncStorage.getItem(KEYS.version);
+      if (storedVersion !== AUTH_VERSION) {
+        await AsyncStorage.multiRemove([KEYS.user, KEYS.accessToken, KEYS.refreshToken]);
+        await AsyncStorage.setItem(KEYS.version, AUTH_VERSION);
+        console.log('Auth version changed — cleared stale session, redirecting to login');
+        set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false, isLoading: false });
+        return;
+      }
+      // ─────────────────────────────────────────────────────────────────────────
+
       const [userStr, accessToken, refreshToken] = await AsyncStorage.multiGet([
         KEYS.user,
         KEYS.accessToken,

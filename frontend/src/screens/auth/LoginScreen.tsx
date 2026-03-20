@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Text as RNText } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { Button, Input, Alert } from '@/components/common';
@@ -17,6 +17,7 @@ export const LoginScreen = () => {
   const { logIn, error, clearError } = useAuth();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const fullPhone = `+91${phone}`;
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const onSubmit = async () => {
@@ -25,7 +26,7 @@ export const LoginScreen = () => {
       setIsSubmitting(true);
       clearError();
       // Backend: POST /api/v1/auth/login with { phone, password }
-      await logIn({ phone, password });
+      await logIn({ phone: fullPhone, password });
       // Navigation handled by AppNavigator based on auth state
     } catch (err) {
       // Error is handled by store
@@ -51,15 +52,23 @@ export const LoginScreen = () => {
         )}
 
         <View style={styles.form}>
-          <Input
-            label="Phone Number"
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="+919119759509"
-            leftIcon="phone"
-            keyboardType="phone-pad"
-            autoFocus
-          />
+          <View style={styles.phoneRow}>
+            <View style={styles.prefixBox}>
+              <RNText style={styles.prefixText}>🇮🇳 +91</RNText>
+            </View>
+            <View style={styles.phoneInput}>
+              <Input
+                label=""
+                value={phone}
+                onChangeText={(t) => setPhone(t.replace(/[^0-9]/g, '').slice(0, 10))}
+                placeholder="10-digit number"
+                leftIcon="phone"
+                keyboardType="number-pad"
+                maxLength={10}
+                autoFocus
+              />
+            </View>
+          </View>
 
           <Input
             type="password"
@@ -155,5 +164,27 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     color: colors.primary,
     fontWeight: '600',
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  prefixBox: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.lg,
+    marginRight: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  prefixText: {
+    fontSize: fontSizes.md,
+    color: colors.textPrimary,
+    fontWeight: '600',
+  },
+  phoneInput: {
+    flex: 1,
   },
 });
