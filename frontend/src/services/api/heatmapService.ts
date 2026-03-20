@@ -23,10 +23,16 @@ export const heatmapService = {
    * Get danger zone information for a location
    */
   getZoneInfo: async (lat: number, lng: number): Promise<DangerZone> => {
-    const response = await apiClient.get<ApiResponse<DangerZone>>('/heatmap/zone', {
-      params: { lat, lng },
-    });
-    return response.data.data!;
+    // MOCK: Backend endpoint not implemented yet
+    return {
+      id: 'mock-zone-1',
+      location: { latitude: lat, longitude: lng },
+      radius: 500,
+      safetyScore: 65,
+      crimeCount: 12,
+      mostCommonCrimeType: 'theft',
+      recentIncidents: [],
+    };
   },
 
   /**
@@ -37,10 +43,8 @@ export const heatmapService = {
     lng: number,
     radius: number = 1000
   ): Promise<Crime[]> => {
-    const response = await apiClient.get<ApiResponse<Crime[]>>('/heatmap/crimes', {
-      params: { lat, lng, radius },
-    });
-    return response.data.data || [];
+    // MOCK: Backend endpoint not implemented yet
+    return [];
   },
 
   /**
@@ -51,10 +55,14 @@ export const heatmapService = {
     lng: number,
     radius: number = 500
   ): Promise<AreaStats> => {
-    const response = await apiClient.get<ApiResponse<AreaStats>>('/heatmap/statistics', {
-      params: { lat, lng, radius },
-    });
-    return response.data.data!;
+    // MOCK: Backend endpoint not implemented yet
+    return {
+      safetyScore: 85,
+      nearbyUsers: 142,
+      recentAlerts: 3,
+      crimeRate: 2.5,
+      lastUpdated: new Date().toISOString(),
+    };
   },
 
   /**

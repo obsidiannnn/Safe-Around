@@ -78,7 +78,7 @@ export const Button: React.FC<ButtonProps> = ({
         <ActivityIndicator color={textColor} size="small" />
       ) : (
         <>
-          {icon && <Icon name={icon} size={getIconSize(size)} color={textColor} style={styles.icon} />}
+          {icon && <Icon name={icon as any} size={getIconSize(size)} color={textColor} style={styles.icon} />}
           <Text style={[styles.text, { color: textColor }, styles[`${size}Text`]]}>{children}</Text>
         </>
       )}

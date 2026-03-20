@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useLocationStore } from '@/store/locationStore';
 import { locationService } from '@/services/location/locationService';
+import { locationApiService } from '@/services/api/locationApiService';
 
 /**
  * Custom hook for location tracking and management
@@ -70,11 +71,21 @@ export const useLocation = () => {
   useEffect(() => {
     if (!isTracking) return;
 
+    let lastSyncTime = 0;
+    const SYNC_INTERVALMs = 15000; // Sync to backend every 15s max to save battery/bandwidth
+
     const subscription = locationService.watchPosition((location) => {
       setCurrentLocation(location);
       addToHistory(location);
       if (location.heading !== undefined) {
         setHeading(location.heading);
+      }
+
+      // Sync to backend
+      const now = Date.now();
+      if (now - lastSyncTime > SYNC_INTERVALMs) {
+        locationApiService.updateLocation(location);
+        lastSyncTime = now;
       }
     });
 
