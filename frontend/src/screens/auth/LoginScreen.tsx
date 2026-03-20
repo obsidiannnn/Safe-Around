@@ -99,7 +99,7 @@ export const LoginScreen = () => {
 
           <Text
             style={styles.otpLoginText}
-            onPress={() => navigation.navigate('Signup' as never)}
+            onPress={() => (navigation as any).navigate('Signup', { mode: 'login' })}
           >
             Login with OTP instead
           </Text>
@@ -172,13 +172,15 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   prefixBox: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.lg,
+    height: 52,
+    justifyContent: 'center',
     marginRight: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.small,
   },
   prefixText: {
     fontSize: fontSizes.md,
