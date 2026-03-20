@@ -7,7 +7,37 @@ import { Button } from '@/components/common/Button';
 import { SearchBar } from '@/components/common/SearchBar';
 import { useLocationStore } from '@/store/locationStore';
 import { theme } from '@/theme';
+import { colors } from '@/theme/colors';
 import { useNavigation } from '@react-navigation/native';
+import { GOOGLE_MAPS_API_KEY } from '@/config/env';
+
+// Polyline Decoder for Google Maps Directions API string compression formula
+const decodePolyline = (t: string, e: number = 5) => {
+  let points = [];
+  let index = 0, len = t.length;
+  let lat = 0, lng = 0;
+  while (index < len) {
+    let b, shift = 0, result = 0;
+    do {
+      b = t.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    let dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lat += dlat;
+    shift = 0;
+    result = 0;
+    do {
+      b = t.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    let dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lng += dlng;
+    points.push({ latitude: (lat / Math.pow(10, e)), longitude: (lng / Math.pow(10, e)) });
+  }
+  return points;
+};
 
 interface Route {
   id: string;
@@ -25,47 +55,58 @@ export const SafeRouteScreen: React.FC = () => {
   const { currentLocation } = useLocationStore();
   const [destination, setDestination] = useState('');
   const [mode, setMode] = useState<'walking' | 'driving' | 'transit'>('walking');
-  const [selectedRoute, setSelectedRoute] = useState<string>('b');
-  const [routes] = useState<Route[]>([
-    {
-      id: 'a',
-      name: 'Fastest',
-      distance: 1.2,
-      duration: 15,
-      safetyScore: 65,
-      dangerZones: 2,
-      coordinates: [],
-    },
-    {
-      id: 'b',
-      name: 'Safest',
-      distance: 1.5,
-      duration: 19,
-      safetyScore: 92,
-      dangerZones: 0,
-      coordinates: [],
-    },
-    {
-      id: 'c',
-      name: 'Balanced',
-      distance: 1.3,
-      duration: 16,
-      safetyScore: 78,
-      dangerZones: 1,
-      coordinates: [],
-    },
-  ]);
+  const [selectedRoute, setSelectedRoute] = useState<string>('a');
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchDirections = async () => {
+    if (!currentLocation || !destination) return;
+    setLoading(true);
+    try {
+      const modeString = mode === 'walking' ? 'walking' : mode === 'driving' ? 'driving' : 'transit';
+      const origin = `${currentLocation.latitude},${currentLocation.longitude}`;
+      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${encodeURIComponent(destination)}&mode=${modeString}&key=${GOOGLE_MAPS_API_KEY}`;
+      
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.status === 'OK' && data.routes.length > 0) {
+        const routeData = data.routes[0];
+        const leg = routeData.legs[0];
+        const points = decodePolyline(routeData.overview_polyline.points);
+        
+        setRoutes([
+          {
+            id: 'a',
+            name: `${modeString.toUpperCase()} Route`,
+            distance: parseFloat(leg.distance.text.replace(/[^0-9.]/g, '')),
+            duration: Math.round(leg.duration.value / 60),
+            safetyScore: Math.floor(Math.random() * 20) + 80, // Mock safety score
+            dangerZones: 0,
+            coordinates: points,
+          }
+        ]);
+        setSelectedRoute('a');
+      } else {
+        setRoutes([]);
+      }
+    } catch (err) {
+      console.error('Directions Error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return theme.colors.success;
-    if (score >= 60) return theme.colors.warning;
-    return theme.colors.error;
+    if (score >= 80) return colors.success;
+    if (score >= 60) return colors.warning;
+    return colors.error;
   };
 
   const handleStartNavigation = () => {
     const route = routes.find((r) => r.id === selectedRoute);
     if (route) {
-      navigation.navigate('Navigation' as never, { route } as never);
+      (navigation as any).navigate('Navigation', { route });
     }
   };
 
@@ -84,7 +125,17 @@ export const SafeRouteScreen: React.FC = () => {
           placeholder="Enter destination"
           value={destination}
           onChangeText={setDestination}
+          onSubmitEditing={fetchDirections}
+          loading={loading}
         />
+        <Button 
+          variant="outline" 
+          size="small" 
+          onPress={fetchDirections} 
+          style={{ marginTop: 8 }}
+        >
+          Get Directions
+        </Button>
       </View>
 
       <View style={styles.modeSelector}>
@@ -112,11 +163,18 @@ export const SafeRouteScreen: React.FC = () => {
           initialRegion={{
             latitude: currentLocation.latitude,
             longitude: currentLocation.longitude,
-            latitudeDelta: 0.02,
-            longitudeDelta: 0.02,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
           }}
         >
           <Marker coordinate={currentLocation} title="Current Location" />
+          {routes.length > 0 && routes[0].coordinates.length > 0 && (
+            <Polyline
+              coordinates={routes[0].coordinates}
+              strokeWidth={4}
+              strokeColor={theme.colors.primary}
+            />
+          )}
         </MapView>
       )}
 

@@ -12,6 +12,7 @@ interface SearchBarProps {
   loading?: boolean;
   debounceMs?: number;
   autoFocus?: boolean;
+  onSubmitEditing?: () => void;
 }
 
 /**
@@ -25,6 +26,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   loading = false,
   debounceMs = 300,
   autoFocus = false,
+  onSubmitEditing,
 }) => {
   const [localValue, setLocalValue] = useState(value);
 
@@ -60,6 +62,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         autoCorrect={false}
         returnKeyType="search"
         accessibilityLabel="Search input"
+        onSubmitEditing={onSubmitEditing}
       />
       
       {loading && <ActivityIndicator size="small" color={colors.primary} style={styles.loader} />}
