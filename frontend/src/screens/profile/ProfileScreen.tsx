@@ -9,6 +9,7 @@ import { ActivityTab } from './ActivityTab';
 import { HelpTab } from './HelpTab';
 import { useAuthStore } from '@/store/authStore';
 import { theme } from '@/theme';
+import { colors } from '@/theme/colors';
 
 type Tab = 'overview' | 'settings' | 'activity' | 'help';
 
@@ -48,7 +49,7 @@ export const ProfileScreen: React.FC = () => {
             <Text style={styles.name}>
               {user?.name ?? 'User'}
             </Text>
-            <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
+            <Ionicons name="checkmark-circle" size={20} color={colors.success} />
           </View>
           <View style={styles.stats}>
             <View style={styles.statItem}>

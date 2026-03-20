@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { ComponentProps } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
@@ -10,7 +10,7 @@ import { spacing } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
 
 interface FeatureProps {
-  icon: string;
+  icon: ComponentProps<typeof Icon>['name'];
   title: string;
   description: string;
 }
@@ -37,7 +37,7 @@ export const WelcomeScreen = () => {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.header}>
-        <Text style={styles.logo}>🛡️</Text>
+        <Icon name="security" size={64} color={colors.primary} style={{ marginBottom: 16 }} />
         <Text style={styles.title}>SafeAround</Text>
         <Text style={styles.tagline}>Your Personal Safety Network</Text>
       </View>
