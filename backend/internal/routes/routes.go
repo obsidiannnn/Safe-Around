@@ -16,6 +16,7 @@ func SetupRouter(
 	alertHandler *handlers.AlertHandler,
 	heatmapHandler *handlers.HeatmapHandler,
 	wsHandler *handlers.WebSocketHandler,
+	locationHandler *handlers.LocationHandler,
 	rdb *redis.Client,
 ) *gin.Engine {
 	r := gin.New()
@@ -68,9 +69,17 @@ func SetupRouter(
 
 		// Heatmap domain
 		heatmap := api.Group("/heatmap")
-		// Optional: heatmap.Use(middleware.AuthRequired()) depending on visibility requirements
 		{
 			heatmap.GET("/:z/:x/:y", heatmapHandler.GetTile)
+		}
+
+		// Location domain
+		location := api.Group("/location")
+		location.Use(middleware.AuthRequired())
+		{
+			location.POST("", locationHandler.UpdateLocation)
+			location.GET("/me", locationHandler.GetCurrentLocation)
+			location.GET("/nearby", locationHandler.GetNearbyUsers)
 		}
 	}
 

@@ -70,7 +70,8 @@ func main() {
 	go wsHub.Run()
 
 	alertSvc := services.NewAlertService(db, rdb, geoSvc, notifSvc, wsHub)
-	heatmapSvc := services.NewHeatmapService(db, rdb, nil) // S3 stub natively implemented
+	heatmapSvc := services.NewHeatmapService(db, rdb, nil)
+	locationSvc := services.NewLocationService(db, rdb, geoSvc)
 
 	// 5. Setup Handlers
 	authHandler := handlers.NewAuthHandler(userRepo, sessionRepo, rdb, twilioClient)
@@ -79,9 +80,10 @@ func main() {
 	alertHandler := handlers.NewAlertHandler(alertSvc)
 	heatmapHandler := handlers.NewHeatmapHandler(heatmapSvc)
 	wsHandler := handlers.NewWebSocketHandler(wsHub)
+	locationHandler := handlers.NewLocationHandler(locationSvc)
 
 	// 6. Setup Routes
-	r := routes.SetupRouter(authHandler, healthHandler, notifHandler, alertHandler, heatmapHandler, wsHandler, rdb)
+	r := routes.SetupRouter(authHandler, healthHandler, notifHandler, alertHandler, heatmapHandler, wsHandler, locationHandler, rdb)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Server.Port,
