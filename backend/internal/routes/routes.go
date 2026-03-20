@@ -17,6 +17,7 @@ func SetupRouter(
 	heatmapHandler *handlers.HeatmapHandler,
 	wsHandler *handlers.WebSocketHandler,
 	locationHandler *handlers.LocationHandler,
+	routeHandler *handlers.RouteHandler,
 	rdb *redis.Client,
 ) *gin.Engine {
 	r := gin.New()
@@ -80,6 +81,13 @@ func SetupRouter(
 			location.POST("", locationHandler.UpdateLocation)
 			location.GET("/me", locationHandler.GetCurrentLocation)
 			location.GET("/nearby", locationHandler.GetNearbyUsers)
+		}
+
+		// Safe Route Planning
+		routesGroup := api.Group("/routes")
+		routesGroup.Use(middleware.AuthRequired())
+		{
+			routesGroup.POST("/safe", routeHandler.GetSafeRoutes)
 		}
 	}
 

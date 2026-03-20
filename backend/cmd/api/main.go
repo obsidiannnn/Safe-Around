@@ -72,6 +72,7 @@ func main() {
 	alertSvc := services.NewAlertService(db, rdb, geoSvc, notifSvc, wsHub)
 	heatmapSvc := services.NewHeatmapService(db, rdb, nil)
 	locationSvc := services.NewLocationService(db, rdb, geoSvc)
+	routeSvc := services.NewRouteService(db, rdb)
 
 	// 5. Setup Handlers
 	authHandler := handlers.NewAuthHandler(userRepo, sessionRepo, rdb, twilioClient)
@@ -81,9 +82,10 @@ func main() {
 	heatmapHandler := handlers.NewHeatmapHandler(heatmapSvc)
 	wsHandler := handlers.NewWebSocketHandler(wsHub)
 	locationHandler := handlers.NewLocationHandler(locationSvc)
+	routeHandler := handlers.NewRouteHandler(routeSvc)
 
 	// 6. Setup Routes
-	r := routes.SetupRouter(authHandler, healthHandler, notifHandler, alertHandler, heatmapHandler, wsHandler, locationHandler, rdb)
+	r := routes.SetupRouter(authHandler, healthHandler, notifHandler, alertHandler, heatmapHandler, wsHandler, locationHandler, routeHandler, rdb)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Server.Port,
