@@ -7,6 +7,21 @@ import (
 
 // RunMigrations automigrates all internal structs against the active DB
 func RunMigrations(db *gorm.DB) error {
+	// 1. Enable required PostgreSQL extensions
+	extensions := []string{
+		`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`,
+		`CREATE EXTENSION IF NOT EXISTS postgis`,
+		`CREATE EXTENSION IF NOT EXISTS pg_trgm`,
+		`CREATE EXTENSION IF NOT EXISTS btree_gist`,
+	}
+	for _, ext := range extensions {
+		if err := db.Exec(ext).Error; err != nil {
+			// Non-fatal: extensions may already exist or require superuser
+			_ = err
+		}
+	}
+
+	// 2. AutoMigrate Go structs → tables
 	err := db.AutoMigrate(
 		&models.User{},
 		&models.Notification{},
