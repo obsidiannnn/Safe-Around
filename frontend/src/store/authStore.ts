@@ -141,11 +141,55 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const access = accessToken[1];
       const refresh = refreshToken[1];
 
-      if (user && access && refresh) {
+      // Nothing stored → go to login
+      if (!user || !access || !refresh) {
+        set({ isLoading: false });
+        return;
+      }
+
+      // Validate the stored token with the backend
+      try {
+        const { apiClient } = require('@/services/api/client');
+        await apiClient.get('/users/profile', {
+          headers: { Authorization: `Bearer ${access}` },
+          timeout: 5000,
+        });
+        // Token is valid → restore auth
         set({ user, accessToken: access, refreshToken: refresh, isAuthenticated: true });
+      } catch (validationError: any) {
+        const isNetworkError = !validationError?.response;
+
+        if (isNetworkError) {
+          // Backend unreachable (offline) → trust cached data
+          console.warn('Backend offline — using cached auth');
+          set({ user, accessToken: access, refreshToken: refresh, isAuthenticated: true });
+        } else {
+          // Token is invalid/expired (401, 403) → try refresh
+          try {
+            const { apiClient } = require('@/services/api/client');
+            const refreshResponse = await apiClient.post('/auth/refresh', {
+              refresh_token: refresh,
+            });
+            const newTokens = refreshResponse.data?.tokens;
+            if (newTokens?.access && newTokens?.refresh) {
+              await AsyncStorage.setItem(KEYS.accessToken, newTokens.access);
+              await AsyncStorage.setItem(KEYS.refreshToken, newTokens.refresh);
+              set({ user, accessToken: newTokens.access, refreshToken: newTokens.refresh, isAuthenticated: true });
+            } else {
+              throw new Error('Invalid refresh response');
+            }
+          } catch {
+            // Refresh also failed → clear everything and show login
+            console.warn('Session expired — redirecting to login');
+            await AsyncStorage.multiRemove([KEYS.user, KEYS.accessToken, KEYS.refreshToken]);
+            set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to load persisted auth:', error);
+      // On any unexpected error, clear auth for safety
+      await AsyncStorage.multiRemove([KEYS.user, KEYS.accessToken, KEYS.refreshToken]);
     } finally {
       set({ isLoading: false });
     }
@@ -154,3 +198,4 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   clearError: () => set({ error: null }),
   setError: (error) => set({ error }),
 }));
+
