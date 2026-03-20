@@ -19,6 +19,7 @@ func SetupRouter(
 	wsHandler *handlers.WebSocketHandler,
 	locationHandler *handlers.LocationHandler,
 	routeHandler *handlers.RouteHandler,
+	profileHandler *handlers.ProfileHandler,
 	rdb *redis.Client,
 ) *gin.Engine {
 	r := gin.New()
@@ -75,7 +76,11 @@ func SetupRouter(
 		// Heatmap domain
 		heatmap := api.Group("/heatmap")
 		{
-			heatmap.GET("/:z/:x/:y", heatmapHandler.GetTile)
+			heatmap.GET("/tiles/:z/:x/:y", heatmapHandler.GetTile)
+			heatmap.GET("/zone", heatmapHandler.GetZoneInfo)
+			heatmap.GET("/crimes", heatmapHandler.GetRecentCrimes)
+			heatmap.GET("/statistics", heatmapHandler.GetStatistics)
+			heatmap.POST("/report", middleware.AuthRequired(), heatmapHandler.ReportIncident)
 		}
 
 		// Location domain
@@ -92,6 +97,17 @@ func SetupRouter(
 		routesGroup.Use(middleware.AuthRequired())
 		{
 			routesGroup.POST("/safe", routeHandler.GetSafeRoutes)
+		}
+
+		// User Profile & Contacts domain
+		users := api.Group("/users")
+		users.Use(middleware.AuthRequired())
+		{
+			users.GET("/profile", profileHandler.GetProfile)
+			users.PUT("/profile", profileHandler.UpdateProfile)
+			users.GET("/contacts", profileHandler.GetContacts)
+			users.POST("/contacts", profileHandler.AddContact)
+			users.DELETE("/contacts/:id", profileHandler.DeleteContact)
 		}
 	}
 

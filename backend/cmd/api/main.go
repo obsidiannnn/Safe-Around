@@ -70,7 +70,7 @@ func main() {
 	go wsHub.Run()
 
 	alertSvc := services.NewAlertService(db, rdb, geoSvc, notifSvc, wsHub)
-	heatmapSvc := services.NewHeatmapService(db, rdb, nil)
+	_ = services.NewHeatmapService(db, rdb, nil) // keep heatmap tile service available if needed
 	locationSvc := services.NewLocationService(db, rdb, geoSvc)
 	routeSvc := services.NewRouteService(db, rdb)
 
@@ -79,13 +79,14 @@ func main() {
 	healthHandler := handlers.NewHealthHandler(db, rdb, cfg)
 	notifHandler := handlers.NewNotificationHandler(notifSvc)
 	alertHandler := handlers.NewAlertHandler(alertSvc)
-	heatmapHandler := handlers.NewHeatmapHandler(heatmapSvc)
+	heatmapHandler := handlers.NewHeatmapHandler(db)
 	wsHandler := handlers.NewWebSocketHandler(wsHub)
 	locationHandler := handlers.NewLocationHandler(locationSvc)
 	routeHandler := handlers.NewRouteHandler(routeSvc)
+	profileHandler := handlers.NewProfileHandler(db)
 
 	// 6. Setup Routes
-	r := routes.SetupRouter(authHandler, healthHandler, notifHandler, alertHandler, heatmapHandler, wsHandler, locationHandler, routeHandler, rdb)
+	r := routes.SetupRouter(authHandler, healthHandler, notifHandler, alertHandler, heatmapHandler, wsHandler, locationHandler, routeHandler, profileHandler, rdb)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Server.Port,
