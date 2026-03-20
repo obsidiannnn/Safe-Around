@@ -34,6 +34,7 @@ func RunMigrations(db *gorm.DB) error {
 		&models.UserLocation{},
 		&models.DangerZone{},
 		&models.NotificationLog{},
+		&models.CrimeIncident{},
 	)
 	if err != nil {
 		return err

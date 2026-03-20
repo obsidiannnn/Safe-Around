@@ -14,6 +14,7 @@ export const initializeApp = async (): Promise<void> => {
     console.log('Initializing SafeAround...');
 
     // 1. Load auth state from storage
+    await useAuthStore.getState().loadPersistedAuth();
     const { accessToken, isAuthenticated } = useAuthStore.getState();
     console.log('Auth state loaded:', isAuthenticated);
 
