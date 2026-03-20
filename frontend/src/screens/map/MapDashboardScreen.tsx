@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet, Pressable, Platform } from 'react-native';
 import MapView, { Region, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -114,7 +114,7 @@ export const MapDashboardScreen = () => {
       <MapView
         ref={mapRef}
         style={styles.map}
-        provider={PROVIDER_GOOGLE}
+        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
         mapType={mapType}
         initialRegion={region}
         onRegionChangeComplete={handleRegionChange}

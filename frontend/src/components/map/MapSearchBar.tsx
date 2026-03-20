@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, FlatList, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { SearchBar, Badge } from '@/components/common';
@@ -28,6 +29,7 @@ interface MapSearchBarProps {
  * Shows recent searches and saved places
  */
 export const MapSearchBar: React.FC<MapSearchBarProps> = ({ onSelectLocation }) => {
+  const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -126,7 +128,7 @@ export const MapSearchBar: React.FC<MapSearchBarProps> = ({ onSelectLocation }) 
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { top: insets.top + 70 }]}>
       <SearchBar
         value={searchQuery}
         onChangeText={(text) => {

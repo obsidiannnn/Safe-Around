@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import MapView, { Polyline, Marker } from 'react-native-maps';
+import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '@/components/common/Button';
 import { SearchBar } from '@/components/common/SearchBar';
@@ -160,6 +160,7 @@ export const SafeRouteScreen: React.FC = () => {
       {currentLocation && (
         <MapView
           style={styles.map}
+          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
           initialRegion={{
             latitude: currentLocation.latitude,
             longitude: currentLocation.longitude,

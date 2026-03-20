@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
@@ -19,6 +20,7 @@ export const MapTypeSwitch: React.FC<MapTypeSwitchProps> = ({
   currentType,
   onTypeChange,
 }) => {
+  const insets = useSafeAreaInsets();
   const types: { value: MapType; label: string }[] = [
     { value: 'standard', label: 'Standard' },
     { value: 'satellite', label: 'Satellite' },
@@ -26,7 +28,7 @@ export const MapTypeSwitch: React.FC<MapTypeSwitchProps> = ({
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { top: insets.top + 70 }]}>
       {types.map((type) => (
         <Pressable
           key={type.value}
