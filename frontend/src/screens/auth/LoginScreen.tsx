@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import React, { useState, useCallback } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Text as RNText } from 'react-native';
 import { Text } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
 import { Button, Input, Alert } from '@/components/common';
 import { useAuth } from '@/hooks/useAuth';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
@@ -20,6 +20,12 @@ export const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const fullPhone = `+91${phone}`;
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      clearError();
+    }, [clearError])
+  );
 
   const onSubmit = async () => {
     if (!phone || !password) return;

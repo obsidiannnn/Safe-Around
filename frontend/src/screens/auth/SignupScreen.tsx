@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
+import React, { useState, useCallback } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Text as RNText } from 'react-native';
 import { Text, Checkbox } from 'react-native-paper';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Button, Input, Alert } from '@/components/common';
 import { useAuth } from '@/hooks/useAuth';
 import { colors } from '@/theme/colors';
@@ -24,6 +24,13 @@ export const SignupScreen = () => {
   const { sendOTP, verifyOTP, setupProfile, error, clearError } = useAuth();
 
   const [step, setStep] = useState<SignupStep>('phone');
+
+  useFocusEffect(
+    useCallback(() => {
+      // Clear any global errors when landing on this screen
+      clearError();
+    }, [clearError])
+  );
   const [phone, setPhone] = useState(''); // user types 10-digit number
   const fullPhone = `+91${phone}`;         // computed E.164 format
   const [otp, setOtp] = useState('');
