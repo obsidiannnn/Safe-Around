@@ -77,6 +77,14 @@ func (h *AuthHandler) SendOTP(c *gin.Context) {
 	}
 
 	input.Phone = normalizePhone(input.Phone)
+	
+	// If this is explicitly from the Signup flow, block if they already have a password
+	if c.Query("type") == "signup" {
+		if u, err := h.repo.GetByPhone(input.Phone); err == nil && u.Password != "" {
+			c.JSON(http.StatusConflict, gin.H{"error": "User already registered. Please log in."})
+			return
+		}
+	}
 
 	ctx := context.Background()
 	rlKey := "rl:otp:send:" + input.Phone

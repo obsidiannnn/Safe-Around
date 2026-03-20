@@ -37,7 +37,7 @@ export const SignupScreen = () => {
     try {
       setIsSubmitting(true);
       clearError();
-      await sendOTP(fullPhone);
+      await sendOTP(fullPhone, 'signup');
       setStep('otp');
     } catch (err) {
       // error handled by store

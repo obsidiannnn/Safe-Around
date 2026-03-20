@@ -3,11 +3,13 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SettingRow } from '@/components/profile/SettingRow';
 import { useNavigation } from '@react-navigation/native';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useAuth } from '@/hooks/useAuth';
 import { theme } from '@/theme';
 
 export const SettingsTab: React.FC = () => {
   const navigation = useNavigation();
   const { locationSharingMode, batteryOptimization, setBatteryOptimization } = useSettingsStore();
+  const { logOut } = useAuth();
 
   return (
     <ScrollView style={styles.container}>
@@ -24,6 +26,15 @@ export const SettingsTab: React.FC = () => {
           icon="trash"
           title="Delete Account"
           onPress={() => navigation.navigate('DeleteAccount' as never)}
+        />
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>SESSION</Text>
+        <SettingRow
+          icon="log-out-outline"
+          title="Log Out"
+          onPress={logOut}
         />
       </View>
 

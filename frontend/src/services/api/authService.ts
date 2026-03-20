@@ -10,8 +10,9 @@ import {
 
 export const authService = {
   // Step 1: Request OTP (Signup or Login via OTP)
-  sendOTP: async (phone: string): Promise<{ message: string }> => {
-    const response = await apiClient.post<{ message: string }>('/auth/otp/send', { phone } as SendOTPRequest);
+  sendOTP: async (phone: string, type?: 'signup' | 'login'): Promise<{ message: string }> => {
+    const url = type ? `/auth/otp/send?type=${type}` : '/auth/otp/send';
+    const response = await apiClient.post<{ message: string }>(url, { phone } as SendOTPRequest);
     return response.data;
   },
 
