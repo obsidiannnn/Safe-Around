@@ -114,23 +114,21 @@ export const SignupScreen = () => {
           {/* ── Step 1: Phone ── */}
           {step === 'phone' && (
             <>
-              <View style={styles.phoneRow}>
-                <View style={styles.prefixBox}>
-                  <RNText style={styles.prefixText}>+91</RNText>
-                </View>
-                <View style={styles.phoneInput}>
-                  <Input
-                    label=""
-                    value={phone}
-                    onChangeText={(t) => setPhone(t.replace(/[^0-9]/g, '').slice(0, 10))}
-                    placeholder="10-digit number"
-                    leftIcon="phone"
-                    keyboardType="number-pad"
-                    maxLength={10}
-                    autoFocus
-                  />
-                </View>
-              </View>
+                <Input
+                  label="Phone Number"
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="10-digit number"
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                  leftElement={
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: 8, marginRight: 8, borderRightWidth: 1, borderRightColor: colors.border }}>
+                      <RNText style={{ fontSize: 16, fontWeight: '600', color: colors.textPrimary }}>+91</RNText>
+                    </View>
+                  }
+                  leftIcon="phone"
+                  autoFocus
+                />
               <Button
                 variant="primary"
                 size="large"

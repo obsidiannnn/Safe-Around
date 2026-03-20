@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, TextInput, StyleSheet, Pressable, Text, KeyboardTypeOptions, ViewStyle, TextStyle } from 'react-native';
+import { ComponentProps } from 'react';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
@@ -15,8 +16,9 @@ interface InputProps {
   placeholder?: string;
   label?: string;
   error?: string;
-  leftIcon?: string;
-  rightIcon?: string;
+  leftIcon?: ComponentProps<typeof Icon>['name'];
+  leftElement?: React.ReactNode;
+  rightIcon?: ComponentProps<typeof Icon>['name'];
   maxLength?: number;
   showCounter?: boolean;
   autoFocus?: boolean;
@@ -39,6 +41,7 @@ export const Input: React.FC<InputProps> = ({
   label,
   error,
   leftIcon,
+  leftElement,
   rightIcon,
   maxLength,
   showCounter = false,
@@ -85,6 +88,9 @@ export const Input: React.FC<InputProps> = ({
           disabled && styles.disabledContainer,
         ]}
       >
+        {leftElement && (
+          <View style={styles.leftElementContainer}>{leftElement}</View>
+        )}
         {leftIcon && (
           <Icon name={leftIcon} size={20} color={colors.textSecondary} style={styles.leftIcon} />
         )}
@@ -171,6 +177,9 @@ const styles = StyleSheet.create({
   },
   leftIcon: {
     marginRight: 0,
+  },
+  leftElementContainer: {
+    justifyContent: 'center',
   },
   rightIcon: {
     marginLeft: spacing.sm,

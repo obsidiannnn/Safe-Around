@@ -53,24 +53,22 @@ export const LoginScreen = () => {
         )}
 
         <View style={styles.form}>
-          <View style={styles.phoneRow}>
-            <View style={styles.prefixBox}>
-              <RNText style={styles.prefixText}>+91</RNText>
-            </View>
-            <View style={styles.phoneInput}>
               <Input
-                label=""
+                label="Phone Number"
                 value={phone}
                 onChangeText={(t) => setPhone(t.replace(/[^0-9]/g, '').slice(0, 10))}
                 placeholder="10-digit number"
-                leftIcon="phone"
-                keyboardType="number-pad"
+                keyboardType="phone-pad"
                 maxLength={10}
+                leftElement={
+                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: 8, marginRight: 8, borderRightWidth: 1, borderRightColor: colors.border }}>
+                    <RNText style={{ fontSize: 16, fontWeight: '600', color: colors.textPrimary }}>+91</RNText>
+                  </View>
+                }
+                leftIcon="phone"
                 autoFocus
+                error={!phone ? undefined : phone.length < 10 ? 'Enter valid 10-digit number' : undefined}
               />
-            </View>
-          </View>
-
           <Input
             type="password"
             label="Password"
