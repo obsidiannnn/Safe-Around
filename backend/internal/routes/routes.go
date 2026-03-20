@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/handlers"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -25,7 +26,10 @@ func SetupRouter(
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 	r.Use(middleware.CorsMiddleware())
+	r.Use(middleware.MetricsMiddleware())
 
+	// Prometheus metrics scrape endpoint (unauthenticated – secure at the network level)
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 	// Public Health endpoints
 	healthGroup := r.Group("/health")
 	{

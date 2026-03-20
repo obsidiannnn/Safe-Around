@@ -1,0 +1,115 @@
+version: "3.9"
+
+# =============================================================================
+# SafeAround Observability Stack
+# Prometheus  →  Grafana  (metrics)
+# Filebeat    →  Logstash  →  Elasticsearch  →  Kibana  (logs)
+#
+# Usage:
+#   docker compose -f docker-compose.monitoring.yml up -d
+# =============================================================================
+
+volumes:
+  prometheus_data: {}
+  grafana_data: {}
+  elasticsearch_data: {}
+
+networks:
+  monitoring:
+    driver: bridge
+
+services:
+
+  # --------------------------------------------------------------------------
+  # Prometheus
+  # --------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: safearound-prometheus
+    restart: unless-stopped
+    networks: [monitoring]
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus_data:/prometheus
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus.rules.yml:/etc/prometheus/rules.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+      - --web.enable-admin-api
+
+  # --------------------------------------------------------------------------
+  # Grafana
+  # --------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: safearound-grafana
+    restart: unless-stopped
+    networks: [monitoring]
+    ports:
+      - "3000:3000"
+    depends_on: [prometheus]
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboard.json:/etc/grafana/provisioning/dashboards/safearound.json:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-safearound123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/safearound.json
+
+  # --------------------------------------------------------------------------
+  # Elasticsearch
+  # --------------------------------------------------------------------------
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    container_name: safearound-elasticsearch
+    restart: unless-stopped
+    networks: [monitoring]
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - "cluster.name=safearound-logs"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+  # --------------------------------------------------------------------------
+  # Logstash
+  # --------------------------------------------------------------------------
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.13.0
+    container_name: safearound-logstash
+    restart: unless-stopped
+    networks: [monitoring]
+    ports:
+      - "5044:5044"  # Beats input
+      - "5001:5001"  # JSON TCP input
+    depends_on: [elasticsearch]
+    environment:
+      - LS_JAVA_OPTS=-Xms256m -Xmx256m
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+
+  # --------------------------------------------------------------------------
+  # Kibana
+  # --------------------------------------------------------------------------
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.0
+    container_name: safearound-kibana
+    restart: unless-stopped
+    networks: [monitoring]
+    ports:
+      - "5601:5601"
+    depends_on: [elasticsearch]
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - KIBANA_SYSTEM_PASSWORD=${KIBANA_PASSWORD:-kibana123}

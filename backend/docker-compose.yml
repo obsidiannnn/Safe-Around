@@ -1,61 +1,214 @@
-version: '3.8'
+version: "3.9"
+
+# =============================================================================
+# SafeAround – Full Production Stack
+# Usage:
+#   cp .env.example .env && vi .env
+#   docker compose up -d
+# =============================================================================
+
+volumes:
+  postgres_data: {}
+  redis_data: {}
+  prometheus_data: {}
+  grafana_data: {}
+
+networks:
+  safearound-network:
+    driver: bridge
 
 services:
-  db:
-    image: postgis/postgis:15-3.3
-    container_name: safearound_db
-    restart: always
+
+  # --------------------------------------------------------------------------
+  # PostgreSQL + PostGIS
+  # --------------------------------------------------------------------------
+  postgres:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: safearound-postgres
+    restart: unless-stopped
+    networks: [safearound-network]
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: ${DB_USER:-safearound_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-your_secure_password}
-      POSTGRES_DB: ${DB_NAME:-safearound_dev}
-    ports:
-      - "${DB_PORT:-5432}:5432"
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-safearound_prod}
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - safearound_network
+      - ./scripts/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./scripts/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-safearound_user} -d ${DB_NAME:-safearound_dev}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-safearound_user}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # --------------------------------------------------------------------------
+  # Redis
+  # --------------------------------------------------------------------------
   redis:
     image: redis:7-alpine
-    container_name: safearound_redis
-    restart: always
+    container_name: safearound-redis
+    restart: unless-stopped
+    networks: [safearound-network]
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "6379:6379"
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
-    networks:
-      - safearound_network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
-      timeout: 5s
+      timeout: 3s
       retries: 5
 
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: safearound_pgadmin
-    restart: always
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@safearound.local
-      PGADMIN_DEFAULT_PASSWORD: admin
+  # --------------------------------------------------------------------------
+  # Backend API
+  # --------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: safearound/backend:${APP_VERSION:-latest}
+    container_name: safearound-backend
+    restart: unless-stopped
+    networks: [safearound-network]
     ports:
-      - "5050:80"
-    networks:
-      - safearound_network
+      - "8080:8080"
+    env_file: .env
+    environment:
+      - DB_HOST=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - GIN_MODE=release
+      - ENVIRONMENT=production
     depends_on:
-      db:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # --------------------------------------------------------------------------
+  # Background Worker
+  # --------------------------------------------------------------------------
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    image: safearound/worker:${APP_VERSION:-latest}
+    container_name: safearound-worker
+    restart: unless-stopped
+    networks: [safearound-network]
+    env_file: .env
+    environment:
+      - DB_HOST=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENVIRONMENT=production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
-volumes:
-  postgres_data:
-  redis_data:
+  # --------------------------------------------------------------------------
+  # Crime Data Pipeline (Python)
+  # --------------------------------------------------------------------------
+  crime-pipeline:
+    build:
+      context: ../crime-pipeline
+      dockerfile: Dockerfile
+    image: safearound/crime-pipeline:${APP_VERSION:-latest}
+    container_name: safearound-crime-pipeline
+    restart: unless-stopped
+    networks: [safearound-network]
+    ports:
+      - "8001:8001"
+    env_file: .env
+    environment:
+      - DB_HOST=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
 
-networks:
-  safearound_network:
-    driver: bridge
+  # --------------------------------------------------------------------------
+  # Kong API Gateway (DB-less)
+  # --------------------------------------------------------------------------
+  kong:
+    image: kong/kong-gateway:3.6
+    container_name: safearound-kong
+    restart: unless-stopped
+    networks: [safearound-network]
+    ports:
+      - "80:8000"
+      - "443:8443"
+      - "8001:8001"
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+      KONG_PLUGINS: "bundled"
+    volumes:
+      - ../deploy/kong.yml:/kong/kong.yml:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # --------------------------------------------------------------------------
+  # Prometheus
+  # --------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: safearound-prometheus
+    restart: unless-stopped
+    networks: [safearound-network]
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus_data:/prometheus
+      - ../deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../deploy/prometheus.rules.yml:/etc/prometheus/rules.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+
+  # --------------------------------------------------------------------------
+  # Grafana
+  # --------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: safearound-grafana
+    restart: unless-stopped
+    networks: [safearound-network]
+    ports:
+      - "3000:3000"
+    depends_on: [prometheus]
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../deploy/grafana/dashboard.json:/etc/grafana/provisioning/dashboards/safearound.json:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-safearound123}
+      - GF_USERS_ALLOW_SIGN_UP=false
