@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from '@/types/navigation';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { MapScreen } from '@/screens/map/MapScreen';
 import { EmergencyScreen } from '@/screens/emergency/EmergencyScreen';
 import { ProfileScreen } from '@/screens/profile/ProfileScreen';
@@ -18,18 +18,27 @@ export const MainNavigator = () => {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
-          height: 68,
-          paddingTop: spacing.sm,
-          paddingBottom: spacing.sm,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
+          height: 85,
+          paddingTop: 12,
+          paddingBottom: 24,
           backgroundColor: colors.surface,
-          borderTopLeftRadius: borderRadius.lg,
-          borderTopRightRadius: borderRadius.lg,
+          borderTopLeftRadius: 32,
+          borderTopRightRadius: 32,
+          borderTopWidth: 0,
+          position: 'absolute', // Floating effect over content
+          bottom: 0,
+          left: 0,
+          right: 0,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 12,
+          elevation: 16,
         },
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '600',
+          marginTop: 4,
         },
       }}
     >

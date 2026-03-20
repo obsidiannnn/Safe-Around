@@ -3,7 +3,7 @@ import { View, StyleSheet, Vibration } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { BottomSheet, Button } from '@/components/common';
 import { useLocationStore } from '@/store/locationStore';
 import { useLocation } from '@/hooks/useLocation';

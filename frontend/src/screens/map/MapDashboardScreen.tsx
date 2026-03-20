@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import MapView, { Region, PROVIDER_GOOGLE } from 'react-native-maps';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeatmapLayer } from '@/components/map/HeatmapLayer';
 import { HeatmapLegend } from '@/components/map/HeatmapLegend';
@@ -236,41 +236,43 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
+    zIndex: 10,
   },
   menuButton: {
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
     borderRadius: borderRadius.pill,
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
-    ...shadows.medium,
+    ...shadows.large,
   },
   notificationButton: {
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
     borderRadius: borderRadius.pill,
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
-    ...shadows.medium,
+    ...shadows.large,
     position: 'relative',
   },
   notificationBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 10,
+    right: 10,
   },
   statsToggle: {
     position: 'absolute',
-    bottom: 120,
+    bottom: 130, // Lifted slightly
     left: spacing.lg,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    ...shadows.medium,
+    ...shadows.large,
+    zIndex: 10,
   },
 });

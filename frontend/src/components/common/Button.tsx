@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Pressable, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
 import { Text } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
@@ -123,11 +123,11 @@ const styles = StyleSheet.create({
   },
   primary: {
     backgroundColor: colors.primary,
-    ...shadows.small,
+    ...shadows.medium,
   },
   secondary: {
     backgroundColor: colors.secondary,
-    ...shadows.small,
+    ...shadows.medium,
   },
   outline: {
     backgroundColor: colors.surface,
@@ -139,6 +139,7 @@ const styles = StyleSheet.create({
   },
   danger: {
     backgroundColor: colors.error,
+    ...shadows.medium,
   },
   small: {
     paddingVertical: spacing.md,
