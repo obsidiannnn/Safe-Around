@@ -4,6 +4,7 @@ import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { Button, Input, Alert } from '@/components/common';
 import { useAuth } from '@/hooks/useAuth';
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
@@ -42,7 +43,7 @@ export const LoginScreen = () => {
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <Text style={styles.logo}>🛡️</Text>
+          <Icon name="security" size={64} color={colors.primary} style={styles.logo} />
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Sign in to continue to SafeAround</Text>
         </View>
@@ -54,7 +55,7 @@ export const LoginScreen = () => {
         <View style={styles.form}>
           <View style={styles.phoneRow}>
             <View style={styles.prefixBox}>
-              <RNText style={styles.prefixText}>🇮🇳 +91</RNText>
+              <RNText style={styles.prefixText}>+91</RNText>
             </View>
             <View style={styles.phoneInput}>
               <Input
@@ -98,7 +99,7 @@ export const LoginScreen = () => {
 
           <Text
             style={styles.otpLoginText}
-            onPress={() => navigation.navigate('Signup' as never)}
+            onPress={() => (navigation as any).navigate('Signup', { mode: 'login' })}
           >
             Login with OTP instead
           </Text>
@@ -167,17 +168,19 @@ const styles = StyleSheet.create({
   },
   phoneRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: spacing.md,
   },
   prefixBox: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.lg,
+    height: 52,
+    justifyContent: 'center',
     marginRight: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.small,
   },
   prefixText: {
     fontSize: fontSizes.md,

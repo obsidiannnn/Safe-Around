@@ -27,7 +27,7 @@ interface AuthState {
   setUser: (user: BackendUser | null) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
 
-  sendOTP: (phone: string) => Promise<void>;
+  sendOTP: (phone: string, type?: 'signup' | 'login') => Promise<void>;
   verifyOTP: (phone: string, otp: string) => Promise<void>;
   setupProfile: (data: SetupProfileRequest) => Promise<void>;
   logIn: (data: LoginRequest) => Promise<void>;
@@ -61,10 +61,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     AsyncStorage.setItem(KEYS.refreshToken, refreshToken);
   },
 
-  sendOTP: async (phone) => {
+  sendOTP: async (phone, type) => {
     try {
       set({ error: null });
-      await authService.sendOTP(phone);
+      await authService.sendOTP(phone, type);
     } catch (error: any) {
       const msg = error.response?.data?.error || 'Failed to send OTP';
       set({ error: msg });

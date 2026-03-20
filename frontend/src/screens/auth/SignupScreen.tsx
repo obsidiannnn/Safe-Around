@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Text as RNText } from 'react-native';
 import { Text, Checkbox } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Button, Input, Alert } from '@/components/common';
 import { useAuth } from '@/hooks/useAuth';
 import { colors } from '@/theme/colors';
@@ -18,6 +18,9 @@ type SignupStep = 'phone' | 'otp' | 'profile';
  */
 export const SignupScreen = () => {
   const navigation = useNavigation();
+  const route = useRoute<RouteProp<{ params: { mode?: 'login' | 'signup' } }, 'params'>>();
+  const mode = route.params?.mode || 'signup';
+  
   const { sendOTP, verifyOTP, setupProfile, error, clearError } = useAuth();
 
   const [step, setStep] = useState<SignupStep>('phone');
@@ -37,7 +40,7 @@ export const SignupScreen = () => {
     try {
       setIsSubmitting(true);
       clearError();
-      await sendOTP(fullPhone);
+      await sendOTP(fullPhone, mode);
       setStep('otp');
     } catch (err) {
       // error handled by store
@@ -88,7 +91,7 @@ export const SignupScreen = () => {
   const pwdStrength = getPasswordStrength(password);
 
   const stepTitles = {
-    phone: { title: 'Create Account', subtitle: 'Enter your phone number to get started' },
+    phone: { title: mode === 'login' ? 'Login with OTP' : 'Create Account', subtitle: 'Enter your phone number to get started' },
     otp: { title: 'Verify Phone', subtitle: `Enter the 6-digit code sent to ${fullPhone}` },
     profile: { title: 'Set Up Profile', subtitle: 'Complete your account setup' },
   };
@@ -113,7 +116,7 @@ export const SignupScreen = () => {
             <>
               <View style={styles.phoneRow}>
                 <View style={styles.prefixBox}>
-                  <RNText style={styles.prefixText}>🇮🇳 +91</RNText>
+                  <RNText style={styles.prefixText}>+91</RNText>
                 </View>
                 <View style={styles.phoneInput}>
                   <Input
@@ -303,17 +306,19 @@ const styles = StyleSheet.create({
   },
   phoneRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: spacing.md,
   },
   prefixBox: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.lg,
+    height: 52,
+    justifyContent: 'center',
     marginRight: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.small,
   },
   prefixText: {
     fontSize: fontSizes.md,

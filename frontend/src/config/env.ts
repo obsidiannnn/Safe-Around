@@ -1,23 +1,29 @@
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-// On Android emulator: localhost → 10.0.2.2 (host machine IP)
-// On iOS simulator: localhost works fine
-const getLocalhost = () => {
+const getDevHost = () => {
+  // If running via Expo Go, dynamically get the host machine's LAN IP
+  const debuggerHost = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost || Constants.manifest2?.extra?.expoGo?.debuggerHost;
+  if (debuggerHost) {
+    return debuggerHost.split(':')[0]; // Extracts '10.110.153.103'
+  }
+  
+  // Fallbacks for simulators
   if (Platform.OS === 'android') {
     return '10.0.2.2';
   }
   return 'localhost';
 };
 
-const localhost = getLocalhost();
+const devHost = getDevHost();
 
 // Use __DEV__ (set by Metro bundler) rather than NODE_ENV for reliable dev vs prod detection in React Native.
 const IS_DEV = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production';
 
 const config = {
   dev: {
-    API_URL: `http://${localhost}:8080/api/v1`,
-    WEBSOCKET_URL: `ws://${localhost}:8080`,
+    API_URL: `http://${devHost}:8000/api/v1`,
+    WEBSOCKET_URL: `ws://${devHost}:8000`,
     GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || '',
   },
   prod: {

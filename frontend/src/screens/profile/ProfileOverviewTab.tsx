@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useNavigation } from '@react-navigation/native';
 import { theme } from '@/theme';
 import { format } from 'date-fns';
+import { colors } from '@/theme/colors';
 
 export const ProfileOverviewTab: React.FC = () => {
   const { user } = useAuthStore();
@@ -26,8 +27,8 @@ export const ProfileOverviewTab: React.FC = () => {
           <View style={styles.infoRow}>
             <Ionicons name="call" size={20} color={theme.colors.textSecondary} />
             <Text style={styles.infoLabel}>Phone</Text>
-            <Text style={styles.infoValue}>{user?.phoneNumber}</Text>
-            <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+            <Text style={styles.infoValue}>{user?.phone}</Text>
+            <Ionicons name="checkmark-circle" size={16} color={colors.success} />
           </View>
           <View style={styles.infoRow}>
             <Ionicons name="mail" size={20} color={theme.colors.textSecondary} />
@@ -38,7 +39,7 @@ export const ProfileOverviewTab: React.FC = () => {
             <Ionicons name="calendar" size={20} color={theme.colors.textSecondary} />
             <Text style={styles.infoLabel}>Joined</Text>
             <Text style={styles.infoValue}>
-              {user?.createdAt ? format(new Date(user.createdAt), 'MMM yyyy') : 'N/A'}
+              {user?.created_at ? format(new Date(user.created_at), 'MMM yyyy') : 'N/A'}
             </Text>
           </View>
         </View>
