@@ -13,7 +13,7 @@ const KEYS = {
 
 // Bump this number whenever you want to force-clear old sessions
 // (e.g. after major auth changes, schema updates, etc.)
-const AUTH_VERSION = '2';
+const AUTH_VERSION = '3';
 
 
 interface AuthState {
