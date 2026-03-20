@@ -3,6 +3,8 @@ package config
 import (
 	"errors"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -14,12 +16,15 @@ type Config struct {
 		Env  string
 	}
 	DB struct {
-		Host     string
-		Port     string
-		User     string
-		Password string
-		Name     string
-		SSLMode  string
+		Host            string
+		Port            string
+		User            string
+		Password        string
+		Name            string
+		SSLMode         string
+		MaxOpenConns    int
+		MaxIdleConns    int
+		ConnMaxLifetime time.Duration
 	}
 	Redis struct {
 		URL      string // Cloud Redis URL (e.g. Upstash) - takes priority
@@ -60,6 +65,9 @@ func LoadConfig() (*Config, error) {
 	if cfg.DB.SSLMode == "" {
 		cfg.DB.SSLMode = "disable"
 	}
+	cfg.DB.MaxOpenConns = envInt("DB_MAX_OPEN_CONNS", 25)
+	cfg.DB.MaxIdleConns = envInt("DB_MAX_IDLE_CONNS", 5)
+	cfg.DB.ConnMaxLifetime = envDuration("DB_CONN_MAX_LIFETIME", 5*time.Minute)
 
 	// Redis - supports cloud URL (Upstash) or local Host:Port
 	cfg.Redis.URL = os.Getenv("REDIS_URL")
@@ -97,4 +105,25 @@ func validate(cfg *Config) error {
 		return errors.New("missing jwt secret")
 	}
 	return nil
+}
+
+// envInt reads an integer environment variable, returning defaultVal if unset or unparseable.
+func envInt(key string, defaultVal int) int {
+	if v := os.Getenv(key); v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			return i
+		}
+	}
+	return defaultVal
+}
+
+// envDuration reads a time.Duration environment variable (e.g. "5m", "1h"),
+// returning defaultVal if unset or unparseable.
+func envDuration(key string, defaultVal time.Duration) time.Duration {
+	if v := os.Getenv(key); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			return d
+		}
+	}
+	return defaultVal
 }
