@@ -9,6 +9,10 @@ import { WelcomeScreen } from '@/screens/onboarding/WelcomeScreen';
 import { PermissionsScreen } from '@/screens/onboarding/PermissionsScreen';
 import { EmergencyContactsScreen } from '@/screens/onboarding/EmergencyContactsScreen';
 import { OnboardingTutorialScreen } from '@/screens/onboarding/OnboardingTutorialScreen';
+import { SafeRouteScreen } from '@/screens/map/SafeRouteScreen';
+import { NavigationScreen } from '@/screens/map/NavigationScreen';
+import { LocationHistoryScreen } from '@/screens/map/LocationHistoryScreen';
+import { CrimeDetailsScreen } from '@/screens/map/CrimeDetailsScreen';
 import { useAuthStore } from '@/store/authStore';
 
 const Stack = createStackNavigator<RootStackParamList>();

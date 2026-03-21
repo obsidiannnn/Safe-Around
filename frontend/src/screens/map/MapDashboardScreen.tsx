@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, Pressable, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, Platform, Text } from 'react-native';
 import MapView, { Region, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,8 +39,8 @@ export const MapDashboardScreen = () => {
   const { isInDangerZone, currentZone } = useGeofencing();
   
   const [region, setRegion] = useState<Region>({
-    latitude: 37.78825,
-    longitude: -122.4324,
+    latitude: currentLocation?.latitude || 37.78825,
+    longitude: currentLocation?.longitude || -122.4324,
     latitudeDelta: 0.0922,
     longitudeDelta: 0.0421,
   });
@@ -48,6 +48,7 @@ export const MapDashboardScreen = () => {
   const [showStatsCard, setShowStatsCard] = useState(false);
   const [notificationCount, setNotificationCount] = useState(3);
   const [showDangerAlert, setShowDangerAlert] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<{ name: string; location: { latitude: number; longitude: number } } | null>(null);
 
   useEffect(() => {
     startTracking();
@@ -55,12 +56,14 @@ export const MapDashboardScreen = () => {
 
   useEffect(() => {
     if (isInDangerZone && currentZone) {
+      console.log('User entered danger zone:', currentZone.id);
       setShowDangerAlert(true);
     }
   }, [isInDangerZone, currentZone]);
 
   useEffect(() => {
     if (currentLocation) {
+      console.log('Centering map on current location:', currentLocation.latitude, currentLocation.longitude);
       const newRegion = {
         latitude: currentLocation.latitude,
         longitude: currentLocation.longitude,
@@ -118,10 +121,10 @@ export const MapDashboardScreen = () => {
         mapType={mapType}
         initialRegion={region}
         onRegionChangeComplete={handleRegionChange}
-        showsUserLocation={false}
+        showsUserLocation={true}
         showsMyLocationButton={false}
-        showsCompass
-        showsScale
+        showsCompass={false}
+        showsScale={false}
       >
         <HeatmapLayer region={region} />
         
@@ -141,10 +144,22 @@ export const MapDashboardScreen = () => {
         ))}
       </MapView>
 
-      {/* Top bar */}
-      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable style={styles.menuButton}>
-          <Icon name="menu" size={24} color={colors.textPrimary} />
+      {/* Top Profile Bar (Psychological: Sense of being protected/logged in) */}
+      <View style={[styles.profileBar, { top: insets.top + spacing.sm }]}>
+        <Pressable 
+          style={styles.profileButton}
+          onPress={() => navigation.navigate('Profile' as never)}
+        >
+          <View style={styles.avatarPlaceholder}>
+            <Icon name="verified-user" size={18} color={colors.secondary} />
+          </View>
+          <View style={styles.profileTextContainer}>
+            <Text style={styles.profileTitle}>Verified Citizen</Text>
+            <View style={styles.statusRow}>
+              <View style={styles.statusDot} />
+              <Text style={styles.profileStatus}>LIVE PROTECTION</Text>
+            </View>
+          </View>
         </Pressable>
 
         <BackgroundLocationIndicator
@@ -152,21 +167,12 @@ export const MapDashboardScreen = () => {
           batteryImpact="low"
           onPress={() => navigation.navigate('LocationHistory' as never)}
         />
-
-        <Pressable style={styles.notificationButton}>
-          <Icon name="notifications" size={24} color={colors.textPrimary} />
-          {notificationCount > 0 && (
-            <View style={styles.notificationBadge}>
-              <Badge variant="notification" count={notificationCount} color="red" />
-            </View>
-          )}
-        </Pressable>
       </View>
 
-      {/* Search bar */}
       <MapSearchBar
-        topOffset={insets.top + 68}
+        topOffset={insets.top + 70}
         onSelectLocation={(location) => {
+          setSelectedPlace(location);
           mapRef.current?.animateToRegion(
             {
               ...location.location,
@@ -178,18 +184,50 @@ export const MapDashboardScreen = () => {
         }}
       />
 
-      {/* Map controls */}
-      <HeatmapLegend />
-      <MapTypeSwitch currentType={mapType} onTypeChange={setMapType} />
-      <CurrentLocationButton onPress={handleCenterLocation} />
-      <EmergencySOSButton onEmergencyTrigger={handleEmergencyTrigger} />
+      {/* Selected location actions */}
+      {selectedPlace && (
+        <View style={[styles.locationActions, { bottom: insets.bottom + 110 }]}>
+          <View style={styles.locationInfo}>
+            <Text style={styles.locationName} numberOfLines={1}>{selectedPlace.name}</Text>
+          </View>
+          <Pressable 
+            style={styles.directionsButton}
+            onPress={() => {
+              const coords = `${selectedPlace.location.latitude},${selectedPlace.location.longitude}`;
+              (navigation as any).navigate('SafeRoute', { destination: coords });
+            }}
+          >
+            <Icon name="directions" size={20} color={colors.surface} />
+            <Text style={styles.directionsButtonText}>Safe Path</Text>
+          </Pressable>
+          <Pressable style={styles.closeActionsButton} onPress={() => setSelectedPlace(null)}>
+            <Icon name="close" size={20} color={colors.textSecondary} />
+          </Pressable>
+        </View>
+      )}
 
-      {/* Quick stats */}
+      {/* Layer Controls - Unified into a single floating button for clarity */}
+      <View style={[styles.layersButtonContainer, { top: insets.top + 130 }]}>
+        <Pressable style={styles.layersFAB}>
+          <Icon name="layers" size={24} color={colors.textPrimary} />
+        </Pressable>
+      </View>
+
+      <CurrentLocationButton 
+        onPress={handleCenterLocation} 
+        style={{ bottom: insets.bottom + 180 }}
+      />
+      
+      <EmergencySOSButton 
+        onEmergencyTrigger={handleEmergencyTrigger} 
+      />
+
+      {/* Quick stats floating button */}
       <Pressable
-        style={styles.statsToggle}
+        style={[styles.statsFAB, { bottom: insets.bottom + 250 }]}
         onPress={() => setShowStatsCard(!showStatsCard)}
       >
-        <Icon name="info" size={20} color={colors.surface} />
+        <Icon name="insights" size={24} color={colors.surface} />
       </Pressable>
 
       <QuickStatsCard
@@ -224,48 +262,84 @@ export const MapDashboardScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   map: {
     ...StyleSheet.absoluteFillObject,
   },
-  topBar: {
+  profileBar: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    left: spacing.lg,
+    right: spacing.lg,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
+    alignItems: 'center',
     zIndex: 10,
   },
-  menuButton: {
-    width: 52,
-    height: 52,
-    borderRadius: borderRadius.pill,
+  profileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.lg,
+    ...shadows.medium,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  avatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(26, 115, 232, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
+  profileTextContainer: {
+    justifyContent: 'center',
+  },
+  profileTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  profileStatus: {
+    fontSize: 9,
+    color: colors.secondary,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 1,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.secondary,
+    marginRight: 4,
+  },
+  layersButtonContainer: {
+    position: 'absolute',
+    right: spacing.lg,
+    zIndex: 5,
+  },
+  layersFAB: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
-    ...shadows.large,
+    ...shadows.medium,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  notificationButton: {
-    width: 52,
-    height: 52,
-    borderRadius: borderRadius.pill,
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...shadows.large,
-    position: 'relative',
-  },
-  notificationBadge: {
+  statsFAB: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-  },
-  statsToggle: {
-    position: 'absolute',
-    bottom: 130, // Lifted slightly
     left: spacing.lg,
     width: 48,
     height: 48,
@@ -275,5 +349,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...shadows.large,
     zIndex: 10,
+  },
+  locationActions: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    ...shadows.premium,
+    zIndex: 15,
+  },
+  locationInfo: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  locationName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  directionsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    marginRight: spacing.sm,
+  },
+  directionsButtonText: {
+    color: colors.surface,
+    fontWeight: 'bold',
+    marginLeft: spacing.xs,
+  },
+  closeActionsButton: {
+    padding: spacing.xs,
   },
 });

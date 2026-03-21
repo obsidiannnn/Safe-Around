@@ -20,6 +20,7 @@ interface ButtonProps {
   icon?: string;
   fullWidth?: boolean;
   style?: ViewStyle | ViewStyle[];
+  textStyle?: TextStyle | TextStyle[];
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -38,6 +39,7 @@ export const Button: React.FC<ButtonProps> = ({
   icon,
   fullWidth = false,
   style,
+  textStyle,
 }) => {
   const scale = useSharedValue(1);
 
@@ -79,7 +81,7 @@ export const Button: React.FC<ButtonProps> = ({
       ) : (
         <>
           {icon && <Icon name={icon as any} size={getIconSize(size)} color={textColor} style={styles.icon} />}
-          <Text style={[styles.text, { color: textColor }, styles[`${size}Text`]]}>{children}</Text>
+          <Text style={[styles.text, { color: textColor }, styles[`${size}Text`], textStyle]}>{children}</Text>
         </>
       )}
     </AnimatedPressable>

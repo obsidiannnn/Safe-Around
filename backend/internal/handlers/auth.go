@@ -99,10 +99,6 @@ func (h *AuthHandler) SendOTP(c *gin.Context) {
 	h.redis.Incr(ctx, rlKey)
 	h.redis.Expire(ctx, rlKey, 10*time.Minute)
 
-	if input.Phone == "+919119759509" {
-		c.JSON(http.StatusOK, gin.H{"message": "otp sent successfully (bypassed)"})
-		return
-	}
 
 	_, err := h.twilio.SendOTP(input.Phone, verifySID)
 	if err != nil {
@@ -123,15 +119,7 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 
 	input.Phone = normalizePhone(input.Phone)
 
-	var isValid bool
-	var err error
-
-	if input.Phone == "+919119759509" && input.OTP == "123456" {
-		isValid = true
-	} else {
-		isValid, err = h.twilio.VerifyOTP(input.Phone, input.OTP, verifySID)
-	}
-
+	isValid, err := h.twilio.VerifyOTP(input.Phone, input.OTP, verifySID)
 	if err != nil || !isValid {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired otp"})
 		return

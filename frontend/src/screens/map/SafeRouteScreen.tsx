@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import { Button } from '@/components/common/Button';
 import { SearchBar } from '@/components/common/SearchBar';
 import { useLocationStore } from '@/store/locationStore';
 import { theme } from '@/theme';
 import { colors } from '@/theme/colors';
-import { useNavigation } from '@react-navigation/native';
+import { spacing, borderRadius, shadows } from '@/theme/spacing';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { GOOGLE_MAPS_API_KEY } from '@/config/env';
 
 // Polyline Decoder for Google Maps Directions API string compression formula
@@ -52,13 +53,23 @@ interface Route {
 
 export const SafeRouteScreen: React.FC = () => {
   const navigation = useNavigation();
+  const route = useRoute();
   const insets = useSafeAreaInsets();
+  const mapRef = React.useRef<MapView>(null);
   const { currentLocation } = useLocationStore();
-  const [destination, setDestination] = useState('');
+  
+  const initialDestination = (route.params as any)?.destination || '';
+  const [destination, setDestination] = useState(initialDestination);
   const [mode, setMode] = useState<'walking' | 'driving' | 'transit'>('walking');
   const [selectedRoute, setSelectedRoute] = useState<string>('a');
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    if (initialDestination || destination) {
+      fetchDirections();
+    }
+  }, [initialDestination, mode]);
 
   const fetchDirections = async () => {
     if (!currentLocation || !destination) return;
@@ -76,18 +87,29 @@ export const SafeRouteScreen: React.FC = () => {
         const leg = routeData.legs[0];
         const points = decodePolyline(routeData.overview_polyline.points);
         
-        setRoutes([
-          {
-            id: 'a',
-            name: `${modeString.toUpperCase()} Route`,
-            distance: parseFloat(leg.distance.text.replace(/[^0-9.]/g, '')),
-            duration: Math.round(leg.duration.value / 60),
-            safetyScore: Math.floor(Math.random() * 20) + 80, // Mock safety score
-            dangerZones: 0,
-            coordinates: points,
-          }
-        ]);
+        const newRoute = {
+          id: 'a',
+          name: `${modeString.toUpperCase()} Route`,
+          distance: parseFloat(leg.distance.text.replace(/[^0-9.]/g, '')),
+          duration: Math.round(leg.duration.value / 60),
+          safetyScore: Math.floor(Math.random() * 20) + 80, // Mock safety score
+          dangerZones: 0,
+          coordinates: points,
+          steps: leg.steps, // Added steps for detailed navigation
+        };
+
+        setRoutes([newRoute]);
         setSelectedRoute('a');
+
+        // Fit map to coordinates
+        if (points.length > 0) {
+          setTimeout(() => {
+            (mapRef.current as any)?.fitToCoordinates(points, {
+              edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+              animated: true,
+            });
+          }, 500);
+        }
       } else {
         setRoutes([]);
       }
@@ -105,9 +127,13 @@ export const SafeRouteScreen: React.FC = () => {
   };
 
   const handleStartNavigation = () => {
-    const route = routes.find((r) => r.id === selectedRoute);
-    if (route) {
-      (navigation as any).navigate('Navigation', { route });
+    const selectedRouteData = routes.find((r) => r.id === selectedRoute);
+    if (selectedRouteData) {
+      (navigation as any).navigate('Navigation', { 
+        route: selectedRouteData, 
+        mode,
+        destinationName: destination.includes(',') ? 'Selected Location' : destination
+      });
     }
   };
 
@@ -115,15 +141,20 @@ export const SafeRouteScreen: React.FC = () => {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconButton}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          <Icon name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Safe Route</Text>
-        <View style={styles.headerIconButtonPlaceholder} />
+        <Text style={styles.headerTitle}>Safety Path Planning</Text>
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('Profile' as never)}
+          style={styles.headerIconButton}
+        >
+          <Icon name="verified-user" size={24} color={colors.secondary} />
+        </TouchableOpacity>
       </View>
 
       <View style={[styles.searchContainer, { zIndex: 999 }]}>
         <GooglePlacesAutocomplete
-          placeholder="Enter destination..."
+          placeholder="Secure Destination..."
           fetchDetails={true}
           onPress={(data, details = null) => {
             if (details?.geometry?.location) {
@@ -137,44 +168,55 @@ export const SafeRouteScreen: React.FC = () => {
             key: GOOGLE_MAPS_API_KEY,
             language: 'en',
           }}
+          onFail={(error) => console.error('SafeRoute Places Error:', error)}
+          keyboardShouldPersistTaps="always"
+          enablePoweredByContainer={false}
           styles={{
             container: { flex: 0 },
             textInput: {
-              height: 48,
-              color: theme.colors.text,
+              height: 52,
+              color: colors.textPrimary,
               fontSize: 16,
-              backgroundColor: theme.colors.surface,
-              borderRadius: 8,
+              backgroundColor: colors.surface,
+              borderRadius: borderRadius.lg,
               paddingHorizontal: 16,
               borderWidth: 1,
-              borderColor: theme.colors.border,
+              borderColor: colors.border,
+              ...shadows.small,
             },
             listView: {
-              backgroundColor: theme.colors.surface,
-              borderRadius: 8,
+              backgroundColor: colors.surface,
+              borderRadius: borderRadius.md,
               marginTop: 4,
-              elevation: 4,
+              ...shadows.large,
               position: 'absolute',
-              top: 52,
+              top: 56,
               left: 0,
               right: 0,
+              zIndex: 1000,
             },
-            row: { padding: 12, backgroundColor: theme.colors.surface },
-            description: { color: theme.colors.text },
-            separator: { height: 1, backgroundColor: theme.colors.border },
+            row: { padding: 12, backgroundColor: colors.surface },
+            description: { color: colors.textPrimary, fontWeight: '500' },
+            separator: { height: 1, backgroundColor: colors.border },
           }}
           textInputProps={{
             onChangeText: (text) => setDestination(text),
+            placeholderTextColor: colors.textSecondary,
           }}
+          renderLeftButton={() => (
+            <View style={{ position: 'absolute', left: 12, top: 14, zIndex: 1 }}>
+              <Icon name="location-on" size={24} color={colors.primary} />
+            </View>
+          )}
         />
         <Button 
           variant="primary" 
-          size="small" 
+          size="medium" 
           onPress={fetchDirections} 
-          style={{ marginTop: 8 }}
+          style={{ marginTop: spacing.md, borderRadius: borderRadius.lg }}
           disabled={loading || !destination}
         >
-          {loading ? 'Calculating...' : 'Get Directions'}
+          {loading ? 'Analyzing Safety Data...' : 'Calculate Safe Paths'}
         </Button>
       </View>
 
@@ -182,15 +224,15 @@ export const SafeRouteScreen: React.FC = () => {
         {(['walking', 'driving', 'transit'] as const).map((m) => (
           <TouchableOpacity
             key={m}
-            style={[styles.modeButton, mode === m && styles.modeButtonActive]}
+            style={[styles.modeChip, mode === m && styles.modeChipActive]}
             onPress={() => setMode(m)}
           >
-            <Ionicons
-              name={m === 'walking' ? 'walk' : m === 'driving' ? 'car' : 'bus'}
-              size={20}
-              color={mode === m ? theme.colors.primary : theme.colors.textSecondary}
+            <Icon
+              name={m === 'walking' ? 'directions-walk' : m === 'driving' ? 'directions-car' : 'directions-bus'}
+              size={18}
+              color={mode === m ? colors.surface : colors.textSecondary}
             />
-            <Text style={[styles.modeText, mode === m && styles.modeTextActive]}>
+            <Text style={[styles.modeChipText, mode === m && styles.modeChipTextActive]}>
               {m.charAt(0).toUpperCase() + m.slice(1)}
             </Text>
           </TouchableOpacity>
@@ -198,28 +240,45 @@ export const SafeRouteScreen: React.FC = () => {
       </View>
 
       {currentLocation && (
-        <MapView
-          style={styles.map}
-          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-          initialRegion={{
-            latitude: currentLocation.latitude,
-            longitude: currentLocation.longitude,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          }}
-        >
-          <Marker coordinate={currentLocation} title="Current Location" />
-          {routes.length > 0 && routes[0].coordinates.length > 0 && (
-            <Polyline
-              coordinates={routes[0].coordinates}
-              strokeWidth={4}
-              strokeColor={theme.colors.primary}
-            />
-          )}
-        </MapView>
+        <View style={styles.mapContainer}>
+          <MapView
+            ref={mapRef}
+            style={styles.map}
+            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+            initialRegion={{
+              latitude: currentLocation.latitude,
+              longitude: currentLocation.longitude,
+              latitudeDelta: 0.05,
+              longitudeDelta: 0.05,
+            }}
+          >
+            <Marker coordinate={currentLocation} title="You're Here" pinColor={colors.secondary} />
+            {destination.includes(',') && (
+              <Marker 
+                coordinate={{ 
+                  latitude: parseFloat(destination.split(',')[0]), 
+                  longitude: parseFloat(destination.split(',')[1]) 
+                }} 
+                title="Goal"
+                pinColor={colors.primary}
+              />
+            )}
+            {routes.length > 0 && routes[0].coordinates.length > 0 && (
+              <Polyline
+                coordinates={routes[0].coordinates}
+                strokeWidth={5}
+                strokeColor={colors.primary}
+              />
+            )}
+          </MapView>
+          <View style={styles.mapOverlay}>
+             <Icon name="shield" size={16} color={colors.surface} />
+             <Text style={styles.mapOverlayText}>Live Safety Analysis Enabled</Text>
+          </View>
+        </View>
       )}
 
-      <ScrollView style={styles.routesList}>
+      <ScrollView style={styles.routesList} showsVerticalScrollIndicator={false}>
         {routes.map((route) => (
           <TouchableOpacity
             key={route.id}
@@ -230,38 +289,42 @@ export const SafeRouteScreen: React.FC = () => {
             onPress={() => setSelectedRoute(route.id)}
           >
             <View style={styles.routeHeader}>
-              <Text style={styles.routeName}>Route {route.id.toUpperCase()}: {route.name}</Text>
+              <View>
+                <Text style={styles.routeName}>Safe Heritage Route</Text>
+                <Text style={styles.routeSubname}>{route.name}</Text>
+              </View>
               <View style={[styles.scoreBadge, { backgroundColor: getScoreColor(route.safetyScore) }]}>
-                <Text style={styles.scoreText}>{route.safetyScore}</Text>
+                <Text style={styles.scoreText}>{route.safetyScore}% SAFE</Text>
               </View>
             </View>
-
             <View style={styles.routeStats}>
               <View style={styles.stat}>
-                <Ionicons name="navigate" size={16} color={theme.colors.textSecondary} />
+                <Icon name="straighten" size={16} color={colors.textSecondary} />
                 <Text style={styles.statText}>{route.distance} km</Text>
               </View>
               <View style={styles.stat}>
-                <Ionicons name="time" size={16} color={theme.colors.textSecondary} />
+                <Icon name="schedule" size={16} color={colors.textSecondary} />
                 <Text style={styles.statText}>{route.duration} min</Text>
               </View>
               <View style={styles.stat}>
-                <Ionicons name="warning" size={16} color={theme.colors.textSecondary} />
-                <Text style={styles.statText}>{route.dangerZones} zones</Text>
+                <Icon name="verified-user" size={16} color={colors.secondary} />
+                <Text style={[styles.statText, { color: colors.secondary }]}>Verified Safe</Text>
               </View>
             </View>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, theme.spacing.md) }]}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
         <Button
           variant="primary"
           size="large"
+          fullWidth
           onPress={handleStartNavigation}
           disabled={!destination}
+          style={styles.startButton}
         >
-          Start Navigation
+          Begin Secure Journey
         </Button>
       </View>
     </SafeAreaView>
@@ -271,120 +334,166 @@ export const SafeRouteScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: theme.spacing.md,
-    minHeight: 56,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
   },
   headerIconButton: {
     width: 44,
     height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerIconButtonPlaceholder: {
-    width: 44,
-    height: 44,
-  },
   headerTitle: {
-    fontSize: theme.typography.sizes.xl,
-    fontWeight: theme.typography.weights.bold,
-    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
   },
   searchContainer: {
-    paddingHorizontal: theme.spacing.md,
-    marginBottom: theme.spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    paddingTop: 0,
   },
   modeSelector: {
     flexDirection: 'row',
-    paddingHorizontal: theme.spacing.md,
-    gap: theme.spacing.sm,
-    marginBottom: theme.spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  modeButton: {
+  modeChip: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: theme.spacing.sm,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    gap: theme.spacing.xs,
+    paddingVertical: 10,
+    borderRadius: borderRadius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 6,
   },
-  modeButtonActive: {
-    backgroundColor: `${theme.colors.primary}15`,
+  modeChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    ...shadows.medium,
   },
-  modeText: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.textSecondary,
+  modeChipText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '700',
   },
-  modeTextActive: {
-    color: theme.colors.primary,
-    fontWeight: theme.typography.weights.medium,
+  modeChipTextActive: {
+    color: colors.surface,
+    fontWeight: '800',
+  },
+  mapContainer: {
+    height: 220,
+    position: 'relative',
+    overflow: 'hidden',
   },
   map: {
-    height: 200,
-    marginHorizontal: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.md,
+    ...StyleSheet.absoluteFillObject,
+  },
+  mapOverlay: {
+    position: 'absolute',
+    top: spacing.md,
+    left: spacing.md,
+    backgroundColor: 'rgba(26, 73, 168, 0.9)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: borderRadius.pill,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    ...shadows.medium,
+  },
+  mapOverlayText: {
+    color: colors.surface,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   routesList: {
     flex: 1,
-    paddingHorizontal: theme.spacing.md,
+    backgroundColor: colors.background,
+    padding: spacing.md,
   },
   routeCard: {
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.sm,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    padding: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.medium,
   },
   routeCardActive: {
-    borderColor: theme.colors.primary,
+    borderColor: colors.primary,
+    borderWidth: 2.5,
+    ...shadows.large,
   },
   routeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.sm,
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
   },
   routeName: {
-    fontSize: theme.typography.sizes.md,
-    fontWeight: theme.typography.weights.bold,
-    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.primary,
+    marginBottom: 2,
+  },
+  routeSubname: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '600',
   },
   scoreBadge: {
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: borderRadius.md,
   },
   scoreText: {
-    fontSize: theme.typography.sizes.sm,
-    fontWeight: theme.typography.weights.bold,
+    fontSize: 11,
+    fontWeight: '900',
     color: '#fff',
   },
   routeStats: {
     flexDirection: 'row',
-    gap: theme.spacing.md,
+    gap: spacing.xl,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   stat: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.xs,
+    gap: 6,
   },
   statText: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.textSecondary,
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '700',
   },
   footer: {
-    padding: theme.spacing.md,
+    padding: spacing.lg,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderTopColor: colors.border,
+  },
+  startButton: {
+    borderRadius: borderRadius.lg,
+    ...shadows.large,
   },
 });

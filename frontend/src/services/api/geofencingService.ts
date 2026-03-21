@@ -22,7 +22,6 @@ export const geofencingApiService = {
       if (error.response?.status === 404) {
         return null; // Not an error, just no danger zones nearby
       }
-      console.error('Error checking danger zone:', error);
       return null;
     }
   },

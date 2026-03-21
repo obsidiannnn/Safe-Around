@@ -54,31 +54,31 @@ export const MapTypeSwitch: React.FC<MapTypeSwitchProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    top: 80,
-    right: spacing.lg,
     flexDirection: 'column',
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     ...shadows.medium,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   button: {
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    minWidth: 90,
+    minWidth: 80,
     alignItems: 'center',
   },
   activeButton: {
     backgroundColor: colors.primary,
   },
   buttonText: {
-    fontSize: fontSizes.xs,
+    fontSize: 11,
     color: colors.textPrimary,
-    fontWeight: '500',
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   activeButtonText: {
     color: colors.surface,
-    fontWeight: '600',
+    fontWeight: '800',
   },
 });

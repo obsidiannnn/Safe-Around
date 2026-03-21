@@ -1,12 +1,12 @@
 import React, { ComponentProps } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { Button } from '@/components/common';
 import { colors } from '@/theme/colors';
-import { spacing } from '@/theme/spacing';
+import { spacing, borderRadius, shadows } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
 
 interface FeatureProps {
@@ -35,50 +35,55 @@ export const WelcomeScreen = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-        <Icon name="security" size={64} color={colors.primary} style={{ marginBottom: 16 }} />
-        <Text style={styles.title}>SafeAround</Text>
-        <Text style={styles.tagline}>Your Personal Safety Network</Text>
-      </View>
+          <View style={styles.badge}>
+            <Icon name="verified-user" size={14} color={colors.secondary} />
+            <Text style={styles.badgeText}>Trusted by 10k+ citizens</Text>
+          </View>
+          <View style={styles.logoContainer}>
+            <Icon name="shield" size={80} color={colors.primary} />
+            <View style={styles.pulseNode} />
+          </View>
+          <Text style={styles.title}>SafeAround</Text>
+          <Text style={styles.tagline}>Your personal safety network, simplified.</Text>
+        </View>
 
-      <View style={styles.features}>
-        <Feature
-          icon="map"
-          title="Real-time Crime Heatmap"
-          description="Stay informed about safety levels in your area with live crime data"
-        />
-        <Feature
-          icon="warning"
-          title="Emergency SOS Alerts"
-          description="Instantly alert your emergency contacts with your location in critical situations"
-        />
-        <Feature
-          icon="people"
-          title="Community Safety Network"
-          description="Connect with trusted contacts and build your personal safety circle"
-        />
-      </View>
+        <View style={styles.features}>
+          <Feature
+            icon="security"
+            title="Intelligent Safety Path"
+            description="Our AI analyzes live crime data to guide you through the safest possible routes."
+          />
+          <Feature
+            icon="notifications-active"
+            title="Instant SOS Network"
+            description="One-tap emergency alerts to your inner circle with real-time location tracking."
+          />
+          <Feature
+            icon="public"
+            title="Community Vigilance"
+            description="Stay protected with real-time reports from fellow citizens in your area."
+          />
+        </View>
 
         <View style={styles.actions}>
-        <Button
-          variant="primary"
-          size="large"
-          fullWidth
-          onPress={() => (navigation as any).navigate('Auth', { screen: 'Signup' })}
-        >
-          Get Started
-        </Button>
-        
-        <View style={styles.signInContainer}>
-          <Text style={styles.signInText}>Already have an account? </Text>
-          <Text
-            style={styles.signInLink}
-            onPress={() => (navigation as any).navigate('Auth', { screen: 'Login' })}
+          <Button
+            variant="primary"
+            size="large"
+            fullWidth
+            onPress={() => (navigation as any).navigate('Auth', { screen: 'Signup' })}
+            style={styles.mainButton}
           >
-            Sign In
-          </Text>
-        </View>
+            Secure Your Journey
+          </Button>
+          
+          <View style={styles.signInContainer}>
+            <Text style={styles.signInText}>Part of the network? </Text>
+            <TouchableOpacity onPress={() => (navigation as any).navigate('Auth', { screen: 'Login' })}>
+              <Text style={styles.signInLink}>Sign In</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -146,11 +151,16 @@ const styles = StyleSheet.create({
   },
   actions: {
     marginTop: spacing.xl,
+    paddingHorizontal: spacing.xl,
+  },
+  mainButton: {
+    borderRadius: borderRadius.lg,
+    ...shadows.medium,
   },
   signInContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: spacing.lg,
+    marginTop: spacing.xl,
   },
   signInText: {
     fontSize: fontSizes.sm,
@@ -159,6 +169,35 @@ const styles = StyleSheet.create({
   signInLink: {
     fontSize: fontSizes.sm,
     color: colors.primary,
-    fontWeight: '600',
+    fontWeight: '700',
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(30, 142, 62, 0.1)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.pill,
+    marginBottom: spacing.lg,
+  },
+  badgeText: {
+    fontSize: 12,
+    color: colors.secondary,
+    fontWeight: '700',
+    marginLeft: spacing.xs,
+  },
+  logoContainer: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  pulseNode: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(26, 115, 232, 0.05)',
+    zIndex: -1,
   },
 });

@@ -45,16 +45,20 @@ export const MapSearchBar: React.FC<MapSearchBarProps> = ({ onSelectLocation, to
           key: GOOGLE_MAPS_API_KEY,
           language: 'en',
         }}
+        onFail={(error) => console.error('Google Places Error:', error)}
+        keyboardShouldPersistTaps="always"
+        suppressDefaultStyles={false}
+        enablePoweredByContainer={false}
         styles={{
           container: { flex: 1 },
           textInputContainer: {
             backgroundColor: colors.surface,
-            borderRadius: borderRadius.md,
-            paddingHorizontal: spacing.sm,
-            height: 48,
+            borderRadius: borderRadius.pill,
+            paddingHorizontal: spacing.md,
+            height: 52,
             alignItems: 'center',
             flexDirection: 'row',
-            ...shadows.medium,
+            ...shadows.large,
           },
           textInput: {
             color: colors.textPrimary,
@@ -68,8 +72,10 @@ export const MapSearchBar: React.FC<MapSearchBarProps> = ({ onSelectLocation, to
             backgroundColor: colors.surface,
             borderRadius: borderRadius.md,
             marginTop: spacing.sm,
-            ...shadows.medium,
-            elevation: 5,
+            ...shadows.large,
+            elevation: 10,
+            zIndex: 1000,
+            maxHeight: 350,
           },
           row: {
             padding: spacing.md,
@@ -82,7 +88,8 @@ export const MapSearchBar: React.FC<MapSearchBarProps> = ({ onSelectLocation, to
           },
           description: {
             color: colors.textPrimary,
-            fontSize: fontSizes.sm,
+            fontSize: 14,
+            fontWeight: '500',
           },
         }}
         renderLeftButton={() => (
