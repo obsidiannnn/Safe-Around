@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
-import { StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { StyleSheet, Pressable, ActivityIndicator, ViewStyle } from 'react-native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
 
 interface CurrentLocationButtonProps {
-  onPress: () => void;
+  onPress: () => Promise<void> | void;
+  style?: ViewStyle;
 }
 
 /**
  * Floating button to center map on user's current location
  * Shows loading state while fetching location
  */
-export const CurrentLocationButton: React.FC<CurrentLocationButtonProps> = ({ onPress }) => {
+export const CurrentLocationButton: React.FC<CurrentLocationButtonProps> = ({ onPress, style }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handlePress = async () => {
@@ -23,7 +24,7 @@ export const CurrentLocationButton: React.FC<CurrentLocationButtonProps> = ({ on
 
   return (
     <Pressable
-      style={styles.button}
+      style={[styles.button, style]}
       onPress={handlePress}
       accessibilityLabel="Center map on current location"
       accessibilityRole="button"

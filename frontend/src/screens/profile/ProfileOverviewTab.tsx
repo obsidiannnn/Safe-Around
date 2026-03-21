@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatCard } from '@/components/profile/StatCard';
 import { useAuthStore } from '@/store/authStore';
@@ -20,7 +20,11 @@ export const ProfileOverviewTab: React.FC = () => {
   ];
 
   return (
-    <View style={styles.container}>
+    <ScrollView 
+      style={styles.container} 
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+    >
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>User Information</Text>
         <View style={styles.card}>
@@ -70,13 +74,17 @@ export const ProfileOverviewTab: React.FC = () => {
           ))}
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  contentContainer: {
     padding: theme.spacing.md,
+    paddingBottom: theme.spacing.xl * 2,
   },
   section: {
     marginBottom: theme.spacing.lg,

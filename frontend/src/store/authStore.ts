@@ -129,8 +129,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (!currentRefreshToken) throw new Error('No refresh token');
       const tokens = await authService.refreshToken(currentRefreshToken);
       get().setTokens(tokens.access, tokens.refresh);
-    } catch (error) {
-      console.error('Token refresh failed:', error);
+    } catch (err) {
+      if (get().isAuthenticated) {
+        console.error('Token refresh failed:', err);
+      }
       get().logOut();
     }
   },
@@ -167,12 +169,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // Validate the stored token with the backend
       try {
+        console.log('--- DATABASE AUTH CHECK ---');
+        console.log('Validating user session with backend database...');
+        
         const { apiClient } = require('@/services/api/client');
         await apiClient.get('/users/profile', {
           headers: { Authorization: `Bearer ${access}` },
           timeout: 5000,
         });
+
         // Token is valid → restore auth
+        console.log('Database check SUCCESS: Session is valid.');
         set({ user, accessToken: access, refreshToken: refresh, isAuthenticated: true });
       } catch (validationError: any) {
         const isNetworkError = !validationError?.response;
@@ -196,7 +203,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             } else {
               throw new Error('Invalid refresh response');
             }
-          } catch {
+          } catch (e) {
             // Refresh also failed → clear everything and show login
             console.warn('Session expired — redirecting to login');
             await AsyncStorage.multiRemove([KEYS.user, KEYS.accessToken, KEYS.refreshToken]);

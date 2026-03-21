@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Text as RNText } from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import React, { useState, useCallback } from 'react';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Text as RNText, TouchableOpacity } from 'react-native';
 import { Text } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
 import { Button, Input, Alert } from '@/components/common';
 import { useAuth } from '@/hooks/useAuth';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
@@ -20,6 +20,12 @@ export const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const fullPhone = `+91${phone}`;
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      clearError();
+    }, [clearError])
+  );
 
   const onSubmit = async () => {
     if (!phone || !password) return;
@@ -41,11 +47,14 @@ export const LoginScreen = () => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Icon name="security" size={64} color={colors.primary} style={styles.logo} />
-          <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>Sign in to continue to SafeAround</Text>
+          <View style={styles.logoContainer}>
+            <Icon name="shield" size={64} color={colors.primary} />
+            <View style={styles.pulseNode} />
+          </View>
+          <Text style={styles.title}>Secure Login</Text>
+          <Text style={styles.subtitle}>Enter your credentials to access your safety network.</Text>
         </View>
 
         {error && (
@@ -53,37 +62,37 @@ export const LoginScreen = () => {
         )}
 
         <View style={styles.form}>
-              <Input
-                label="Phone Number"
-                value={phone}
-                onChangeText={(t) => setPhone(t.replace(/[^0-9]/g, '').slice(0, 10))}
-                placeholder="10-digit number"
-                keyboardType="phone-pad"
-                maxLength={10}
-                leftElement={
-                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: 8, marginRight: 8, borderRightWidth: 1, borderRightColor: colors.border }}>
-                    <RNText style={{ fontSize: 16, fontWeight: '600', color: colors.textPrimary }}>+91</RNText>
-                  </View>
-                }
-                leftIcon="phone"
-                autoFocus
-                error={!phone ? undefined : phone.length < 10 ? 'Enter valid 10-digit number' : undefined}
-              />
+          <Input
+            label="Phone Number"
+            value={phone}
+            onChangeText={(t) => setPhone(t.replace(/[^0-9]/g, '').slice(0, 10))}
+            placeholder="10-digit number"
+            keyboardType="phone-pad"
+            maxLength={10}
+            leftElement={
+              <View style={styles.prefixContainer}>
+                <RNText style={styles.prefixText}>+91</RNText>
+              </View>
+            }
+            leftIcon="phone"
+            autoFocus
+            error={!phone ? undefined : phone.length < 10 ? 'Enter valid 10-digit number' : undefined}
+          />
           <Input
             type="password"
-            label="Password"
+            label="Security Password"
             value={password}
             onChangeText={setPassword}
             placeholder="Enter your password"
             leftIcon="lock"
           />
 
-          <Text
-            style={styles.forgotPassword}
+          <TouchableOpacity 
             onPress={() => navigation.navigate('PasswordReset' as never)}
+            style={styles.forgotPasswordContainer}
           >
-            Forgot Password?
-          </Text>
+            <Text style={styles.forgotPassword}>Forgot Password?</Text>
+          </TouchableOpacity>
 
           <Button
             variant="primary"
@@ -91,25 +100,30 @@ export const LoginScreen = () => {
             fullWidth
             onPress={onSubmit}
             loading={isSubmitting}
+            style={styles.loginButton}
           >
-            Sign In
+            Access My Account
           </Button>
 
-          <Text
-            style={styles.otpLoginText}
+          <View style={styles.trustFooter}>
+            <Icon name="lock-outline" size={12} color={colors.textSecondary} />
+            <Text style={styles.trustText}>Your data is end-to-end encrypted</Text>
+          </View>
+
+          <View style={styles.divider} />
+
+          <TouchableOpacity 
             onPress={() => (navigation as any).navigate('Signup', { mode: 'login' })}
+            style={styles.otpButton}
           >
-            Login with OTP instead
-          </Text>
+            <Text style={styles.otpLoginText}>Login with Secure OTP</Text>
+          </TouchableOpacity>
 
           <View style={styles.signUpContainer}>
-            <Text style={styles.signUpText}>Don't have an account? </Text>
-            <Text
-              style={styles.signUpLink}
-              onPress={() => navigation.navigate('Signup' as never)}
-            >
-              Sign Up
-            </Text>
+            <Text style={styles.signUpText}>New to SafeAround? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Signup' as never)}>
+              <Text style={styles.signUpLink}>Join the Network</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -122,70 +136,104 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1, padding: spacing['2xl'], justifyContent: 'center' },
   header: {
     alignItems: 'center',
-    marginBottom: spacing['2xl'],
+    marginBottom: spacing['3xl'],
   },
-  logo: { fontSize: 64, marginBottom: spacing.md },
+  logoContainer: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  pulseNode: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(26, 115, 232, 0.05)',
+    zIndex: -1,
+  },
   title: {
     fontSize: fontSizes['3xl'],
     fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
-  subtitle: { fontSize: fontSizes.md, color: colors.textSecondary, textAlign: 'center' },
+  subtitle: { 
+    fontSize: fontSizes.md, 
+    color: colors.textSecondary, 
+    textAlign: 'center',
+    paddingHorizontal: spacing.xl,
+  },
   form: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
     marginBottom: spacing['2xl'],
     ...shadows.medium,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  prefixContainer: {
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingRight: 8, 
+    marginRight: 8, 
+    borderRightWidth: 1, 
+    borderRightColor: colors.border 
+  },
+  prefixText: { 
+    fontSize: 16, 
+    fontWeight: '600', 
+    color: colors.textPrimary 
+  },
+  forgotPasswordContainer: {
+    alignSelf: 'flex-end',
+    marginBottom: spacing.lg,
   },
   forgotPassword: {
     fontSize: fontSizes.sm,
     color: colors.primary,
-    fontWeight: '600',
-    textAlign: 'right',
-    marginBottom: spacing.xl,
+    fontWeight: '700',
+  },
+  loginButton: {
+    borderRadius: borderRadius.lg,
+    ...shadows.medium,
+  },
+  trustFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.md,
+  },
+  trustText: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginLeft: spacing.xs,
+    fontWeight: '500',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.xl,
+  },
+  otpButton: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
   otpLoginText: {
     fontSize: fontSizes.sm,
     color: colors.primary,
-    textAlign: 'center',
-    marginTop: spacing.lg,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   signUpContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
   },
   signUpText: { fontSize: fontSizes.sm, color: colors.textSecondary },
   signUpLink: {
     fontSize: fontSizes.sm,
     color: colors.primary,
-    fontWeight: '600',
-  },
-  phoneRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  prefixBox: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.md,
-    height: 52,
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.small,
-  },
-  prefixText: {
-    fontSize: fontSizes.md,
-    color: colors.textPrimary,
-    fontWeight: '600',
-  },
-  phoneInput: {
-    flex: 1,
+    fontWeight: '700',
   },
 });

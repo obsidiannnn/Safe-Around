@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Text as RNText } from 'react-native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
+import React, { useState, useCallback } from 'react';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Text as RNText, TouchableOpacity } from 'react-native';
 import { Text, Checkbox } from 'react-native-paper';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Button, Input, Alert } from '@/components/common';
 import { useAuth } from '@/hooks/useAuth';
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
@@ -24,6 +25,13 @@ export const SignupScreen = () => {
   const { sendOTP, verifyOTP, setupProfile, error, clearError } = useAuth();
 
   const [step, setStep] = useState<SignupStep>('phone');
+
+  useFocusEffect(
+    useCallback(() => {
+      // Clear any global errors when landing on this screen
+      clearError();
+    }, [clearError])
+  );
   const [phone, setPhone] = useState(''); // user types 10-digit number
   const fullPhone = `+91${phone}`;         // computed E.164 format
   const [otp, setOtp] = useState('');
@@ -95,14 +103,19 @@ export const SignupScreen = () => {
     otp: { title: 'Verify Phone', subtitle: `Enter the 6-digit code sent to ${fullPhone}` },
     profile: { title: 'Set Up Profile', subtitle: 'Complete your account setup' },
   };
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
+          {step === 'phone' && (
+            <View style={styles.logoContainer}>
+              <Icon name="shield" size={64} color={colors.primary} />
+              <View style={styles.pulseNode} />
+            </View>
+          )}
           <Text style={styles.title}>{stepTitles[step].title}</Text>
           <Text style={styles.subtitle}>{stepTitles[step].subtitle}</Text>
         </View>
@@ -111,50 +124,56 @@ export const SignupScreen = () => {
 
         <View style={styles.form}>
 
-          {/* ── Step 1: Phone ── */}
+          {/* ── Step 1: Phone (Join the Network) ── */}
           {step === 'phone' && (
             <>
-                <Input
-                  label="Phone Number"
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder="10-digit number"
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                  leftElement={
-                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: 8, marginRight: 8, borderRightWidth: 1, borderRightColor: colors.border }}>
-                      <RNText style={{ fontSize: 16, fontWeight: '600', color: colors.textPrimary }}>+91</RNText>
-                    </View>
-                  }
-                  leftIcon="phone"
-                  autoFocus
-                />
+              <Input
+                label="Primary Phone Number"
+                value={phone}
+                onChangeText={(t) => setPhone(t.replace(/[^0-9]/g, '').slice(0, 10))}
+                placeholder="10-digit number"
+                keyboardType="phone-pad"
+                maxLength={10}
+                leftElement={
+                  <View style={styles.prefixContainer}>
+                    <RNText style={styles.prefixText}>+91</RNText>
+                  </View>
+                }
+                leftIcon="phone"
+                autoFocus
+              />
               <Button
                 variant="primary"
                 size="large"
                 fullWidth
                 onPress={handleSendOTP}
                 loading={isSubmitting}
+                style={styles.mainButton}
               >
-                Send OTP
+                Request Access Code
               </Button>
+
+              <View style={styles.trustFooter}>
+                <Icon name="verified-user" size={12} color={colors.secondary} />
+                <Text style={[styles.trustText, { color: colors.secondary }]}>Join 10,000+ protected citizens</Text>
+              </View>
+
+              <View style={styles.divider} />
+
               <View style={styles.signInContainer}>
-                <Text style={styles.signInText}>Already have an account? </Text>
-                <Text
-                  style={styles.signInLink}
-                  onPress={() => navigation.navigate('Login' as never)}
-                >
-                  Sign In
-                </Text>
+                <Text style={styles.signInText}>Part of the network? </Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Login' as never)}>
+                  <Text style={styles.signInLink}>Secure Sign In</Text>
+                </TouchableOpacity>
               </View>
             </>
           )}
 
-          {/* ── Step 2: OTP ── */}
+          {/* ── Step 2: OTP (Verification) ── */}
           {step === 'otp' && (
             <>
               <Input
-                label="Verification Code"
+                label="Secure Access Code"
                 value={otp}
                 onChangeText={setOtp}
                 placeholder="6-digit OTP"
@@ -169,58 +188,57 @@ export const SignupScreen = () => {
                 fullWidth
                 onPress={handleVerifyOTP}
                 loading={isSubmitting}
+                style={styles.mainButton}
               >
-                Verify OTP
+                Verify & Join
               </Button>
-              <Button
-                variant="ghost"
-                size="medium"
-                fullWidth
-                onPress={handleSendOTP}
-              >
-                Resend Code
-              </Button>
+              <TouchableOpacity onPress={handleSendOTP} style={styles.resendButton}>
+                <Text style={styles.resendText}>Didn't receive code? Resend</Text>
+              </TouchableOpacity>
             </>
           )}
 
-          {/* ── Step 3: Profile Setup ── */}
+          {/* ── Step 3: Profile Setup (Secure Your Identity) ── */}
           {step === 'profile' && (
             <>
               <Input
-                label="Full Name"
+                label="Display Name"
                 value={name}
                 onChangeText={setName}
-                placeholder="Aditya Kumar"
+                placeholder="Your name for safety alerts"
                 leftIcon="person"
                 autoFocus
               />
               <Input
                 type="email"
-                label="Email (Optional)"
+                label="Verify Email (Optional)"
                 value={email}
                 onChangeText={setEmail}
-                placeholder="aditya@example.com"
+                placeholder="safety@example.com"
                 leftIcon="email"
               />
               <Input
                 type="password"
-                label="Password"
+                label="Security Password"
                 value={password}
                 onChangeText={setPassword}
-                placeholder="Create a password"
+                placeholder="Create a strong password"
                 leftIcon="lock"
               />
               {password.length > 0 && (
-                <Text style={[styles.passwordStrength, { color: pwdStrength.color }]}>
-                  Strength: {pwdStrength.strength}
-                </Text>
+                <View style={styles.strengthContainer}>
+                  <View style={[styles.strengthBar, { width: pwdStrength.strength === 'Strong' ? '100%' : pwdStrength.strength === 'Medium' ? '60%' : '30%', backgroundColor: pwdStrength.color }]} />
+                  <Text style={[styles.passwordStrength, { color: pwdStrength.color }]}>
+                    {pwdStrength.strength} Security
+                  </Text>
+                </View>
               )}
               <Input
                 type="password"
-                label="Confirm Password"
+                label="Confirm Security Password"
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
-                placeholder="Re-enter password"
+                placeholder="Verify password"
                 leftIcon="lock"
               />
               <View style={styles.termsContainer}>
@@ -230,10 +248,10 @@ export const SignupScreen = () => {
                   color={colors.primary}
                 />
                 <Text style={styles.termsText}>
-                  I agree to the{' '}
-                  <Text style={styles.termsLink}>Terms of Service</Text>
+                  I confirm my commitment to the{' '}
+                  <Text style={styles.termsLink}>Safety Guidelines</Text>
                   {' '}and{' '}
-                  <Text style={styles.termsLink}>Privacy Policy</Text>
+                  <Text style={styles.termsLink}>Privacy Charter</Text>
                 </Text>
               </View>
               <Button
@@ -243,8 +261,9 @@ export const SignupScreen = () => {
                 onPress={handleSetupProfile}
                 loading={isSubmitting}
                 disabled={!acceptedTerms || password !== confirmPassword}
+                style={styles.mainButton}
               >
-                Complete Sign Up
+                Create Secure Profile
               </Button>
             </>
           )}
@@ -258,26 +277,102 @@ export const SignupScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { flexGrow: 1, padding: spacing['2xl'], justifyContent: 'center' },
-  header: { marginBottom: spacing['2xl'] },
+  header: { 
+    alignItems: 'center',
+    marginBottom: spacing['3xl'] 
+  },
+  logoContainer: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  pulseNode: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(26, 115, 232, 0.05)',
+    zIndex: -1,
+  },
   title: {
     fontSize: fontSizes['3xl'],
     fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: spacing.sm,
+    textAlign: 'center',
   },
-  subtitle: { fontSize: fontSizes.md, color: colors.textSecondary, lineHeight: 22 },
+  subtitle: { 
+    fontSize: fontSizes.md, 
+    color: colors.textSecondary, 
+    lineHeight: 22,
+    textAlign: 'center',
+    paddingHorizontal: spacing.xl,
+  },
   form: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
     marginBottom: spacing['2xl'],
     ...shadows.medium,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  prefixContainer: {
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingRight: 8, 
+    marginRight: 8, 
+    borderRightWidth: 1, 
+    borderRightColor: colors.border 
+  },
+  prefixText: { 
+    fontSize: 16, 
+    fontWeight: '600', 
+    color: colors.textPrimary 
+  },
+  mainButton: {
+    borderRadius: borderRadius.lg,
+    ...shadows.medium,
+  },
+  resendButton: {
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  resendText: {
+    fontSize: fontSizes.sm,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  strengthContainer: {
+    marginTop: -spacing.md,
+    marginBottom: spacing.lg,
+  },
+  strengthBar: {
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 4,
   },
   passwordStrength: {
-    fontSize: fontSizes.xs,
-    marginTop: -spacing.md,
-    marginBottom: spacing.md,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  trustFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.md,
+  },
+  trustText: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginLeft: spacing.xs,
     fontWeight: '600',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.xl,
   },
   termsContainer: {
     flexDirection: 'row',
@@ -290,40 +385,16 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginLeft: spacing.sm,
   },
-  termsLink: { color: colors.primary, fontWeight: '600' },
+  termsLink: { color: colors.primary, fontWeight: '700' },
   signInContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
   },
   signInText: { fontSize: fontSizes.sm, color: colors.textSecondary },
   signInLink: {
     fontSize: fontSizes.sm,
     color: colors.primary,
-    fontWeight: '600',
-  },
-  phoneRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  prefixBox: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.md,
-    height: 52,
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.small,
-  },
-  prefixText: {
-    fontSize: fontSizes.md,
-    color: colors.textPrimary,
-    fontWeight: '600',
-  },
-  phoneInput: {
-    flex: 1,
+    fontWeight: '700',
   },
 });

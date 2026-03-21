@@ -52,8 +52,8 @@ func (h *HeatmapHandler) GetZoneInfo(c *gin.Context) {
 			COALESCE(MODE() WITHIN GROUP (ORDER BY type), 'none') as top_type
 		FROM crime_incidents
 		WHERE
-			latitude BETWEEN ? AND ?
-			AND longitude BETWEEN ? AND ?
+			ST_Y(location::geometry) BETWEEN ? AND ?
+			AND ST_X(location::geometry) BETWEEN ? AND ?
 			AND occurred_at > NOW() - INTERVAL '30 days'
 			AND verified = true
 	`, lat-latDelta, lat+latDelta, lng-lngDelta, lng+lngDelta).Scan(&result)
@@ -93,8 +93,8 @@ func (h *HeatmapHandler) GetRecentCrimes(c *gin.Context) {
 
 	var crimes []models.CrimeIncident
 	h.db.Where(`
-		latitude BETWEEN ? AND ?
-		AND longitude BETWEEN ? AND ?
+		ST_Y(location::geometry) BETWEEN ? AND ?
+		AND ST_X(location::geometry) BETWEEN ? AND ?
 		AND occurred_at > NOW() - INTERVAL '30 days'
 		AND verified = true
 	`, lat-latDelta, lat+latDelta, lng-lngDelta, lng+lngDelta).
@@ -135,7 +135,7 @@ func (h *HeatmapHandler) GetStatistics(c *gin.Context) {
 	h.db.Raw(`
 		SELECT COUNT(*) as count, COALESCE(AVG(severity),0) as avg_sev
 		FROM crime_incidents
-		WHERE latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?
+		WHERE ST_Y(location::geometry) BETWEEN ? AND ? AND ST_X(location::geometry) BETWEEN ? AND ?
 		AND occurred_at > NOW() - INTERVAL '30 days' AND verified = true
 	`, lat-latDelta, lat+latDelta, lng-lngDelta, lng+lngDelta).Scan(&crimeStat)
 
@@ -149,8 +149,8 @@ func (h *HeatmapHandler) GetStatistics(c *gin.Context) {
 	var nearbyUsers int64
 	h.db.Table("user_locations").
 		Where(`
-			latitude BETWEEN ? AND ?
-			AND longitude BETWEEN ? AND ?
+			ST_Y(location::geometry) BETWEEN ? AND ?
+			AND ST_X(location::geometry) BETWEEN ? AND ?
 			AND recorded_at > NOW() - INTERVAL '15 minutes'
 		`, lat-latDelta, lat+latDelta, lng-lngDelta, lng+lngDelta).
 		Count(&nearbyUsers)

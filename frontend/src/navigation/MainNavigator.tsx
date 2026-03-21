@@ -2,11 +2,12 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from '@/types/navigation';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import { MapScreen } from '@/screens/map/MapScreen';
 import { EmergencyScreen } from '@/screens/emergency/EmergencyScreen';
 import { ProfileScreen } from '@/screens/profile/ProfileScreen';
 import { colors } from '@/theme/colors';
 import { borderRadius, spacing } from '@/theme/spacing';
+import { MapNavigator } from './MapNavigator';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -44,11 +45,31 @@ export const MainNavigator = () => {
     >
       <Tab.Screen
         name="Map"
-        component={MapScreen}
-        options={{
+        component={MapNavigator}
+        options={({ route }) => ({
           tabBarIcon: ({ color, size }) => <Icon name="map" size={size} color={color} />,
           tabBarLabel: 'Map',
-        }}
+          tabBarStyle: ((route) => {
+            const routeName = getFocusedRouteNameFromRoute(route) ?? 'MapDashboard';
+            if (['SafeRoute', 'Navigation', 'LocationHistory', 'CrimeDetails'].includes(routeName)) {
+              return { display: 'none' };
+            }
+            return {
+              height: 85,
+              paddingTop: 12,
+              paddingBottom: 24,
+              backgroundColor: colors.surface,
+              borderTopLeftRadius: 32,
+              borderTopRightRadius: 32,
+              borderTopWidth: 0,
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              elevation: 16,
+            };
+          })(route),
+        })}
       />
       <Tab.Screen
         name="Emergency"

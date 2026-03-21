@@ -67,25 +67,25 @@ export const HeatmapLegend: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    top: 80,
-    left: spacing.lg,
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     ...shadows.medium,
     overflow: 'hidden',
-    width: 180,
+    width: 170,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: spacing.md,
+    padding: spacing.sm + 4,
   },
   title: {
-    fontSize: fontSizes.sm,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
     color: colors.textPrimary,
+    letterSpacing: 0.5,
   },
   content: {
     paddingHorizontal: spacing.md,
@@ -94,11 +94,11 @@ const styles = StyleSheet.create({
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   colorBox: {
-    width: 20,
-    height: 20,
+    width: 14,
+    height: 14,
     borderRadius: 4,
     marginRight: spacing.sm,
   },
@@ -106,12 +106,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   label: {
-    fontSize: fontSizes.xs,
+    fontSize: 11,
     color: colors.textPrimary,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   range: {
-    fontSize: 10,
+    fontSize: 9,
     color: colors.textSecondary,
+    fontWeight: '500',
   },
 });

@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { Avatar } from '@/components/common/Avatar';
 import { ProfileOverviewTab } from './ProfileOverviewTab';
 import { SettingsTab } from './SettingsTab';
 import { ActivityTab } from './ActivityTab';
 import { HelpTab } from './HelpTab';
 import { useAuthStore } from '@/store/authStore';
-import { theme } from '@/theme';
 import { colors } from '@/theme/colors';
+import { spacing, borderRadius, shadows } from '@/theme/spacing';
+import { fontSizes } from '@/theme/typography';
 
 type Tab = 'overview' | 'settings' | 'activity' | 'help';
 
@@ -49,20 +50,24 @@ export const ProfileScreen: React.FC = () => {
             <Text style={styles.name}>
               {user?.name ?? 'User'}
             </Text>
-            <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+            <Icon name="verified" size={18} color={colors.secondary} />
+          </View>
+          <View style={styles.statusBadge}>
+            <Icon name="shield" size={12} color={colors.secondary} />
+            <Text style={styles.statusText}>VERIFIED CITIZEN</Text>
           </View>
           <View style={styles.stats}>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>24</Text>
-              <Text style={styles.statLabel}>Alerts</Text>
+              <Text style={styles.statLabel}>ALERTS</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>12</Text>
-              <Text style={styles.statLabel}>Helped</Text>
+              <Text style={styles.statLabel}>HELPED</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>98</Text>
-              <Text style={styles.statLabel}>Safety</Text>
+              <Text style={styles.statValue}>98%</Text>
+              <Text style={styles.statLabel}>SAFETY</Text>
             </View>
           </View>
         </View>
@@ -75,10 +80,10 @@ export const ProfileScreen: React.FC = () => {
             style={[styles.tab, activeTab === tab.id && styles.activeTab]}
             onPress={() => setActiveTab(tab.id)}
           >
-            <Ionicons
-              name={tab.icon as any}
+            <Icon
+              name={tab.icon === 'person' ? 'person' : tab.icon === 'settings' ? 'settings' : tab.icon === 'time' ? 'history' : 'help-outline'}
               size={20}
-              color={activeTab === tab.id ? theme.colors.primary : theme.colors.textSecondary}
+              color={activeTab === tab.id ? colors.primary : colors.textSecondary}
             />
             <Text style={[styles.tabLabel, activeTab === tab.id && styles.activeTabLabel]}>
               {tab.label}
@@ -95,13 +100,16 @@ export const ProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
-    padding: theme.spacing.lg,
-    backgroundColor: theme.colors.surface,
-    gap: theme.spacing.md,
+    padding: spacing.xl,
+    backgroundColor: colors.surface,
+    gap: spacing.lg,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   headerInfo: {
     flex: 1,
@@ -109,56 +117,74 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.xs,
-    marginBottom: theme.spacing.sm,
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
   },
   name: {
-    fontSize: theme.typography.sizes.xl,
-    fontWeight: theme.typography.weights.bold,
-    color: theme.colors.text,
+    fontSize: fontSizes.xl,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(30, 142, 62, 0.1)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.pill,
+    alignSelf: 'flex-start',
+    marginTop: spacing.xs,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.secondary,
+    marginLeft: 4,
   },
   stats: {
     flexDirection: 'row',
-    gap: theme.spacing.lg,
+    gap: spacing.xl,
+    marginTop: spacing.md,
   },
   statItem: {
     alignItems: 'center',
   },
   statValue: {
-    fontSize: theme.typography.sizes.lg,
-    fontWeight: theme.typography.weights.bold,
-    color: theme.colors.primary,
+    fontSize: fontSizes.md,
+    fontWeight: '800',
+    color: colors.primary,
   },
   statLabel: {
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.textSecondary,
+    fontSize: 10,
+    color: colors.textSecondary,
+    fontWeight: '600',
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   tab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: theme.spacing.md,
-    gap: theme.spacing.xs,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    paddingVertical: spacing.sm,
+    gap: spacing.xs,
+    borderRadius: borderRadius.lg,
   },
   activeTab: {
-    borderBottomColor: theme.colors.primary,
+    backgroundColor: 'rgba(26, 115, 232, 0.08)',
   },
   tabLabel: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.textSecondary,
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '600',
   },
   activeTabLabel: {
-    color: theme.colors.primary,
-    fontWeight: theme.typography.weights.bold,
+    color: colors.primary,
+    fontWeight: '800',
   },
   content: {
     flex: 1,
