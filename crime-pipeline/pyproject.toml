@@ -1,0 +1,16 @@
+[tool.pyright]
+pythonPath = "/opt/anaconda3/bin/python3"
+pythonVersion = "3.13"
+typeCheckingMode = "off"
+reportMissingImports = false
+reportMissingModuleSource = false
+reportUndefinedVariable = "none"
+extraPaths = [
+  "/opt/anaconda3/lib/python3.13/site-packages",
+  "."
+]
+
+[tool.pyre]
+# Disable Pyre analysis entirely
+source_directories = []
+ignore_all_errors = true

@@ -11,7 +11,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/models"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -174,32 +173,51 @@ func (rs *RouteService) scoreRoute(encodedPolyline string) (int, int) {
 	sampled := samplePoints(points, 100)
 
 	totalScore := 0
-	dangerZones := make(map[uuid.UUID]bool)
+	visitedCrimes := make(map[string]bool)
 
 	for _, point := range sampled {
-		var zone struct {
-			ID        uuid.UUID
-			RiskLevel string
+		var crime struct {
+			ID        string
+			WeightPct float64
 		}
 
+		// Query any crime hotspot near this route point (within 1km radius), taking the HIGHEST danger percentage
 		query := `
-			SELECT id, risk_level FROM danger_zones
-			WHERE ST_Contains(boundary::geometry, ST_SetSRID(ST_MakePoint(?, ?), 4326))
-			  AND valid_until > NOW()
+			SELECT 
+			  id, 
+			  GREATEST(0.0, 
+                CASE severity 
+                    WHEN 4 THEN 100.0 
+                    WHEN 3 THEN 75.0 
+                    WHEN 2 THEN 50.0 
+                    ELSE 25.0 
+                END 
+                - 
+                (EXTRACT(EPOCH FROM (NOW() - occurred_at)) / 86400.0 * 
+                CASE 
+                    WHEN crime_type IN ('murder', 'rape') THEN 0.1 
+                    WHEN crime_type IN ('robbery', 'kidnapping', 'assault') THEN 0.5 
+                    ELSE 2.0 
+                END)
+              ) as weight_pct
+			FROM crime_incidents
+			WHERE ST_DWithin(location, ST_MakePoint(?, ?)::geography, 1000)
+			ORDER BY weight_pct DESC
 			LIMIT 1
 		`
-		err := rs.db.Raw(query, point.Longitude, point.Latitude).Scan(&zone).Error
+		err := rs.db.Raw(query, point.Longitude, point.Latitude).Scan(&crime).Error
 
-		if err == nil && zone.ID != uuid.Nil {
-			dangerZones[zone.ID] = true
-			switch zone.RiskLevel {
-			case "critical":
+		if err == nil && crime.ID != "" && crime.WeightPct > 0 {
+			visitedCrimes[crime.ID] = true
+			
+			// Subtract safety score based purely on the severity %
+			if crime.WeightPct >= 80 {
 				totalScore -= 40
-			case "high":
+			} else if crime.WeightPct >= 50 {
 				totalScore -= 25
-			case "medium":
+			} else if crime.WeightPct >= 20 {
 				totalScore -= 15
-			case "low":
+			} else {
 				totalScore -= 5
 			}
 		} else {
@@ -220,7 +238,7 @@ func (rs *RouteService) scoreRoute(encodedPolyline string) (int, int) {
 		safetyScore = 100
 	}
 
-	return safetyScore, len(dangerZones)
+	return safetyScore, len(visitedCrimes)
 }
 
 // rankRoutes sorts routes by: (safetyScore * 0.6) + (timeEfficiency * 0.4)

@@ -1,0 +1,55 @@
+name: Production Deployment
+
+on:
+  push:
+    branches: [ main ]
+  release:
+    types: [ created ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 1. Build and Push Backend
+      - name: Build and push Backend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/safearound-backend:latest
+
+      # 2. Build and push Crime Pipeline
+      - name: Build and push Crime Pipeline
+        uses: docker/build-push-action@v4
+        with:
+          context: ./crime-pipeline
+          file: ./crime-pipeline/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/safearound-crime-pipeline:latest
+
+      # 3. Deploy to Server via SSH (Optional - requires secrets.SERVER_SSH_KEY)
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd ~/Safe-Around
+            git pull origin main
+            docker compose pull
+            docker compose up -d
+            docker image prune -f

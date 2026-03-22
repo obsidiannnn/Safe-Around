@@ -65,13 +65,9 @@
       "expo-location",
       "expo-notifications",
       "expo-camera",
-      "expo-av",
-      "expo-maps"
+      "expo-av"
     ],
     "extra": {
-      "eas": {
-        "projectId": "safearound-mobile"
-      }
     }
   }
 }

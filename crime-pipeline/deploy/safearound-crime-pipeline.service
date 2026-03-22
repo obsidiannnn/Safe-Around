@@ -1,0 +1,46 @@
+[Unit]
+Description=SafeAround Crime Pipeline - India Automated Crime Tracking
+Documentation=https://github.com/obsidiannnn/Safe-Around
+After=network.target postgresql.service redis.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=safearound
+Group=safearound
+WorkingDirectory=/opt/safearound/crime-pipeline
+
+# Load environment variables
+EnvironmentFile=/opt/safearound/.env
+
+# Command to run — FastAPI via uvicorn for production
+ExecStart=/opt/safearound/venv/bin/uvicorn crime_pipeline:app \
+    --host 0.0.0.0 \
+    --port 8001 \
+    --workers 1 \
+    --log-level info \
+    --access-log
+
+# Graceful shutdown
+ExecStop=/bin/kill -TERM $MAINPID
+TimeoutStopSec=30
+KillMode=process
+KillSignal=SIGTERM
+
+# Auto-restart on failure
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=120
+StartLimitBurst=5
+
+# Resource limits
+LimitNOFILE=65536
+MemoryLimit=1G
+
+# Logging (journalctl -u safearound-crime-pipeline -f)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=safearound-pipeline
+
+[Install]
+WantedBy=multi-user.target

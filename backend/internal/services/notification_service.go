@@ -225,10 +225,32 @@ func (s *notifService) NotifyEmergencyContacts(userID uint, alert *models.Emerge
 	)
 
 	for _, contact := range contacts {
+		// 1. Try to find a registered user with this phone number
+		var contactUser models.User
+		if err := s.db.Where("phone = ?", contact.Phone).First(&contactUser).Error; err == nil {
+			// Found a registered user! Send in-app notification
+			s.queue <- &notificationTask{
+				UserID:           contactUser.ID,
+				NotificationType: "emergency_contact_alert",
+				Title:            "🚨 Emergency: " + user.Name,
+				Body:             user.Name + " is in danger! Tap to see live location.",
+				Data: map[string]interface{}{
+					"alert_id":     alert.ID.String(),
+					"latitude":     alert.AlertLocation.Latitude,
+					"longitude":    alert.AlertLocation.Longitude,
+					"victim_name":  user.Name,
+					"victim_phone": user.Phone,
+				},
+				Priority: "critical",
+				AlertID:  &alert.ID,
+			}
+		}
+
+		// 2. Always send SMS backup (as requested: "message will be triggered")
 		go func(phone string) {
 			fromNum := os.Getenv("TWILIO_FROM")
 			if _, err := s.twilio.MakeCall(phone, fromNum, msgText); err != nil {
-				logger.Warn("Emergency contact SMS failed", zap.String("phone", phone), zap.Error(err))
+				logger.Warn("Emergency contact SMS/Call failed", zap.String("phone", phone), zap.Error(err))
 			}
 		}(contact.Phone)
 	}

@@ -179,7 +179,8 @@ export const SafeRouteScreen: React.FC = () => {
               fontSize: 16,
               backgroundColor: colors.surface,
               borderRadius: borderRadius.lg,
-              paddingHorizontal: 16,
+              paddingLeft: 44, // Increased to accommodate icon
+              paddingRight: 16,
               borderWidth: 1,
               borderColor: colors.border,
               ...shadows.small,
@@ -204,7 +205,7 @@ export const SafeRouteScreen: React.FC = () => {
             placeholderTextColor: colors.textSecondary,
           }}
           renderLeftButton={() => (
-            <View style={{ position: 'absolute', left: 12, top: 14, zIndex: 1 }}>
+            <View style={{ position: 'absolute', left: 14, top: 14, zIndex: 1, pointerEvents: 'none' }}>
               <Icon name="location-on" size={24} color={colors.primary} />
             </View>
           )}

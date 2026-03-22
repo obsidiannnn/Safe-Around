@@ -40,6 +40,22 @@ func NewAlertService(db *gorm.DB, rdb *redis.Client, gs *GeofencingService, ns N
 	}
 }
 
+func (s *AlertService) GetAlertHistory(ctx context.Context, userID uint) ([]models.EmergencyAlert, error) {
+	var alerts []models.EmergencyAlert
+	if err := s.db.Where("user_id = ?", userID).Order("created_at DESC").Find(&alerts).Error; err != nil {
+		return nil, err
+	}
+	return alerts, nil
+}
+
+func (s *AlertService) GetActiveAlerts(ctx context.Context) ([]models.EmergencyAlert, error) {
+	var alerts []models.EmergencyAlert
+	if err := s.db.Where("alert_status IN ?", []string{"active", "responding"}).Order("created_at DESC").Find(&alerts).Error; err != nil {
+		return nil, err
+	}
+	return alerts, nil
+}
+
 func (s *AlertService) CreateAlert(ctx context.Context, req CreateAlertRequest) (*models.EmergencyAlert, error) {
 	// 1. Create alert record
 	alert := &models.EmergencyAlert{
@@ -80,30 +96,50 @@ func (s *AlertService) CreateAlert(ctx context.Context, req CreateAlertRequest) 
 	// 6. Broadcast via WebSocket
 	s.websocketHub.BroadcastEmergencyAlert(alert)
 
+	// 7. Notify emergency contacts immediately
+	s.notificationService.NotifyEmergencyContacts(alert.UserID, alert)
+
 	return alert, nil
 }
 
 func (s *AlertService) startRadiusExpansion(alertID uuid.UUID) {
-	// T+30s: Expand to 250m
-	timer30 := time.AfterFunc(30*time.Second, func() {
-		s.expandRadius(alertID, 250)
-	})
+	// Start a ticker-like background job for granular expansion
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
 
-	// T+60s: Expand to 500m
-	timer60 := time.AfterFunc(60*time.Second, func() {
-		s.expandRadius(alertID, 500)
-	})
+		for {
+			select {
+			case <-ticker.C:
+				var alert models.EmergencyAlert
+				if err := s.db.First(&alert, "id = ?", alertID).Error; err != nil {
+					return
+				}
 
-	// T+90s: Expand to 1000m + Call 911
-	timer90 := time.AfterFunc(90*time.Second, func() {
-		s.expandRadius(alertID, 1000)
-		s.EscalateToEmergencyServices(alertID, "all")
-	})
+				// Stop expansion if not active or already has responders
+				if alert.AlertStatus != "active" {
+					return
+				}
 
-	// Store timers for cancellation
-	s.schedulers.Store(alertID.String()+":30", timer30)
-	s.schedulers.Store(alertID.String()+":60", timer60)
-	s.schedulers.Store(alertID.String()+":90", timer90)
+				var responderCount int64
+				s.db.Model(&models.AlertResponse{}).
+					Where("alert_id = ? AND response_status = ?", alertID, "accepted").
+					Count(&responderCount)
+
+				if responderCount > 0 {
+					return
+				}
+
+				nextRadius := alert.GetNextRadius()
+				if nextRadius == alert.CurrentRadius {
+					// Max radius reached or couldn't get next
+					return
+				}
+
+				s.expandRadius(alertID, nextRadius)
+			}
+		}
+	}()
 }
 
 func (s *AlertService) cancelRadiusExpansion(alertID uuid.UUID) {

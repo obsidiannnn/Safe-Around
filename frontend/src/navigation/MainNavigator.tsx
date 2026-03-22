@@ -3,15 +3,38 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from '@/types/navigation';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { EmergencyScreen } from '@/screens/emergency/EmergencyScreen';
-import { ProfileScreen } from '@/screens/profile/ProfileScreen';
+import { ProfileNavigator } from './ProfileNavigator';
 import { colors } from '@/theme/colors';
 import { borderRadius, spacing } from '@/theme/spacing';
 import { MapNavigator } from './MapNavigator';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 
+import { useShakeDetection } from '@/hooks/useShakeDetection';
+import { useAlertStore } from '@/store/alertStore';
+import { useLocation } from '@/hooks/useLocation';
+
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export const MainNavigator = () => {
+  const { isAlertActive, createAlert } = useAlertStore();
+  const { currentLocation } = useLocation();
+  
+  // Global Shake Detection for Emergency SOS
+  useShakeDetection({
+    enabled: !isAlertActive,
+    onShake: async () => {
+      console.log('Global Shake Detected! Triggering Emergency SOS.');
+      if (currentLocation) {
+        try {
+          await createAlert(currentLocation, true); // Silent mode by default for shake
+          console.log('Shake-based Silent Alert Created Successfully.');
+        } catch (error) {
+          console.error('Failed to create shake-based alert:', error);
+        }
+      }
+    }
+  });
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -81,7 +104,7 @@ export const MainNavigator = () => {
       />
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
+        component={ProfileNavigator}
         options={{
           tabBarIcon: ({ color, size }) => <Icon name="person" size={size} color={color} />,
           tabBarLabel: 'Profile',

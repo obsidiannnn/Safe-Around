@@ -1,12 +1,14 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math"
 	"net/url"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/config"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -63,4 +65,28 @@ func NewPostgresDB(cfg *config.Config) (*gorm.DB, error) {
 	}
 
 	return nil, fmt.Errorf("failed to connect to database after %d attempts: %w", maxRetries, err)
+}
+
+// NewPostgresPool initializes and returns a pgxpool.Pool for low-level PG operations.
+func NewPostgresPool(cfg *config.Config) (*pgxpool.Pool, error) {
+	dsn := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s&TimeZone=UTC",
+		cfg.DB.User,
+		url.QueryEscape(cfg.DB.Password),
+		cfg.DB.Host,
+		cfg.DB.Port,
+		cfg.DB.Name,
+		cfg.DB.SSLMode,
+	)
+
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse pgxpool config: %w", err)
+	}
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pgxpool: %w", err)
+	}
+
+	return pool, nil
 }

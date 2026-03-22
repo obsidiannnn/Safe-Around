@@ -42,7 +42,7 @@ export const DangerZoneAlert: React.FC<DangerZoneAlertProps> = ({
           <Ionicons name="warning" size={64} color={theme.colors.warning} />
         </View>
 
-        <Text style={styles.title}>You've entered a high-risk area</Text>
+        <Text style={styles.title}>You are not in safe zone please get out of here</Text>
 
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>

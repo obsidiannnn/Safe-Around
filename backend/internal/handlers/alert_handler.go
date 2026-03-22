@@ -21,7 +21,7 @@ func NewAlertHandler(as *services.AlertService) *AlertHandler {
 // POST /api/v1/alerts
 func (h *AlertHandler) CreateAlert(c *gin.Context) {
 	// Extract userID from context (set by auth middleware)
-	userIDVal, exists := c.Get("userID")
+	userIDVal, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -78,7 +78,7 @@ func (h *AlertHandler) GetAlertDetails(c *gin.Context) {
 
 // POST /api/v1/alerts/:id/respond
 func (h *AlertHandler) RespondToAlert(c *gin.Context) {
-	userIDVal, exists := c.Get("userID")
+	userIDVal, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -119,7 +119,7 @@ func (h *AlertHandler) RespondToAlert(c *gin.Context) {
 
 // PATCH /api/v1/alerts/:id/status
 func (h *AlertHandler) UpdateAlertStatus(c *gin.Context) {
-	userIDVal, exists := c.Get("userID")
+	userIDVal, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -184,12 +184,29 @@ func (h *AlertHandler) EscalateAlert(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Alert escalated to formal emergency services"})
 }
 
-// GET /api/v1/alerts/active
+// GET    /api/v1/alerts/active
 func (h *AlertHandler) GetActiveAlerts(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"message": "Endpoint not implemented internally yet"})
+	alerts, err := h.alertService.GetActiveAlerts(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch active alerts"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": alerts})
 }
 
-// GET /api/v1/alerts/history
+// GET    /api/v1/alerts/history
 func (h *AlertHandler) GetAlertHistory(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"message": "Endpoint not implemented internally yet"})
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	userID := userIDVal.(uint)
+
+	alerts, err := h.alertService.GetAlertHistory(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch alert history"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": alerts})
 }

@@ -78,7 +78,7 @@ export const QuickStatsCard: React.FC<QuickStatsCardProps> = ({
 
               <View style={styles.statItem}>
                 <Icon name="local-police" size={24} color={colors.error} />
-                <Text style={styles.statValue}>{stats.crimeRate.toFixed(1)}</Text>
+                <Text style={styles.statValue}>{(stats.crimeRate ?? 0).toFixed(1)}</Text>
                 <Text style={styles.statLabel}>Crime Rate</Text>
               </View>
             </View>
