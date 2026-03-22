@@ -32,6 +32,13 @@ export const authService = {
     return response.data;
   },
 
+  async updateProfile(data: Partial<SetupProfileRequest>, token: string) {
+    const response = await apiClient.patch('/users/profile', data, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  },
+
   // Direct Login with phone + password (for returning users who set up password)
   login: async (credentials: LoginRequest): Promise<AuthResponse> => {
     const response = await apiClient.post<AuthResponse>('/auth/login', credentials);

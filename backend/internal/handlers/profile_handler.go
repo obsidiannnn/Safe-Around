@@ -34,18 +34,20 @@ func (h *ProfileHandler) GetProfile(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"id":                     user.ID,
-		"name":                   user.Name,
-		"phone":                  user.Phone,
-		"email":                  user.Email,
-		"is_phone_verified":      user.IsPhoneVerified,
-		"profile_picture_url":    user.ProfilePictureURL,
-		"subscription_tier":      user.SubscriptionTier,
-		"total_alerts_triggered": user.TotalAlertsTriggered,
-		"people_helped_count":    user.PeopleHelpedCount,
-		"trust_level_score":      user.TrustLevelScore,
-		"last_login":             user.LastLogin,
-		"created_at":             user.CreatedAt,
+		"user": gin.H{
+			"id":                     user.ID,
+			"name":                   user.Name,
+			"phone":                  user.Phone,
+			"email":                  user.Email,
+			"is_phone_verified":      user.IsPhoneVerified,
+			"profile_picture_url":    user.ProfilePictureURL,
+			"subscription_tier":      user.SubscriptionTier,
+			"total_alerts_triggered": user.TotalAlertsTriggered,
+			"people_helped_count":    user.PeopleHelpedCount,
+			"trust_level_score":      user.TrustLevelScore,
+			"last_login":             user.LastLogin,
+			"created_at":             user.CreatedAt,
+		},
 	})
 }
 

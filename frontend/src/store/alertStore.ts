@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Alert } from '@/types/models';
 import { alertService } from '@/services/api/alertService';
+import { locationService } from '@/services/location/locationService';
 
 interface AlertState {
   activeAlert: Alert | null;
@@ -20,6 +21,8 @@ interface AlertState {
   resolveAlert: (alertId: string) => Promise<void>;
   respondToAlert: (alertId: string) => Promise<void>;
   updateAlertStatus: (status: 'active' | 'resolved' | 'cancelled') => void;
+  fetchHistory: () => Promise<void>;
+  fetchActiveAlerts: (location: { latitude: number; longitude: number }, radius: number) => Promise<void>;
 }
 
 export const useAlertStore = create<AlertState>((set, get) => ({
@@ -86,11 +89,15 @@ export const useAlertStore = create<AlertState>((set, get) => ({
     }
   },
 
-  respondToAlert: async (alertId) => {
+  respondToAlert: async (alertId: string) => {
     try {
+      const location = await locationService.getCurrentLocation();
+      if (!location) {
+        throw new Error('Could not get current location');
+      }
       await alertService.respondToAlert(alertId, {
-        latitude: 0,
-        longitude: 0,
+        latitude: location.latitude,
+        longitude: location.longitude,
       });
       set((state) => ({ respondersCount: state.respondersCount + 1 }));
     } catch (error) {
@@ -99,10 +106,28 @@ export const useAlertStore = create<AlertState>((set, get) => ({
     }
   },
 
-  updateAlertStatus: (status) => {
+  updateAlertStatus: (status: 'active' | 'resolved' | 'cancelled') => {
     const alert = get().activeAlert;
     if (alert) {
       set({ activeAlert: { ...alert, status } });
+    }
+  },
+  
+  fetchHistory: async () => {
+    try {
+      const history = await alertService.getAlertHistory();
+      set({ alertHistory: history });
+    } catch (error) {
+      console.error('Error fetching alert history:', error);
+    }
+  },
+
+  fetchActiveAlerts: async (location: { latitude: number; longitude: number }, radius: number) => {
+    try {
+      const alerts = await alertService.getActiveAlerts(location, radius);
+      set({ nearbyAlerts: alerts });
+    } catch (error) {
+      console.error('Error fetching active alerts:', error);
     }
   },
 }));

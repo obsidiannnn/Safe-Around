@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
@@ -19,8 +19,12 @@ type FilterPeriod = '7days' | '30days' | 'all';
  */
 export const AlertHistoryScreen = () => {
   const navigation = useNavigation();
-  const { alertHistory } = useAlertStore();
+  const { alertHistory, fetchHistory } = useAlertStore();
   const [filter, setFilter] = useState<FilterPeriod>('30days');
+
+  useEffect(() => {
+    fetchHistory();
+  }, []);
 
   const getStatusColor = (status: string): 'green' | 'red' | 'gray' => {
     switch (status) {

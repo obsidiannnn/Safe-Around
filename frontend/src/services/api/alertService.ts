@@ -30,7 +30,13 @@ export const alertService = {
    * Create a new emergency alert
    */
   createAlert: async (data: CreateAlertRequest): Promise<Alert> => {
-    const response = await apiClient.post<ApiResponse<Alert>>('/alerts', data);
+    const response = await apiClient.post<ApiResponse<Alert>>('/alerts', {
+      alert_type: data.type,
+      latitude: data.location.latitude,
+      longitude: data.location.longitude,
+      silent_mode: data.silentMode,
+      metadata: data.message
+    });
     return response.data.data!;
   },
 
@@ -64,7 +70,10 @@ export const alertService = {
   ): Promise<AlertResponse> => {
     const response = await apiClient.post<ApiResponse<AlertResponse>>(
       `/alerts/${id}/respond`,
-      { location }
+      { 
+        latitude: location.latitude,
+        longitude: location.longitude 
+      }
     );
     return response.data.data!;
   },

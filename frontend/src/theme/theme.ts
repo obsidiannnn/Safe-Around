@@ -19,6 +19,8 @@ export const theme = {
     textSecondary: colors.textSecondary,
     disabled: colors.disabled,
     backdrop: colors.backdrop,
+    warning: colors.warning,
+    success: colors.success,
   },
   spacing,
   borderRadius,

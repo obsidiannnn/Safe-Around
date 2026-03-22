@@ -16,10 +16,11 @@ func SetupRouter(
 	notifHandler *handlers.NotificationHandler,
 	alertHandler *handlers.AlertHandler,
 	heatmapHandler *handlers.HeatmapHandler,
-	wsHandler *handlers.WebSocketHandler,
+	wsHandler gin.HandlerFunc,
 	locationHandler *handlers.LocationHandler,
 	routeHandler *handlers.RouteHandler,
 	profileHandler *handlers.ProfileHandler,
+	geofencingHandler *handlers.GeofencingHandler,
 	rdb *redis.Client,
 ) *gin.Engine {
 	r := gin.New()
@@ -40,7 +41,7 @@ func SetupRouter(
 	}
 
 	// WebSockets Upgrade Endpoint
-	r.GET("/ws", wsHandler.HandleWebSocket)
+	r.GET("/ws/crime", wsHandler)
 
 	// API Endpoints - applying global rate limit of 100 requests / minute initially
 	api := r.Group("/api/v1")
@@ -76,7 +77,9 @@ func SetupRouter(
 		// Heatmap domain
 		heatmap := api.Group("/heatmap")
 		{
-			heatmap.GET("/tiles/:z/:x/:y", heatmapHandler.GetTile)
+			heatmap.GET("/data", heatmapHandler.GetHeatmapData)
+			heatmap.GET("/grid", heatmapHandler.GetGridData)
+			heatmap.GET("/tiles/:z/:x/:y", heatmapHandler.GetTile) // Keep for backward compatibility
 			heatmap.GET("/zone", heatmapHandler.GetZoneInfo)
 			heatmap.GET("/crimes", heatmapHandler.GetRecentCrimes)
 			heatmap.GET("/statistics", heatmapHandler.GetStatistics)
@@ -108,6 +111,16 @@ func SetupRouter(
 			users.GET("/contacts", profileHandler.GetContacts)
 			users.POST("/contacts", profileHandler.AddContact)
 			users.DELETE("/contacts/:id", profileHandler.DeleteContact)
+		}
+
+		// Geofencing domain
+		geofencing := api.Group("/geofencing")
+		geofencing.Use(middleware.AuthRequired())
+		{
+			geofencing.GET("/check", geofencingHandler.CheckDangerZone)
+			geofencing.GET("/nearby-users", geofencingHandler.GetNearbyUsers)
+			geofencing.POST("/location", geofencingHandler.UpdateLocation)
+			geofencing.GET("/zones", geofencingHandler.GetDangerZones)
 		}
 	}
 

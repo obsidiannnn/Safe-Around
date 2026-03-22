@@ -30,6 +30,7 @@ interface AuthState {
   sendOTP: (phone: string, type?: 'signup' | 'login') => Promise<void>;
   verifyOTP: (phone: string, otp: string) => Promise<void>;
   setupProfile: (data: SetupProfileRequest) => Promise<void>;
+  updateProfile: (data: Partial<SetupProfileRequest>) => Promise<void>;
   logIn: (data: LoginRequest) => Promise<void>;
   logOut: () => Promise<void>;
   refreshAccessToken: () => Promise<void>;
@@ -94,6 +95,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       get().setUser(result.user);
     } catch (error: any) {
       const msg = error.response?.data?.error || 'Profile setup failed';
+      set({ error: msg });
+      throw new Error(msg);
+    }
+  },
+
+  updateProfile: async (data) => {
+    try {
+      set({ error: null });
+      const token = get().accessToken;
+      if (!token) throw new Error('Not authenticated');
+      const result = await authService.updateProfile(data, token);
+      get().setUser(result.user);
+    } catch (error: any) {
+      const msg = error.response?.data?.error || 'Profile update failed';
       set({ error: msg });
       throw new Error(msg);
     }

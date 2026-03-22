@@ -26,14 +26,21 @@ export default function App() {
 
   useEffect(() => {
     const init = async () => {
-      await initializeApp();
-      setIsInitializing(false);
+      try {
+        await initializeApp();
+      } catch (error) {
+        console.error('Initialization failed:', error);
+      } finally {
+        setIsInitializing(false);
+        // Hide splash screen as soon as we're done initializing
+        await SplashScreen.hideAsync();
+      }
     };
     init();
   }, []);
 
   if (isInitializing) {
-    return <LoadingOverlay visible={true} message="Initializing SafeAround..." />;
+    return <LoadingOverlay visible={true} message="Initializing SafeAround..." onLayout={() => SplashScreen.hideAsync()} />;
   }
 
   return (

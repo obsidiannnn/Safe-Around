@@ -8,6 +8,12 @@ const getDevHost = () => {
     return debuggerHost.split(':')[0]; // Extracts '10.110.153.103'
   }
   
+  // Try to extract from process.env.API_URL if available
+  if (process.env.API_URL) {
+    const match = process.env.API_URL.match(/http:\/\/([^:/]+)/);
+    if (match) return match[1];
+  }
+  
   // Fallbacks for simulators
   if (Platform.OS === 'android') {
     return '10.0.2.2';

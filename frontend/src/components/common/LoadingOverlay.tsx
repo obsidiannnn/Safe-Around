@@ -1,17 +1,18 @@
 import React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, LayoutChangeEvent } from 'react-native';
 import { theme } from '@/theme';
 
 interface LoadingOverlayProps {
   visible: boolean;
   message?: string;
+  onLayout?: (event: LayoutChangeEvent) => void;
 }
 
-export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ visible, message }) => {
+export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ visible, message, onLayout }) => {
   if (!visible) return null;
 
   return (
-    <View style={styles.overlay}>
+    <View style={styles.overlay} onLayout={onLayout}>
       <View style={styles.container}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
         {message && <Text style={styles.message}>{message}</Text>}

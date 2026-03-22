@@ -64,6 +64,22 @@ export const PermissionsScreen = () => {
       required: false,
       granted: false,
     },
+    {
+      id: 'motion',
+      icon: 'vibration',
+      title: 'Motion Sensors',
+      description: 'Used for "Shake to Alert" to detect emergencies automatically',
+      required: true,
+      granted: false,
+    },
+    {
+      id: 'biometrics',
+      icon: 'fingerprint',
+      title: 'Biometric Security',
+      description: 'Optional: Use FaceID or Fingerprint for secure, rapid access',
+      required: false,
+      granted: false,
+    },
   ]);
 
   const requestPermission = async (permissionId: string) => {
@@ -81,6 +97,15 @@ export const PermissionsScreen = () => {
         case 'notifications':
           const notificationStatus = await Notifications.requestPermissionsAsync();
           granted = notificationStatus.status === 'granted';
+          break;
+        case 'motion':
+          // On many platforms this is granted by default or via generic app permissions
+          // We simulate a check/request here for UX completeness
+          granted = true;
+          break;
+        case 'biometrics':
+          // Simulate biometric check
+          granted = true;
           break;
         case 'camera':
           const cameraStatus = await Camera.requestCameraPermissionsAsync();
@@ -123,7 +148,7 @@ export const PermissionsScreen = () => {
           <View style={styles.permissionContent}>
             <View style={[styles.iconContainer, permission.granted && styles.iconGranted]}>
               <Icon
-                name={permission.granted ? 'check' : permission.icon}
+                name={(permission.granted ? 'check' : permission.icon) as any}
                 size={32}
                 color={permission.granted ? colors.success : colors.primary}
               />

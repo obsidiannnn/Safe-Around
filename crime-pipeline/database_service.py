@@ -78,9 +78,22 @@ class DatabaseService:
         raise RuntimeError("Could not initialize DB connection pool after 5 attempts")
 
     def _get_conn(self):
-        return self._pool.getconn()
+        """Get a fresh, validated connection from the pool."""
+        conn = self._pool.getconn()
+        try:
+            # Check if connection is alive using a lightweight query
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+            return conn
+        except Exception:
+            # Connection is dead, discard it and get a new one
+            logger.info("♻️ Discarding stale DB connection and getting fresh one")
+            self._pool.putconn(conn, close=True)
+            return self._pool.getconn()
 
     def _put_conn(self, conn, rollback: bool = False):
+        if conn is None:
+            return
         if rollback:
             try:
                 conn.rollback()
@@ -155,6 +168,25 @@ class DatabaseService:
             self._put_conn(conn)
             return max(inserted, 0)
 
+        except (psycopg2.OperationalError, psycopg2.InterfaceError) as exc:
+            # Connection-related errors: retry once with a fresh connection
+            logger.warning("⚠️ DB connection lost during insert, retrying once: %s", exc)
+            self._put_conn(conn, rollback=True)
+            
+            # Retry logic
+            conn = self._get_conn() 
+            try:
+                cur = conn.cursor()
+                execute_values(cur, self.INSERT_SQL, values, page_size=100)
+                inserted = cur.rowcount
+                conn.commit()
+                cur.close()
+                self._put_conn(conn)
+                return max(inserted, 0)
+            except Exception as retry_exc:
+                logger.error("❌ DB retry failed: %s", retry_exc)
+                self._put_conn(conn, rollback=True)
+                return 0
         except Exception as exc:
             logger.error("DB batch insert failed: %s", exc)
             self._put_conn(conn, rollback=True)

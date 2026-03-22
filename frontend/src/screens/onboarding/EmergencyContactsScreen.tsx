@@ -12,6 +12,7 @@ import { EmergencyContact } from '@/types/models';
 import { colors } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
+import { profileApiService } from '@/services/api/profileApiService';
 
 /**
  * Emergency contacts setup screen
@@ -57,9 +58,22 @@ export const EmergencyContactsScreen = () => {
     setContacts(contacts.filter((c) => c.id !== contactId));
   };
 
-  const handleContinue = () => {
-    // TODO: Save contacts to backend
-    navigation.navigate('OnboardingTutorial' as never);
+  const handleContinue = async () => {
+    try {
+      // Save contacts to backend
+      for (const contact of contacts) {
+        await profileApiService.addContact({
+          name: contact.name,
+          phone: contact.phoneNumber,
+          relationship: contact.relationship,
+          is_priority: contact.isPrimary,
+        });
+      }
+      navigation.navigate('OnboardingTutorial' as never);
+    } catch (error) {
+      console.error('Failed to save contacts:', error);
+      Alert.alert('Error', 'Failed to save emergency contacts. Please try again.');
+    }
   };
 
   const handleSkip = () => {

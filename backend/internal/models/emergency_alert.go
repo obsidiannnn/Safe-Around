@@ -15,7 +15,7 @@ type EmergencyAlert struct {
 	AlertType         string         `gorm:"type:varchar(50);default:'emergency'" json:"alert_type"`
 	AlertStatus       string         `gorm:"type:varchar(50);default:'active';index" json:"alert_status"`
 	CurrentRadius     int            `gorm:"default:100" json:"current_radius"`
-	MaxRadiusReached  int            `gorm:"default:100" json:"max_radius_reached"`
+	MaxRadiusReached  int            `gorm:"default:1000" json:"max_radius_reached"`
 	UsersNotified     int            `gorm:"default:0" json:"users_notified"`
 	SilentMode        bool           `gorm:"default:false" json:"silent_mode"`
 	AudioRecordingURL string         `gorm:"type:text" json:"audio_recording_url"`
@@ -43,14 +43,9 @@ func (e *EmergencyAlert) CanExpand() bool {
 }
 
 func (e *EmergencyAlert) GetNextRadius() int {
-	switch e.CurrentRadius {
-	case 100:
-		return 250
-	case 250:
-		return 500
-	case 500:
-		return 1000
-	default:
-		return e.CurrentRadius // Maxed out
+	next := e.CurrentRadius + 100
+	if next > 5000 { // Max 5km for safety search
+		return e.CurrentRadius
 	}
+	return next
 }

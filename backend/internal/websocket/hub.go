@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/models"
 )
 
@@ -29,6 +31,9 @@ type Hub struct {
 
 	// Mutex for thread safety
 	mu sync.RWMutex
+
+	// Database pool for LISTEN/NOTIFY
+	dbPool *pgxpool.Pool
 }
 
 type Client struct {
@@ -54,14 +59,21 @@ type Location struct {
 	Longitude float64 `json:"longitude"`
 }
 
-func NewHub() *Hub {
-	return &Hub{
+func NewHub(dbPool *pgxpool.Pool) *Hub {
+	hub := &Hub{
 		clients:    make(map[string]*Client),
 		rooms:      make(map[string]map[*Client]bool),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		broadcast:  make(chan *BroadcastMessage, 256),
+		dbPool:     dbPool,
 	}
+
+	if dbPool != nil {
+		go hub.listenPostgresNotifications()
+	}
+
+	return hub
 }
 
 func NewClient(hub *Hub, conn *websocket.Conn, userID string) *Client {
@@ -304,5 +316,47 @@ func (h *Hub) CloseRoom(roomID string) {
 		}
 
 		delete(h.rooms, roomID)
+	}
+}
+func (h *Hub) listenPostgresNotifications() {
+	// Connect to PostgreSQL for LISTEN/NOTIFY
+	conn, err := h.dbPool.Acquire(context.Background())
+	if err != nil {
+		fmt.Printf("Error acquiring connection for WS listener: %v\n", err)
+		return
+	}
+	defer conn.Release()
+
+	// Listen to crime_updates channel
+	_, err = conn.Exec(context.Background(), "LISTEN crime_updates")
+	if err != nil {
+		fmt.Printf("Error starting LISTEN: %v\n", err)
+		return
+	}
+
+	fmt.Println("✅ WebSocket Hub listening for real-time crime updates...")
+
+	for {
+		notification, err := conn.Conn().WaitForNotification(context.Background())
+		if err != nil {
+			fmt.Printf("Error waiting for notification: %v\n", err)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		// Parse notification payload
+		var payload map[string]interface{}
+		if err := json.Unmarshal([]byte(notification.Payload), &payload); err != nil {
+			fmt.Printf("Error parsing notification payload: %v\n", err)
+			continue
+		}
+
+		// Broadcast to all connected users in the 'global' room
+		h.BroadcastToRoom("global", "crime_added", payload["data"].(map[string]interface{}))
+
+		// Also trigger client-side heatmap refresh
+		h.BroadcastToRoom("global", "heatmap_refresh", map[string]interface{}{
+			"timestamp": time.Now().UTC(),
+		})
 	}
 }
