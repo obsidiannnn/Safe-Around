@@ -42,26 +42,22 @@ export const MainNavigator = () => {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
-          height: 85,
-          paddingTop: 12,
-          paddingBottom: 24,
+          height: 80,
+          paddingTop: 8,
+          paddingBottom: 20,
           backgroundColor: colors.surface,
-          borderTopLeftRadius: 32,
-          borderTopRightRadius: 32,
-          borderTopWidth: 0,
-          position: 'absolute', // Floating effect over content
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.1,
-          shadowRadius: 12,
-          elevation: 16,
+          elevation: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
+          fontSize: 11,
+          fontWeight: '700',
+          letterSpacing: 0.5,
           marginTop: 4,
         },
       }}
@@ -70,26 +66,33 @@ export const MainNavigator = () => {
         name="Map"
         component={MapNavigator}
         options={({ route }) => ({
-          tabBarIcon: ({ color, size }) => <Icon name="map" size={size} color={color} />,
-          tabBarLabel: 'Map',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Icon name="map" size={size} color={focused ? colors.primary : color} />
+          ),
+          tabBarLabel: 'MAP',
+          tabBarLabelStyle: {
+            fontSize: 11,
+            fontWeight: '700',
+            letterSpacing: 0.5,
+            marginTop: 4,
+          },
           tabBarStyle: ((route) => {
             const routeName = getFocusedRouteNameFromRoute(route) ?? 'MapDashboard';
             if (['SafeRoute', 'Navigation', 'LocationHistory', 'CrimeDetails'].includes(routeName)) {
               return { display: 'none' };
             }
             return {
-              height: 85,
-              paddingTop: 12,
-              paddingBottom: 24,
+              height: 80,
+              paddingTop: 8,
+              paddingBottom: 20,
               backgroundColor: colors.surface,
-              borderTopLeftRadius: 32,
-              borderTopRightRadius: 32,
-              borderTopWidth: 0,
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
               position: 'absolute',
               bottom: 0,
               left: 0,
               right: 0,
-              elevation: 16,
+              elevation: 8,
             };
           })(route),
         })}
@@ -98,16 +101,32 @@ export const MainNavigator = () => {
         name="Emergency"
         component={EmergencyScreen}
         options={{
-          tabBarIcon: ({ color, size }) => <Icon name="warning" size={size} color={color} />,
-          tabBarLabel: 'Emergency',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Icon name="notifications" size={size} color={focused ? colors.primary : color} />
+          ),
+          tabBarLabel: 'ALERTS',
+          tabBarLabelStyle: {
+            fontSize: 11,
+            fontWeight: '700',
+            letterSpacing: 0.5,
+            marginTop: 4,
+          },
         }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileNavigator}
         options={{
-          tabBarIcon: ({ color, size }) => <Icon name="person" size={size} color={color} />,
-          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Icon name="person" size={size} color={focused ? colors.primary : color} />
+          ),
+          tabBarLabel: 'PROFILE',
+          tabBarLabelStyle: {
+            fontSize: 11,
+            fontWeight: '700',
+            letterSpacing: 0.5,
+            marginTop: 4,
+          },
         }}
       />
     </Tab.Navigator>

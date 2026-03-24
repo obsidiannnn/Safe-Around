@@ -166,12 +166,12 @@ const styles = StyleSheet.create({
   },
   form: {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius.lg, // Updated to 24
     padding: spacing.xl,
     marginBottom: spacing['2xl'],
-    ...shadows.medium,
+    ...shadows.large, // Deeper shadow
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   prefixContainer: {
     flexDirection: 'row', 

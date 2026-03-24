@@ -235,13 +235,17 @@ export const MapDashboardScreen = () => {
     }
 
     try {
+      // Directly create alert without modal
       await createAlert({
         latitude: currentLocation.latitude,
         longitude: currentLocation.longitude,
       }, false);
-      Alert.alert('SOS Sent', 'Help request has been sent to nearby volunteers and emergency contacts.');
+      
+      // Navigate to active emergency screen
+      navigation.navigate('EmergencyActive' as never);
     } catch (error) {
-      Alert.alert('Error', 'Failed to trigger SOS alert.');
+      console.error('Error creating alert:', error);
+      Alert.alert('Error', 'Failed to trigger SOS alert. Please try again.');
     }
   };
 
@@ -300,34 +304,24 @@ export const MapDashboardScreen = () => {
         ))}
       </MapView>
 
-      {/* Map Components continue below */}
-{/* Top Profile Bar */}
-      <View style={[styles.profileBar, { top: insets.top + spacing.sm }]}>
+      {/* Header Bar */}
+      <View style={[styles.headerBar, { top: insets.top + spacing.md }]}>
+        <View style={styles.logoContainer}>
+          <Icon name="shield" size={24} color={colors.secondary} />
+          <Text style={styles.logoText}>SafeAround</Text>
+        </View>
+        
         <Pressable 
-          style={styles.profileButton}
+          style={styles.menuButton}
           onPress={() => navigation.navigate('Profile' as never)}
         >
-          <View style={styles.avatarPlaceholder}>
-            <Icon name="verified-user" size={18} color={colors.secondary} />
-          </View>
-          <View style={styles.profileTextContainer}>
-            <Text style={styles.profileTitle}>Verified Citizen</Text>
-            <View style={styles.statusRow}>
-              <View style={styles.statusDot} />
-              <Text style={styles.profileStatus}>LIVE PROTECTION</Text>
-            </View>
-          </View>
+          <Icon name="menu" size={24} color={colors.textPrimary} />
         </Pressable>
-
-        <BackgroundLocationIndicator
-          isActive={isTracking}
-          batteryImpact="low"
-          onPress={() => navigation.navigate('LocationHistory' as never)}
-        />
       </View>
 
+      {/* Search Bar */}
       <MapSearchBar
-        topOffset={insets.top + 70}
+        topOffset={insets.top + 80}
         onSelectLocation={(location) => {
           setSelectedPlace(location);
           mapRef.current?.animateToRegion(
@@ -341,74 +335,41 @@ export const MapDashboardScreen = () => {
         }}
       />
 
-      {/* Selected location actions */}
-      {selectedPlace && (
-        <View style={[styles.locationActions, { bottom: insets.bottom + 110 }]}>
-          <View style={styles.locationInfo}>
-            <Text style={styles.locationName} numberOfLines={1}>{selectedPlace.name}</Text>
+      {/* Safe Route Card at Bottom */}
+      {currentStats && (
+        <View style={[styles.safeRouteCard, { bottom: insets.bottom + 80 }]}>
+          <View style={styles.routeIconContainer}>
+            <Icon name="route" size={24} color={colors.success} />
+          </View>
+          <View style={styles.routeInfo}>
+            <Text style={styles.routeTitle}>Safer route via Main St</Text>
+            <Text style={styles.routeSubtitle}>+2 mins • Well lit & active</Text>
           </View>
           <Pressable 
-            style={styles.directionsButton}
-            onPress={() => {
-              const coords = `${selectedPlace.location.latitude},${selectedPlace.location.longitude}`;
-              (navigation as any).navigate('SafeRoute', { destination: coords });
-            }}
+            style={styles.shieldButton}
+            onPress={() => navigation.navigate('SafeRoute' as never)}
           >
-            <Icon name="directions" size={20} color={colors.surface} />
-            <Text style={styles.directionsButtonText}>Safe Path</Text>
-          </Pressable>
-          <Pressable style={styles.closeActionsButton} onPress={() => setSelectedPlace(null)}>
-            <Icon name="close" size={20} color={colors.textSecondary} />
+            <Icon name="shield" size={20} color={colors.secondary} />
           </Pressable>
         </View>
       )}
 
-      {/* Layer Controls */}
-      <View style={[styles.layersButtonContainer, { top: insets.top + 130 }]}>
-        <Pressable 
-          style={[styles.layersFAB, showMapTypeMenu && styles.layersFABActive]} 
-          onPress={() => setShowMapTypeMenu(!showMapTypeMenu)}
-        >
-          <Icon name="layers" size={24} color={showMapTypeMenu ? colors.surface : colors.textPrimary} />
-        </Pressable>
-        
-        {showMapTypeMenu && (
-          <View style={styles.mapTypeMenuContainer}>
-            <MapTypeSwitch 
-              currentType={mapType} 
-              onTypeChange={(type) => {
-                setMapType(type);
-                setShowMapTypeMenu(false);
-              }} 
-            />
-          </View>
-        )}
-      </View>
-
-      <CurrentLocationButton 
-        onPress={handleCenterLocation} 
-        style={{ bottom: insets.bottom + 180 }}
-      />
-      
-      <EmergencySOSButton 
-        onEmergencyTrigger={handleEmergencyTrigger} 
-      />
-
-      <Pressable
-        style={[styles.statsFAB, { bottom: insets.bottom + 250 }]}
-        onPress={() => setShowStatsCard(!showStatsCard)}
+      {/* Center Location Button */}
+      <Pressable 
+        style={[styles.centerLocationButton, { bottom: insets.bottom + 180 }]}
+        onPress={handleCenterLocation}
       >
-        <Icon name="insights" size={24} color={colors.surface} />
+        <Icon name="my-location" size={24} color={colors.secondary} />
       </Pressable>
-
-      <QuickStatsCard
-        visible={showStatsCard}
-        onClose={() => setShowStatsCard(false)}
-        stats={currentStats}
-        onViewCrimeHistory={() => console.log('View crime history')}
-        onPlanSafeRoute={() => navigation.navigate('SafeRoute' as never)}
-        onReportIncident={() => console.log('Report incident')}
-      />
+      
+      {/* Emergency SOS Button */}
+      <Pressable 
+        style={[styles.sosButton, { bottom: insets.bottom + 100 }]}
+        onPress={handleEmergencyTrigger}
+      >
+        <Icon name="wifi-tethering" size={32} color={colors.surface} />
+        <Text style={styles.sosText}>SOS</Text>
+      </Pressable>
 
       {currentZone && (
         <DangerZoneAlert
@@ -436,7 +397,7 @@ const styles = StyleSheet.create({
   map: {
     ...StyleSheet.absoluteFillObject,
   },
-  profileBar: {
+  headerBar: {
     position: 'absolute',
     left: spacing.lg,
     right: spacing.lg,
@@ -444,128 +405,100 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     zIndex: 10,
+    backgroundColor: colors.surface,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.xl,
+    ...shadows.medium,
   },
-  profileButton: {
+  logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.lg,
-    ...shadows.medium,
-    borderWidth: 1,
-    borderColor: colors.border,
+    gap: spacing.sm,
   },
-  avatarPlaceholder: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(26, 115, 232, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.sm,
-  },
-  profileTextContainer: {
-    justifyContent: 'center',
-  },
-  profileTitle: {
-    fontSize: 14,
+  logoText: {
+    fontSize: 20,
     fontWeight: '700',
     color: colors.textPrimary,
   },
-  profileStatus: {
-    fontSize: 9,
-    color: colors.secondary,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+  menuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.backgroundSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  statusRow: {
+  safeRouteCard: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 1,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.secondary,
-    marginRight: 4,
-  },
-  layersButtonContainer: {
-    position: 'absolute',
-    right: spacing.lg,
+    ...shadows.premium,
     zIndex: 5,
   },
-  layersFAB: {
+  routeIconContainer: {
     width: 48,
     height: 48,
     borderRadius: 24,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  routeInfo: {
+    flex: 1,
+  },
+  routeTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  routeSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  shieldButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(25, 118, 210, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  centerLocationButton: {
+    position: 'absolute',
+    right: spacing.lg,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     ...shadows.medium,
-    borderWidth: 1,
-    borderColor: colors.border,
+    zIndex: 5,
   },
-  layersFABActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  mapTypeMenuContainer: {
+  sosButton: {
     position: 'absolute',
-    top: 56,
-    right: 0,
-    width: 120,
-    zIndex: 10,
-  },
-  statsFAB: {
-    position: 'absolute',
-    left: spacing.lg,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primary,
+    right: spacing.lg,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: colors.error,
     justifyContent: 'center',
     alignItems: 'center',
-    ...shadows.large,
-    zIndex: 10,
-  },
-  locationActions: {
-    position: 'absolute',
-    left: spacing.lg,
-    right: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
     ...shadows.premium,
-    zIndex: 15,
+    zIndex: 5,
   },
-  locationInfo: {
-    flex: 1,
-    marginRight: spacing.md,
-  },
-  locationName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  directionsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-    marginRight: spacing.sm,
-  },
-  directionsButtonText: {
+  sosText: {
+    fontSize: 12,
+    fontWeight: '700',
     color: colors.surface,
-    fontWeight: 'bold',
-    marginLeft: spacing.xs,
-  },
-  closeActionsButton: {
-    padding: spacing.xs,
+    marginTop: 2,
   },
 });
