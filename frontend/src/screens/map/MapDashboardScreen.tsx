@@ -235,13 +235,17 @@ export const MapDashboardScreen = () => {
     }
 
     try {
+      // Directly create alert without modal
       await createAlert({
         latitude: currentLocation.latitude,
         longitude: currentLocation.longitude,
       }, false);
-      Alert.alert('SOS Sent', 'Help request has been sent to nearby volunteers and emergency contacts.');
+      
+      // Navigate to active emergency screen
+      navigation.navigate('EmergencyActive' as never);
     } catch (error) {
-      Alert.alert('Error', 'Failed to trigger SOS alert.');
+      console.error('Error creating alert:', error);
+      Alert.alert('Error', 'Failed to trigger SOS alert. Please try again.');
     }
   };
 
@@ -300,7 +304,7 @@ export const MapDashboardScreen = () => {
         ))}
       </MapView>
 
-      {/* Top Header Bar */}
+      {/* Header Bar */}
       <View style={[styles.headerBar, { top: insets.top + spacing.md }]}>
         <View style={styles.logoContainer}>
           <Icon name="shield" size={24} color={colors.secondary} />
@@ -314,6 +318,22 @@ export const MapDashboardScreen = () => {
           <Icon name="menu" size={24} color={colors.textPrimary} />
         </Pressable>
       </View>
+
+      {/* Search Bar */}
+      <MapSearchBar
+        topOffset={insets.top + 80}
+        onSelectLocation={(location) => {
+          setSelectedPlace(location);
+          mapRef.current?.animateToRegion(
+            {
+              ...location.location,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            },
+            1000
+          );
+        }}
+      />
 
       {/* Safe Route Card at Bottom */}
       {currentStats && (
@@ -345,8 +365,7 @@ export const MapDashboardScreen = () => {
       {/* Emergency SOS Button */}
       <Pressable 
         style={[styles.sosButton, { bottom: insets.bottom + 100 }]}
-        onLongPress={handleEmergencyTrigger}
-        delayLongPress={500}
+        onPress={handleEmergencyTrigger}
       >
         <Icon name="wifi-tethering" size={32} color={colors.surface} />
         <Text style={styles.sosText}>SOS</Text>
