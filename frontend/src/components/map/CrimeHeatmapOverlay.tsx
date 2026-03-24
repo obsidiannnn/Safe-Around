@@ -65,63 +65,65 @@ export default function CrimeHeatmapOverlay({ bounds, onCrimeDataLoaded }: Props
     return (
       <Heatmap
         points={heatmapPoints}
-        radius={40}
-        opacity={0.7}
+        radius={80} // Increased for a more realistic spread
+        opacity={0.6} // Softer opacity for better blending
         gradient={{
-          colors: ['#4CAF50', '#FFEB3B', '#FF9800', '#F44336'],
-          startPoints: [0.2, 0.4, 0.6, 1.0],
-          colorMapSize: 256,
+          colors: [
+            'rgba(16, 185, 129, 0.4)', // Safe Green (Very faint)
+            'rgba(16, 185, 129, 0.8)', // Safe Green (Opaque)
+            'rgba(245, 158, 11, 0.9)', // Warning Amber
+            'rgba(239, 68, 68, 1.0)',  // Emergency Red
+          ],
+          startPoints: [0.1, 0.3, 0.6, 1.0], // Smoother transition
+          colorMapSize: 512, // Higher density for better gradients
         }}
       />
     );
   }
 
-  // Helper to interpolate color based on weight (0.25 to 1.0)
+  // Helper to interpolate color based on weight (0.1 to 1.0)
   const getInterpolatedColor = (weight: number, alpha: number) => {
-    // Green (0,255,0) -> Yellow (255,255,0) -> Red (255,0,0)
-    let r = 0;
-    let g = 255;
-    
-    if (weight <= 0.5) {
-      // Green to Yellow
-      r = Math.floor((weight / 0.5) * 255);
-    } else {
-      // Yellow to Red
-      r = 255;
-      g = Math.floor(255 - ((weight - 0.5) / 0.5) * 255);
+    // Green (16, 185, 129) -> Amber (245, 158, 11) -> Red (239, 68, 68)
+    if (weight <= 0.4) {
+      return `rgba(16, 185, 129, ${alpha})`;
+    } else if (weight <= 0.7) {
+      return `rgba(245, 158, 11, ${alpha})`;
     }
-    return `rgba(${r}, ${g}, 0, ${alpha})`;
+    return `rgba(239, 68, 68, ${alpha})`;
   };
 
   // Fallback: render simulated gradient circles for iOS Apple Maps
   return (
     <>
       {heatmapPoints.map((point, index) => {
-        const baseColor = getInterpolatedColor(point.weight, 0.4);
-        const intenseColor = getInterpolatedColor(point.weight, 0.7);
-        const maxRadius = 400 * (point.weight + 0.5);
+        const maxRadius = 500 * (point.weight + 0.5); // Larger spread
 
         return (
           <React.Fragment key={index}>
-            {/* Outer soft glow */}
+            {/* Multi-layered soft glow for realistic spread */}
             <Circle
               center={{ latitude: point.latitude, longitude: point.longitude }}
               radius={maxRadius}
-              fillColor={getInterpolatedColor(point.weight, 0.15)}
+              fillColor={getInterpolatedColor(point.weight, 0.05)}
               strokeColor="transparent"
             />
-            {/* Mid intensity */}
             <Circle
               center={{ latitude: point.latitude, longitude: point.longitude }}
-              radius={maxRadius * 0.6}
-              fillColor={baseColor}
+              radius={maxRadius * 0.7}
+              fillColor={getInterpolatedColor(point.weight, 0.12)}
+              strokeColor="transparent"
+            />
+            <Circle
+              center={{ latitude: point.latitude, longitude: point.longitude }}
+              radius={maxRadius * 0.4}
+              fillColor={getInterpolatedColor(point.weight, 0.25)}
               strokeColor="transparent"
             />
             {/* Core center point */}
             <Circle
               center={{ latitude: point.latitude, longitude: point.longitude }}
-              radius={maxRadius * 0.3}
-              fillColor={intenseColor}
+              radius={maxRadius * 0.15}
+              fillColor={getInterpolatedColor(point.weight, 0.5)}
               strokeColor="transparent"
             />
           </React.Fragment>

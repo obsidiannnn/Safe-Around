@@ -19,36 +19,41 @@ export const typography = {
   h1: {
     fontSize: fontSizes['4xl'],
     fontWeight: fontWeights.bold,
-    lineHeight: 40,
+    lineHeight: 44,
+    letterSpacing: -0.5,
   },
   h2: {
     fontSize: fontSizes['2xl'],
     fontWeight: fontWeights.bold,
-    lineHeight: 32,
+    lineHeight: 34,
+    letterSpacing: -0.3,
   },
   h3: {
     fontSize: fontSizes.xl,
     fontWeight: fontWeights.medium,
     lineHeight: 28,
+    letterSpacing: -0.2,
   },
   body1: {
     fontSize: fontSizes.md,
     fontWeight: fontWeights.regular,
-    lineHeight: 24,
+    lineHeight: 26,
   },
   body2: {
     fontSize: fontSizes.sm,
     fontWeight: fontWeights.regular,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   caption: {
     fontSize: fontSizes.xs,
-    fontWeight: fontWeights.regular,
-    lineHeight: 16,
+    fontWeight: fontWeights.medium,
+    lineHeight: 18,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
   },
   button: {
     fontSize: fontSizes.md,
-    fontWeight: fontWeights.medium,
+    fontWeight: fontWeights.bold,
     lineHeight: 24,
   },
 };

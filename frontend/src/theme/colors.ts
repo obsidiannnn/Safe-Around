@@ -1,23 +1,27 @@
 export const colors = {
-  primary: '#1A73E8',        // Trust Blue (Google style)
-  secondary: '#1E8E3E',      // Safe Green
-  accent: '#F9AB00',         // Caution Yellow
-  error: '#D93025',          // Emergency Red
-  success: '#1E8E3E',        // Shared with secondary for safety
-  warning: '#FBBC04',        // Google Yellow
-  background: '#F8F9FA',     // Soft Google Gray
+  primary: '#2D5AF0',        // Vibrant Trust Blue
+  secondary: '#10B981',      // Safe Emerald Green
+  accent: '#F59E0B',         // Warning Amber
+  error: '#C41E3A',          // Deep Emergency Red
+  success: '#10B981',        // Emerald Green
+  warning: '#F59E0B',        // Amber
+  background: '#F9FAFB',     // Very Light Gray
+  backgroundSecondary: '#F3F4F6', // Slightly darker gray
   surface: '#FFFFFF',        // Pure White
-  textPrimary: '#202124',     // Near Black
-  textSecondary: '#5F6368',   // Medium Gray
-  border: '#DADCE0',         // Soft Border
-  disabled: '#F1F3F4',
-  backdrop: 'rgba(32, 33, 36, 0.4)',
-  surfaceTranslucent: 'rgba(255, 255, 255, 0.9)',
-  primaryTranslucent: 'rgba(26, 115, 232, 0.1)',
+  textPrimary: '#111827',     // Dark Slate
+  textSecondary: '#6B7280',   // Gray
+  border: '#E5E7EB',         // Slate Border
+  disabled: '#F3F4F6',
+  backdrop: 'rgba(17, 24, 39, 0.6)',
+  surfaceTranslucent: 'rgba(255, 255, 255, 0.95)',
+  primaryTranslucent: 'rgba(45, 90, 240, 0.1)',
+  glass: 'rgba(255, 255, 255, 0.7)',
+  darkGlass: 'rgba(17, 24, 39, 0.7)',
 };
 
 export const gradients = {
-  emergency: ['#D93025', '#B71C1C'],
-  safe: ['#1E8E3E', '#137333'],
-  trust: ['#1A73E8', '#174EA6'],
+  emergency: ['#EF4444', '#991B1B'],
+  safe: ['#10B981', '#065F46'],
+  trust: ['#2D5AF0', '#1E40AF'],
+  glass: ['rgba(255, 255, 255, 0.8)', 'rgba(255, 255, 255, 0.4)'],
 };

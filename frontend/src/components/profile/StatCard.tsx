@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '@/theme';
+import { colors } from '@/theme/colors';
+import { spacing, borderRadius, shadows } from '@/theme/spacing';
 
 interface StatCardProps {
   icon: string;
@@ -21,29 +22,33 @@ export const StatCard: React.FC<StatCardProps> = ({
   const getColor = () => {
     switch (variant) {
       case 'success':
-        return theme.colors.success;
+        return colors.success;
       case 'warning':
-        return theme.colors.warning;
+        return colors.warning;
       default:
-        return theme.colors.primary;
+        return colors.primary;
     }
   };
 
   return (
     <View style={styles.container}>
-      <Ionicons name={icon as any} size={32} color={getColor()} />
+      <View style={[styles.iconBox, { backgroundColor: `${getColor()}15` }]}>
+        <Ionicons name={icon as any} size={24} color={getColor()} />
+      </View>
       <View style={styles.content}>
+        <Text style={styles.label}>{label}</Text>
         <View style={styles.valueRow}>
           <Text style={styles.value}>{value}</Text>
           {trend && (
-            <Ionicons
-              name={trend === 'up' ? 'trending-up' : 'trending-down'}
-              size={20}
-              color={trend === 'up' ? theme.colors.success : theme.colors.error}
-            />
+            <View style={[styles.trendBadge, { backgroundColor: trend === 'up' ? `${colors.success}15` : `${colors.error}15` }]}>
+              <Ionicons
+                name={trend === 'up' ? 'trending-up' : 'trending-down'}
+                size={14}
+                color={trend === 'up' ? colors.success : colors.error}
+              />
+            </View>
           )}
         </View>
-        <Text style={styles.label}>{label}</Text>
       </View>
     </View>
   );
@@ -51,29 +56,49 @@ export const StatCard: React.FC<StatCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    ...shadows.medium,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    minWidth: '45%',
+    flex: 1,
+  },
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    gap: theme.spacing.md,
+    marginBottom: spacing.md,
   },
   content: {
-    flex: 1,
+    width: '100%',
   },
   valueRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.xs,
+    justifyContent: 'space-between',
+    width: '100%',
   },
   value: {
-    fontSize: theme.typography.sizes.xxl,
-    fontWeight: theme.typography.weights.bold,
-    color: theme.colors.text,
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.textPrimary,
   },
   label: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.textSecondary,
-    marginTop: theme.spacing.xs,
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  trendBadge: {
+    padding: 4,
+    borderRadius: 6,
   },
 });
