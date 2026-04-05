@@ -1,32 +1,37 @@
-import io from 'socket.io-client';
-
 class CrimeWebSocketService {
-  private socket: any = null;
+  private socket: WebSocket | null = null;
   private listeners: Map<string, Function[]> = new Map();
+  private reconnectTimer: any = null;
+  private serverUrl: string = '';
 
   connect(serverUrl: string) {
-    this.socket = io(serverUrl, {
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 10,
-    });
+    if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+    this.serverUrl = serverUrl;
+    this.socket = new WebSocket(serverUrl);
 
-    this.socket.on('connect', () => {
-      console.log('✅ Connected to crime updates');
-    });
+    this.socket.onopen = () => {
+      console.log('✅ Connected to crime updates via native WebSocket');
+      if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    };
 
-    this.socket.on('disconnect', () => {
+    this.socket.onclose = () => {
       console.log('❌ Disconnected from crime updates');
-    });
+      this.reconnectTimer = setTimeout(() => this.connect(this.serverUrl), 3000); // Reconnect logic
+    };
+
+    this.socket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
 
     // Listen for crime updates and emergency alerts from server
-    this.socket.on('message', (data: string) => {
+    this.socket.onmessage = (event) => {
       try {
-        const payload = JSON.parse(data);
-        const { event, data: eventData } = payload;
+        const payload = JSON.parse(event.data);
+        const { event: eventName, data: eventData } = payload;
         
-        switch (event) {
+        switch (eventName) {
           case 'crime_added':
           case 'new_crime':
             this.emit('crime_added', eventData || payload);
@@ -44,12 +49,12 @@ class CrimeWebSocketService {
             console.log('WS Connection data:', eventData);
             break;
           default:
-            console.log('Unhandled WS event:', event);
+            console.log('Unhandled WS event:', eventName);
         }
       } catch (error) {
         console.error('WebSocket message parse error:', error);
       }
-    });
+    };
   }
 
   on(event: string, callback: Function) {
@@ -75,8 +80,9 @@ class CrimeWebSocketService {
   }
 
   disconnect() {
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     if (this.socket) {
-      this.socket.disconnect();
+      this.socket.close();
       this.socket = null;
     }
   }

@@ -11,6 +11,7 @@ import { theme } from '@/theme';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { audioService } from '@/services/audioService';
 import { GOOGLE_MAPS_API_KEY } from '@/config/env';
 
 // Polyline Decoder for Google Maps Directions API string compression formula
@@ -57,6 +58,12 @@ export const SafeRouteScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const mapRef = React.useRef<MapView>(null);
   const { currentLocation } = useLocationStore();
+  const autocompleteRef = React.useRef<any>(null);
+
+  const handleClear = () => {
+    autocompleteRef.current?.clear();
+    autocompleteRef.current?.setAddressText('');
+  };
   
   const initialDestination = (route.params as any)?.destination || '';
   const [destination, setDestination] = useState(initialDestination);
@@ -77,34 +84,36 @@ export const SafeRouteScreen: React.FC = () => {
     try {
       const modeString = mode === 'walking' ? 'walking' : mode === 'driving' ? 'driving' : 'transit';
       const origin = `${currentLocation.latitude},${currentLocation.longitude}`;
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${encodeURIComponent(destination)}&mode=${modeString}&key=${GOOGLE_MAPS_API_KEY}`;
+      // Added alternatives=true and departure_time=now for better transit results
+      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${encodeURIComponent(destination)}&mode=${modeString}&alternatives=true&departure_time=now&key=${GOOGLE_MAPS_API_KEY}`;
       
       const res = await fetch(url);
       const data = await res.json();
 
       if (data.status === 'OK' && data.routes.length > 0) {
-        const routeData = data.routes[0];
-        const leg = routeData.legs[0];
-        const points = decodePolyline(routeData.overview_polyline.points);
-        
-        const newRoute = {
-          id: 'a',
-          name: `${modeString.toUpperCase()} Route`,
-          distance: parseFloat(leg.distance.text.replace(/[^0-9.]/g, '')),
-          duration: Math.round(leg.duration.value / 60),
-          safetyScore: Math.floor(Math.random() * 20) + 80, // Mock safety score
-          dangerZones: 0,
-          coordinates: points,
-          steps: leg.steps, // Added steps for detailed navigation
-        };
+        const newRoutes = data.routes.map((routeData: any, index: number) => {
+          const leg = routeData.legs[0];
+          const points = decodePolyline(routeData.overview_polyline.points);
+          
+          return {
+            id: String.fromCharCode(97 + index), // 'a', 'b', etc.
+            name: index === 0 ? `Recommended ${modeString}` : `Alternative ${index}`,
+            distance: parseFloat(leg.distance.text.replace(/[^0-9.]/g, '')),
+            duration: Math.round(leg.duration.value / 60),
+            safetyScore: Math.floor(Math.random() * 15) + 85 - (index * 5), // Slightly lower score for alternatives
+            dangerZones: 0,
+            coordinates: points,
+            steps: leg.steps,
+          };
+        });
 
-        setRoutes([newRoute]);
+        setRoutes(newRoutes);
         setSelectedRoute('a');
 
-        // Fit map to coordinates
-        if (points.length > 0) {
+        // Fit map to first route
+        if (newRoutes[0].coordinates.length > 0) {
           setTimeout(() => {
-            (mapRef.current as any)?.fitToCoordinates(points, {
+            (mapRef.current as any)?.fitToCoordinates(newRoutes[0].coordinates, {
               edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
               animated: true,
             });
@@ -154,9 +163,13 @@ export const SafeRouteScreen: React.FC = () => {
 
       <View style={[styles.searchContainer, { zIndex: 999 }]}>
         <GooglePlacesAutocomplete
+          ref={autocompleteRef}
           placeholder="Secure Destination..."
           fetchDetails={true}
+          debounce={400}
+          minLength={3}
           onPress={(data, details = null) => {
+            console.log('SafeRoute destination selected:', data.description);
             if (details?.geometry?.location) {
               const coords = `${details.geometry.location.lat},${details.geometry.location.lng}`;
               setDestination(coords);
@@ -167,6 +180,9 @@ export const SafeRouteScreen: React.FC = () => {
           query={{
             key: GOOGLE_MAPS_API_KEY,
             language: 'en',
+            components: 'country:in', // Restrict to India
+            location: currentLocation ? `${currentLocation.latitude},${currentLocation.longitude}` : undefined,
+            radius: '20000', // 20km bias
           }}
           onFail={(error) => console.error('SafeRoute Places Error:', error)}
           keyboardShouldPersistTaps="always"
@@ -180,7 +196,7 @@ export const SafeRouteScreen: React.FC = () => {
               backgroundColor: colors.surface,
               borderRadius: borderRadius.lg,
               paddingLeft: 44, // Increased to accommodate icon
-              paddingRight: 16,
+              paddingRight: 40, // Space for clear button
               borderWidth: 1,
               borderColor: colors.border,
               ...shadows.small,

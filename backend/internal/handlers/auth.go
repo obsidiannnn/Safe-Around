@@ -258,7 +258,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
-	// ✅ Validate against PostgreSQL (not just Redis blacklist)
+	//  Validate against PostgreSQL (not just Redis blacklist)
 	session, err := h.sessionRepo.GetByRefreshToken(input.Token)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "session not found or expired"})

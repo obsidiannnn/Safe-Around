@@ -23,11 +23,13 @@ export const DangerZoneAlert: React.FC<DangerZoneAlertProps> = ({
   onAlertContacts,
 }) => {
   useEffect(() => {
-    if (visible) {
+    if (visible && zone) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       Vibration.vibrate([0, 200, 100, 200]);
     }
-  }, [visible]);
+  }, [visible, zone]);
+
+  if (!zone) return null;
 
   const safetyTips = [
     'Stay in well-lit areas',

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Polyline, Marker } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '@/components/common/Button';
@@ -28,6 +28,7 @@ const stripHtml = (html: string) => {
 };
 
 export const NavigationScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const routeParams = useRoute();
   const mapRef = useRef<MapView>(null);
@@ -155,9 +156,6 @@ export const NavigationScreen: React.FC = () => {
           <Text style={styles.instruction} numberOfLines={2}>{instructionDisplay}</Text>
           {nextStepDist && <Text style={styles.distanceText}>{nextStepDist}</Text>}
         </View>
-        <TouchableOpacity style={styles.settingsButton}>
-          <Ionicons name="settings-outline" size={24} color={colors.textSecondary} />
-        </TouchableOpacity>
       </View>
 
       {currentLocation && (
@@ -208,7 +206,7 @@ export const NavigationScreen: React.FC = () => {
         </TouchableOpacity>
       )}
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 24), paddingTop: 20 }]}>
         <View style={styles.tripInfo}>
           <View style={styles.statBox}>
             <Text style={styles.statValue}>{eta}</Text>
@@ -232,10 +230,10 @@ export const NavigationScreen: React.FC = () => {
             <Ionicons name="search" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Button 
-            variant="outline" 
+            variant="danger" 
             onPress={handleCancel}
-            style={styles.exitButton}
-            textStyle={{ color: colors.error }}
+            style={[styles.exitButton, { height: 52 }]}
+            textStyle={{ fontWeight: '800', fontSize: 16 }}
           >
             Exit
           </Button>
@@ -333,7 +331,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
-    paddingBottom: Platform.OS === 'ios' ? spacing.xl : spacing.lg,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     ...shadows.large,

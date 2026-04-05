@@ -7,10 +7,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// =============================================================================
 // Prometheus Metrics Registry for SafeAround
 // All counters/gauges/histograms are auto-registered via promauto.
-// =============================================================================
+
 
 var (
 	// ---- HTTP ----

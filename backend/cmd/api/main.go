@@ -96,7 +96,7 @@ func main() {
 	r := routes.SetupRouter(authHandler, healthHandler, notifHandler, alertHandler, heatmapHandler, wsHandler, locationHandler, routeHandler, profileHandler, geofencingHandler, rdb)
 
 	srv := &http.Server{
-		Addr:    ":" + cfg.Server.Port,
+		Addr:    "0.0.0.0:" + cfg.Server.Port,
 		Handler: r,
 	}
 

@@ -1,6 +1,6 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import React, { useRef } from 'react';
+import { View, StyleSheet, Pressable } from 'react-native';
+import { GooglePlacesAutocomplete, GooglePlacesAutocompleteRef } from 'react-native-google-places-autocomplete';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
@@ -20,15 +20,30 @@ interface SearchResult {
 interface MapSearchBarProps {
   onSelectLocation: (result: SearchResult) => void;
   topOffset: number;
+  currentLocation?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
-export const MapSearchBar: React.FC<MapSearchBarProps> = ({ onSelectLocation, topOffset }) => {
+export const MapSearchBar: React.FC<MapSearchBarProps> = ({ onSelectLocation, topOffset, currentLocation }) => {
+  const ref = useRef<GooglePlacesAutocompleteRef>(null);
+
+  const handleClear = () => {
+    ref.current?.clear();
+    ref.current?.setAddressText('');
+  };
+
   return (
     <View style={[styles.container, { top: topOffset }]}>
       <GooglePlacesAutocomplete
-        placeholder="Search locations..."
+        ref={ref}
+        placeholder="Search for any place..."
         fetchDetails={true}
+        debounce={400}
+        minLength={3}
         onPress={(data, details = null) => {
+          console.log('Place selected:', data.description);
           if (details?.geometry?.location) {
             onSelectLocation({
               id: data.place_id,
@@ -44,8 +59,12 @@ export const MapSearchBar: React.FC<MapSearchBarProps> = ({ onSelectLocation, to
         query={{
           key: GOOGLE_MAPS_API_KEY,
           language: 'en',
+          components: 'country:in', // Prioritize India
+          location: currentLocation ? `${currentLocation.latitude},${currentLocation.longitude}` : undefined,
+          radius: '20000', // 20km bias
+          strictbounds: false, // Don't restrict, just bias
         }}
-        onFail={(error) => console.error('Google Places Error:', error)}
+        onFail={(error) => console.error('Google Places Dashboard Error:', error)}
         keyboardShouldPersistTaps="always"
         suppressDefaultStyles={false}
         enablePoweredByContainer={false}
@@ -93,7 +112,12 @@ export const MapSearchBar: React.FC<MapSearchBarProps> = ({ onSelectLocation, to
           },
         }}
         renderLeftButton={() => (
-          <Icon name="search" size={20} color={colors.textSecondary} style={{ marginRight: spacing.sm }} />
+          <Icon name="location-searching" size={20} color={colors.primary} style={{ marginRight: spacing.sm }} />
+        )}
+        renderRightButton={() => (
+          <Pressable onPress={handleClear} style={{ padding: 8 }}>
+            <Icon name="cancel" size={20} color={colors.textSecondary} />
+          </Pressable>
         )}
       />
     </View>
@@ -106,6 +130,6 @@ const styles = StyleSheet.create({
     top: spacing.lg,
     left: spacing.lg,
     right: spacing.lg,
-    zIndex: 10,
+    zIndex: 2000,
   },
 });

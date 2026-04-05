@@ -8,6 +8,7 @@ import { colors } from '@/theme/colors';
 import { borderRadius, spacing } from '@/theme/spacing';
 import { MapNavigator } from './MapNavigator';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useShakeDetection } from '@/hooks/useShakeDetection';
 import { useAlertStore } from '@/store/alertStore';
@@ -16,6 +17,7 @@ import { useLocation } from '@/hooks/useLocation';
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export const MainNavigator = () => {
+  const insets = useSafeAreaInsets();
   const { isAlertActive, createAlert } = useAlertStore();
   const { currentLocation } = useLocation();
   
@@ -42,9 +44,9 @@ export const MainNavigator = () => {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
-          height: 80,
+          height: 52 + insets.bottom,
           paddingTop: 8,
-          paddingBottom: 20,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
           backgroundColor: colors.surface,
           borderTopWidth: 1,
           borderTopColor: colors.border,
@@ -52,7 +54,8 @@ export const MainNavigator = () => {
           bottom: 0,
           left: 0,
           right: 0,
-          elevation: 8,
+          elevation: 10,
+          overflow: 'visible',
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -82,17 +85,18 @@ export const MainNavigator = () => {
               return { display: 'none' };
             }
             return {
-              height: 80,
-              paddingTop: 8,
-              paddingBottom: 20,
-              backgroundColor: colors.surface,
-              borderTopWidth: 1,
-              borderTopColor: colors.border,
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              elevation: 8,
+          height: 52 + insets.bottom,
+          paddingTop: 8,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+          backgroundColor: colors.surface,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          elevation: 10,
+          overflow: 'visible',
             };
           })(route),
         })}

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Vibration, Pressable, Platform } from 'react-native';
+import { View, StyleSheet, Vibration, Pressable, Platform, ScrollView } from 'react-native';
 import { Text, Switch } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { Modal } from '@/components/common';
 import { useAlertStore } from '@/store/alertStore';
@@ -21,6 +22,7 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
   visible,
   onClose,
 }) => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { createAlert } = useAlertStore();
   const { currentLocation } = useLocationStore();
@@ -31,9 +33,29 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
   const [isConfirming, setIsConfirming] = useState(false);
 
   useEffect(() => {
-    if (!visible) {
+    if (visible) {
       setCountdown(5);
+      navigation.getParent()?.setOptions({
+        tabBarStyle: { display: 'none' }
+      });
       return;
+    } else {
+      navigation.getParent()?.setOptions({
+        tabBarStyle: {
+          height: 52 + insets.bottom,
+          paddingTop: 8,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+          backgroundColor: colors.surface,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          elevation: 10,
+          overflow: 'visible',
+        }
+      });
     }
 
     if (countdown > 0) {
@@ -72,7 +94,7 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} dismissOnBackdrop={false} fullScreen>
+    <Modal visible={visible} onClose={onClose} dismissOnBackdrop={false} fullScreen noAnimation>
       <View style={styles.container}>
         <View style={styles.header}>
           <View style={styles.brandRow}>
@@ -84,65 +106,71 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
           </Pressable>
         </View>
 
-        <View style={styles.mainContent}>
-          <Text style={styles.alertingSub}>EMERGENCY SOS ACTIVE</Text>
-          <Text style={styles.alertingTitle}>Alerting in {countdown}...</Text>
+        <ScrollView 
+          style={styles.scrollView} 
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.mainContent}>
+            <Text style={styles.alertingSub}>EMERGENCY SOS ACTIVE</Text>
+            <Text style={styles.alertingTitle}>Alerting in {countdown}...</Text>
 
-          <View style={styles.pulseContainer}>
-            <Pressable 
-              style={styles.sosCircle}
-              onPress={handleConfirm}
-            >
-              <Icon name="settings-input-antenna" size={40} color={colors.surface} />
-              <Text style={styles.sendNowText}>SEND NOW</Text>
-            </Pressable>
+            <View style={styles.pulseContainer}>
+              <Pressable 
+                style={styles.sosCircle}
+                onPress={handleConfirm}
+              >
+                <Icon name="settings-input-antenna" size={40} color={colors.surface} />
+                <Text style={styles.sendNowText}>SEND NOW</Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.instructionText}>
+              Hold to immediately notify emergency contacts{"\n"}and local authorities.
+            </Text>
+
+            <View style={styles.optionsList}>
+              <View style={styles.glassOption}>
+                <View style={styles.optionInfo}>
+                  <View style={styles.optionIconBox}>
+                    <Icon name="volume-off" size={20} color={colors.surface} />
+                  </View>
+                  <View>
+                    <Text style={styles.optionTitle}>Silent Mode</Text>
+                    <Text style={styles.optionSub}>No siren or visuals on screen</Text>
+                  </View>
+                </View>
+                <Switch value={silentMode} onValueChange={setSilentMode} color={colors.surface} />
+              </View>
+
+              <View style={styles.glassOption}>
+                <View style={styles.optionInfo}>
+                  <View style={styles.optionIconBox}>
+                    <Icon name="mic" size={20} color={colors.surface} />
+                  </View>
+                  <View>
+                    <Text style={styles.optionTitle}>Start Audio Recording</Text>
+                    <Text style={styles.optionSub}>Capturing evidence in real-time</Text>
+                  </View>
+                </View>
+                <Switch value={audioRecording} onValueChange={setAudioRecording} color={colors.surface} />
+              </View>
+
+              <View style={styles.glassOption}>
+                <View style={styles.optionInfo}>
+                  <View style={styles.optionIconBox}>
+                    <Icon name="hub" size={20} color={colors.surface} />
+                  </View>
+                  <View>
+                    <Text style={styles.optionTitle}>Broadcast to Nearby Users</Text>
+                    <Text style={styles.optionSub}>Alert verified citizens in 500m</Text>
+                  </View>
+                </View>
+                <Switch value={broadcastNearby} onValueChange={setBroadcastNearby} color={colors.surface} />
+              </View>
+            </View>
           </View>
-
-          <Text style={styles.instructionText}>
-            Hold to immediately notify emergency contacts{"\n"}and local authorities.
-          </Text>
-
-          <View style={styles.optionsList}>
-            <View style={styles.glassOption}>
-              <View style={styles.optionInfo}>
-                <View style={styles.optionIconBox}>
-                  <Icon name="volume-off" size={20} color={colors.surface} />
-                </View>
-                <View>
-                  <Text style={styles.optionTitle}>Silent Mode</Text>
-                  <Text style={styles.optionSub}>No siren or visuals on screen</Text>
-                </View>
-              </View>
-              <Switch value={silentMode} onValueChange={setSilentMode} color={colors.surface} />
-            </View>
-
-            <View style={styles.glassOption}>
-              <View style={styles.optionInfo}>
-                <View style={styles.optionIconBox}>
-                  <Icon name="mic" size={20} color={colors.surface} />
-                </View>
-                <View>
-                  <Text style={styles.optionTitle}>Start Audio Recording</Text>
-                  <Text style={styles.optionSub}>Capturing evidence in real-time</Text>
-                </View>
-              </View>
-              <Switch value={audioRecording} onValueChange={setAudioRecording} color={colors.surface} />
-            </View>
-
-            <View style={styles.glassOption}>
-              <View style={styles.optionInfo}>
-                <View style={styles.optionIconBox}>
-                  <Icon name="hub" size={20} color={colors.surface} />
-                </View>
-                <View>
-                  <Text style={styles.optionTitle}>Broadcast to Nearby Users</Text>
-                  <Text style={styles.optionSub}>Alert verified citizens in 500m</Text>
-                </View>
-              </View>
-              <Switch value={broadcastNearby} onValueChange={setBroadcastNearby} color={colors.surface} />
-            </View>
-          </View>
-        </View>
+        </ScrollView>
 
         <View style={styles.footer}>
           {currentLocation && (
@@ -166,7 +194,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1E0B3B',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: spacing.xl,
+    paddingBottom: 20,
   },
   header: {
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
