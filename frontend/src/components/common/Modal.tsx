@@ -19,6 +19,7 @@ interface ModalProps {
   children: ReactNode;
   dismissOnBackdrop?: boolean;
   fullScreen?: boolean;
+  noAnimation?: boolean;
 }
 
 /**
@@ -31,12 +32,25 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   dismissOnBackdrop = true,
   fullScreen = false,
+  noAnimation = false,
 }) => {
   const insets = useSafeAreaInsets();
-  const translateY = useSharedValue(SCREEN_HEIGHT);
-  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(noAnimation ? 0 : SCREEN_HEIGHT);
+  const opacity = useSharedValue(noAnimation ? 1 : 0);
 
   useEffect(() => {
+    if (noAnimation) {
+      if (visible) {
+        opacity.value = 1;
+        translateY.value = 0;
+      } else {
+        opacity.value = 0;
+        translateY.value = SCREEN_HEIGHT;
+        onClose();
+      }
+      return;
+    }
+
     if (visible) {
       opacity.value = withTiming(1, { duration: 200 });
       translateY.value = withSpring(0, { damping: 20 });
@@ -46,7 +60,7 @@ export const Modal: React.FC<ModalProps> = ({
         runOnJS(onClose)();
       });
     }
-  }, [visible]);
+  }, [visible, noAnimation]);
 
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,

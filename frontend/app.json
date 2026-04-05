@@ -68,6 +68,9 @@
       "expo-av"
     ],
     "extra": {
+      "eas": {
+        "projectId": "safearound-mobile"
+      }
     }
   }
 }

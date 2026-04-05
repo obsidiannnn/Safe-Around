@@ -65,69 +65,72 @@ export default function CrimeHeatmapOverlay({ bounds, onCrimeDataLoaded }: Props
     return (
       <Heatmap
         points={heatmapPoints}
-        radius={80} // Increased for a more realistic spread
-        opacity={0.6} // Softer opacity for better blending
+        radius={50} // Capped at 50 to prevent "Radius not within bounds"
+        opacity={0.7} 
         gradient={{
           colors: [
-            'rgba(16, 185, 129, 0.4)', // Safe Green (Very faint)
-            'rgba(16, 185, 129, 0.8)', // Safe Green (Opaque)
-            'rgba(245, 158, 11, 0.9)', // Warning Amber
-            'rgba(239, 68, 68, 1.0)',  // Emergency Red
+            'rgba(34, 197, 94, 0.2)',  // Safe Green (Fade in)
+            'rgba(34, 197, 94, 0.5)',  // Safe Green (Mid)
+            'rgba(234, 179, 8, 0.7)',  // Warning Yellow
+            'rgba(239, 68, 68, 0.9)',  // Danger Red
           ],
-          startPoints: [0.1, 0.3, 0.6, 1.0], // Smoother transition
-          colorMapSize: 512, // Higher density for better gradients
-        }}
+          startPoints: [0.01, 0.25, 0.6, 1.0], // Wide spread for organic look
+          colorMapSize: 2000, // Maximum resolution for smooth blending
+        } as any}
       />
     );
   }
 
   // Helper to interpolate color based on weight (0.1 to 1.0)
   const getInterpolatedColor = (weight: number, alpha: number) => {
-    // Green (16, 185, 129) -> Amber (245, 158, 11) -> Red (239, 68, 68)
+    // Green (34, 197, 94) -> Amber (245, 158, 11) -> Red (239, 68, 68)
     if (weight <= 0.4) {
-      return `rgba(16, 185, 129, ${alpha})`;
+      return `rgba(34, 197, 94, ${alpha})`;
     } else if (weight <= 0.7) {
       return `rgba(245, 158, 11, ${alpha})`;
     }
     return `rgba(239, 68, 68, ${alpha})`;
   };
 
-  // Fallback: render simulated gradient circles for iOS Apple Maps
+  // Fallback/Simulated: Multi-layered soft glow for "spreading" effect
+  // Flattening to avoid React.Fragment issues in some react-native-maps versions
   return (
     <>
-      {heatmapPoints.map((point, index) => {
-        const maxRadius = 500 * (point.weight + 0.5); // Larger spread
+      {heatmapPoints.flatMap((point, idx) => {
+        const weight = point.weight || 0.1;
+        const baseRadius = 2500 * (weight + 0.3);
+        const pointKey = `crime-${point.latitude}-${point.longitude}-${idx}`;
 
-        return (
-          <React.Fragment key={index}>
-            {/* Multi-layered soft glow for realistic spread */}
-            <Circle
-              center={{ latitude: point.latitude, longitude: point.longitude }}
-              radius={maxRadius}
-              fillColor={getInterpolatedColor(point.weight, 0.05)}
-              strokeColor="transparent"
-            />
-            <Circle
-              center={{ latitude: point.latitude, longitude: point.longitude }}
-              radius={maxRadius * 0.7}
-              fillColor={getInterpolatedColor(point.weight, 0.12)}
-              strokeColor="transparent"
-            />
-            <Circle
-              center={{ latitude: point.latitude, longitude: point.longitude }}
-              radius={maxRadius * 0.4}
-              fillColor={getInterpolatedColor(point.weight, 0.25)}
-              strokeColor="transparent"
-            />
-            {/* Core center point */}
-            <Circle
-              center={{ latitude: point.latitude, longitude: point.longitude }}
-              radius={maxRadius * 0.15}
-              fillColor={getInterpolatedColor(point.weight, 0.5)}
-              strokeColor="transparent"
-            />
-          </React.Fragment>
-        );
+        return [
+          <Circle
+            key={`${pointKey}-outer`}
+            center={{ latitude: point.latitude, longitude: point.longitude }}
+            radius={baseRadius * 1.5}
+            fillColor={getInterpolatedColor(weight, 0.03)}
+            strokeColor="transparent"
+          />,
+          <Circle
+            key={`${pointKey}-primary`}
+            center={{ latitude: point.latitude, longitude: point.longitude }}
+            radius={baseRadius}
+            fillColor={getInterpolatedColor(weight, 0.08)}
+            strokeColor="transparent"
+          />,
+          <Circle
+            key={`${pointKey}-inner`}
+            center={{ latitude: point.latitude, longitude: point.longitude }}
+            radius={baseRadius * 0.6}
+            fillColor={getInterpolatedColor(weight, 0.15)}
+            strokeColor="transparent"
+          />,
+          <Circle
+            key={`${pointKey}-hotspot`}
+            center={{ latitude: point.latitude, longitude: point.longitude }}
+            radius={baseRadius * 0.25}
+            fillColor={getInterpolatedColor(weight, 0.35)}
+            strokeColor="transparent"
+          />
+        ];
       })}
     </>
   );

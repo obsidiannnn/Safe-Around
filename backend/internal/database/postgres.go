@@ -90,3 +90,6 @@ func NewPostgresPool(cfg *config.Config) (*pgxpool.Pool, error) {
 
 	return pool, nil
 }
+
+
+
