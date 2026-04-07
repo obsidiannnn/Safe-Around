@@ -5,7 +5,7 @@ interface UserState {
   emergencyContacts: EmergencyContact[];
   setEmergencyContacts: (contacts: EmergencyContact[]) => void;
   addEmergencyContact: (contact: EmergencyContact) => void;
-  removeEmergencyContact: (contactId: string) => void;
+  removeEmergencyContact: (contactId: number) => void;
 }
 
 export const useUserStore = create<UserState>((set) => ({
