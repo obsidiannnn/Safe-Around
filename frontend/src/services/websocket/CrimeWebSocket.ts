@@ -3,12 +3,14 @@ class CrimeWebSocketService {
   private listeners: Map<string, Function[]> = new Map();
   private reconnectTimer: any = null;
   private serverUrl: string = '';
+  private shouldReconnect: boolean = false;
 
   connect(serverUrl: string) {
     if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
       return;
     }
     this.serverUrl = serverUrl;
+    this.shouldReconnect = true;
     this.socket = new WebSocket(serverUrl);
 
     this.socket.onopen = () => {
@@ -18,11 +20,13 @@ class CrimeWebSocketService {
 
     this.socket.onclose = () => {
       console.log('❌ Disconnected from crime updates');
-      this.reconnectTimer = setTimeout(() => this.connect(this.serverUrl), 3000); // Reconnect logic
+      if (this.shouldReconnect) {
+        this.reconnectTimer = setTimeout(() => this.connect(this.serverUrl), 3000);
+      }
     };
 
     this.socket.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      console.warn('WebSocket connection unavailable; realtime updates will retry in the background.', error);
     };
 
     // Listen for crime updates and emergency alerts from server
@@ -80,6 +84,7 @@ class CrimeWebSocketService {
   }
 
   disconnect() {
+    this.shouldReconnect = false;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     if (this.socket) {
       this.socket.close();

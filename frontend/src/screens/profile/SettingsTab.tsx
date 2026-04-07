@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SettingRow } from '@/components/profile/SettingRow';
-import { useNavigation } from '@react-navigation/native';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
@@ -11,18 +10,21 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { Button } from '@/components/common/Button';
 
 export const SettingsTab: React.FC = () => {
-  const navigation = useNavigation();
   const { user } = useAuthStore();
   const {
     locationSharingMode,
-    batteryOptimization,
+    dangerZoneWarningDistance,
     priorityAlerts,
     shakeToSOS,
-    setBatteryOptimization,
+    setLocationSharingMode,
+    setDangerZoneWarningDistance,
     setPriorityAlerts,
     setShakeToSOS,
   } = useSettingsStore();
   const { logOut } = useAuth();
+  const nextLocationMode = locationSharingMode === 'always' ? 'alerts_only' : locationSharingMode === 'alerts_only' ? 'never' : 'always';
+  const locationModeLabel = locationSharingMode === 'always' ? 'Always share live location' : locationSharingMode === 'alerts_only' ? 'Only share during SOS alerts' : 'Do not share live location';
+  const nextWarningDistance = dangerZoneWarningDistance === 250 ? 500 : dangerZoneWarningDistance === 500 ? 1000 : 250;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -37,21 +39,11 @@ export const SettingsTab: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>ACCOUNT SECURITY</Text>
         <SettingRow
-          icon="key"
-          title="Change Password"
-          onPress={() => navigation.navigate('ChangePassword' as never)}
-        />
-        <SettingRow
           icon="shield-checkmark"
           title="Phone Verification"
           subtitle={user?.is_phone_verified ? 'Your phone is verified for account recovery' : 'Verify your phone to improve account security'}
           rightElement="text"
           rightValue={user?.is_phone_verified ? 'Verified' : 'Pending'}
-        />
-        <SettingRow
-          icon="trash"
-          title="Delete My Records"
-          onPress={() => navigation.navigate('DeleteAccount' as never)}
         />
       </View>
 
@@ -60,15 +52,18 @@ export const SettingsTab: React.FC = () => {
         <SettingRow
           icon="location"
           title="Live Location Sharing"
-          subtitle={locationSharingMode}
-          onPress={() => navigation.navigate('PrivacySettings' as never)}
+          subtitle={locationModeLabel}
+          rightElement="text"
+          rightValue={locationSharingMode === 'always' ? 'Always' : locationSharingMode === 'alerts_only' ? 'SOS Only' : 'Off'}
+          onPress={() => setLocationSharingMode(nextLocationMode)}
         />
-        <SettingRow 
-          icon="battery-charging" 
-          title="Battery Optimization" 
-          rightElement="toggle" 
-          rightValue={batteryOptimization}
-          onToggle={setBatteryOptimization}
+        <SettingRow
+          icon="shield"
+          title="Danger Zone Warnings"
+          subtitle="Tap to cycle alert distance"
+          rightElement="text"
+          rightValue={`${dangerZoneWarningDistance}m`}
+          onPress={() => setDangerZoneWarningDistance(nextWarningDistance)}
         />
       </View>
 
@@ -77,7 +72,7 @@ export const SettingsTab: React.FC = () => {
         <SettingRow
           icon="notifications"
           title="Priority Alerts"
-          subtitle="Notify you for nearby emergency alerts"
+          subtitle={priorityAlerts ? 'Nearby emergency alerts are active' : 'Nearby emergency alerts are paused'}
           rightElement="toggle"
           rightValue={priorityAlerts}
           onToggle={setPriorityAlerts}
@@ -85,7 +80,7 @@ export const SettingsTab: React.FC = () => {
         <SettingRow
           icon="phone-portrait"
           title="Shake to SOS"
-          subtitle="Trigger SOS from shake detection when enabled"
+          subtitle={shakeToSOS ? 'Shake detection is active' : 'Shake detection is off'}
           rightElement="toggle"
           rightValue={shakeToSOS}
           onToggle={setShakeToSOS}

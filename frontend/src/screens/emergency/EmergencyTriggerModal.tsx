@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Vibration, Pressable, Platform, ScrollView } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, StyleSheet, Vibration, Pressable, Platform, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { Text, Switch } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,19 +27,21 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
   const { createAlert } = useAlertStore();
   const { currentLocation } = useLocationStore();
   const [silentMode, setSilentMode] = useState(false);
-  const [audioRecording, setAudioRecording] = useState(true);
-  const [broadcastNearby, setBroadcastNearby] = useState(true);
   const [countdown, setCountdown] = useState(5);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [hasTriggered, setHasTriggered] = useState(false);
 
   useEffect(() => {
     if (visible) {
       setCountdown(5);
+      setIsConfirming(false);
+      setHasTriggered(false);
       navigation.getParent()?.setOptions({
         tabBarStyle: { display: 'none' }
       });
-      return;
-    } else {
+    }
+
+    return () => {
       navigation.getParent()?.setOptions({
         tabBarStyle: {
           height: 52 + insets.bottom,
@@ -56,21 +58,14 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
           overflow: 'visible',
         }
       });
-    }
+    };
+  }, [visible, insets.bottom, navigation]);
 
-    if (countdown > 0) {
-      const timer = setTimeout(() => {
-        setCountdown(countdown - 1);
-        if (countdown === 1) handleConfirm();
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [visible, countdown]);
-
-  const handleConfirm = async () => {
-    if (!currentLocation || isConfirming) return;
+  const handleConfirm = useCallback(async () => {
+    if (!currentLocation || isConfirming || hasTriggered) return;
 
     try {
+      setHasTriggered(true);
       setIsConfirming(true);
       if (!silentMode) {
         Vibration.vibrate([0, 500, 200, 500]);
@@ -87,10 +82,30 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
       onClose();
       navigation.navigate('EmergencyActive' as never);
     } catch (error) {
-      console.error('Error creating alert:', error);
+      console.warn('Error creating alert:', error);
+      setCountdown(5);
+      setHasTriggered(false);
+      Alert.alert('SOS failed', 'We could not send the emergency alert. Please check your connection and try again.');
     } finally {
       setIsConfirming(false);
     }
+  }, [currentLocation, isConfirming, hasTriggered, silentMode, createAlert, onClose, navigation]);
+
+  useEffect(() => {
+    if (!visible || isConfirming) return;
+
+    if (countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(countdown - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+
+    handleConfirm();
+  }, [visible, countdown, isConfirming, handleConfirm]);
+
+  const formatCoordinate = (value: number, positive: string, negative: string) => {
+    return `${Math.abs(value).toFixed(4)}° ${value >= 0 ? positive : negative}`;
   };
 
   return (
@@ -113,20 +128,32 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
         >
           <View style={styles.mainContent}>
             <Text style={styles.alertingSub}>EMERGENCY SOS ACTIVE</Text>
-            <Text style={styles.alertingTitle}>Alerting in {countdown}...</Text>
+            <View style={styles.countdownBadge}>
+              <Icon name="timer" size={16} color={colors.surface} />
+              <Text style={styles.countdownBadgeText}>{isConfirming ? 'Sending SOS now' : `Auto-send in ${countdown}s`}</Text>
+            </View>
+            <Text style={styles.alertingTitle}>{isConfirming ? 'Sending SOS' : 'Emergency ready'}</Text>
+            <Text style={styles.alertingDescription}>
+              Your contacts and nearby responders will receive your live location.
+            </Text>
 
             <View style={styles.pulseContainer}>
               <Pressable 
-                style={styles.sosCircle}
+                style={[styles.sosCircle, isConfirming && styles.sosCircleDisabled]}
                 onPress={handleConfirm}
+                disabled={isConfirming}
               >
-                <Icon name="settings-input-antenna" size={40} color={colors.surface} />
-                <Text style={styles.sendNowText}>SEND NOW</Text>
+                {isConfirming ? (
+                  <ActivityIndicator color={colors.surface} size="large" />
+                ) : (
+                  <Icon name="settings-input-antenna" size={40} color={colors.surface} />
+                )}
+                <Text style={styles.sendNowText}>{isConfirming ? 'SENDING' : 'SEND NOW'}</Text>
               </Pressable>
             </View>
 
             <Text style={styles.instructionText}>
-              Hold to immediately notify emergency contacts{"\n"}and local authorities.
+              Tap send now to skip the timer, or cancel if this was accidental.
             </Text>
 
             <View style={styles.optionsList}>
@@ -135,7 +162,7 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
                   <View style={styles.optionIconBox}>
                     <Icon name="volume-off" size={20} color={colors.surface} />
                   </View>
-                  <View>
+                  <View style={styles.optionText}>
                     <Text style={styles.optionTitle}>Silent Mode</Text>
                     <Text style={styles.optionSub}>No siren or visuals on screen</Text>
                   </View>
@@ -146,14 +173,16 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
               <View style={styles.glassOption}>
                 <View style={styles.optionInfo}>
                   <View style={styles.optionIconBox}>
-                    <Icon name="mic" size={20} color={colors.surface} />
+                    <Icon name="sms" size={20} color={colors.surface} />
                   </View>
-                  <View>
-                    <Text style={styles.optionTitle}>Start Audio Recording</Text>
-                    <Text style={styles.optionSub}>Capturing evidence in real-time</Text>
+                  <View style={styles.optionText}>
+                    <Text style={styles.optionTitle}>Emergency SMS</Text>
+                    <Text style={styles.optionSub}>Contacts receive your pinned location</Text>
                   </View>
                 </View>
-                <Switch value={audioRecording} onValueChange={setAudioRecording} color={colors.surface} />
+                <View style={styles.includedBadge}>
+                  <Text style={styles.includedText}>Included</Text>
+                </View>
               </View>
 
               <View style={styles.glassOption}>
@@ -161,12 +190,14 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
                   <View style={styles.optionIconBox}>
                     <Icon name="hub" size={20} color={colors.surface} />
                   </View>
-                  <View>
+                  <View style={styles.optionText}>
                     <Text style={styles.optionTitle}>Broadcast to Nearby Users</Text>
                     <Text style={styles.optionSub}>Alert verified citizens in 500m</Text>
                   </View>
                 </View>
-                <Switch value={broadcastNearby} onValueChange={setBroadcastNearby} color={colors.surface} />
+                <View style={styles.includedBadge}>
+                  <Text style={styles.includedText}>Included</Text>
+                </View>
               </View>
             </View>
           </View>
@@ -177,12 +208,12 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
             <View style={styles.coordBox}>
               <Icon name="location-pin" size={14} color={colors.surface} />
               <Text style={styles.coordText}>
-                PINPOINTED: {currentLocation.latitude.toFixed(4)}° N, {currentLocation.longitude.toFixed(4)}° W
+                PINPOINTED: {formatCoordinate(currentLocation.latitude, 'N', 'S')}, {formatCoordinate(currentLocation.longitude, 'E', 'W')}
               </Text>
             </View>
           )}
-          <Pressable style={styles.cancelBtn} onPress={onClose}>
-            <Text style={styles.cancelBtnText}>CANCEL</Text>
+          <Pressable style={[styles.cancelBtn, isConfirming && styles.cancelBtnDisabled]} onPress={onClose} disabled={isConfirming}>
+            <Text style={styles.cancelBtnText}>{isConfirming ? 'SENDING ALERT...' : 'CANCEL SOS'}</Text>
           </Pressable>
         </View>
       </View>
@@ -200,10 +231,13 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: spacing.xl,
-    paddingBottom: 20,
+    paddingBottom: spacing.md,
+    flexGrow: 1,
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: Platform.OS === 'ios' ? 56 : 28,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -224,39 +258,64 @@ const styles = StyleSheet.create({
   mainContent: {
     flex: 1,
     alignItems: 'center',
-    paddingTop: 40,
+    paddingTop: spacing.lg,
   },
   alertingSub: {
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 2,
-    marginBottom: 8,
+    marginBottom: spacing.md,
+  },
+  countdownBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.pill,
+    marginBottom: spacing.md,
+  },
+  countdownBadgeText: {
+    color: colors.surface,
+    fontSize: 13,
+    fontWeight: '800',
+    marginLeft: spacing.xs,
   },
   alertingTitle: {
     color: colors.surface,
-    fontSize: 48,
+    fontSize: 34,
     fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 40,
+  },
+  alertingDescription: {
+    color: 'rgba(255, 255, 255, 0.68)',
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.xl,
   },
   pulseContainer: {
-    width: 200,
-    height: 200,
+    width: 168,
+    height: 168,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: spacing.lg,
   },
   sosCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 138,
+    height: 138,
+    borderRadius: 69,
     backgroundColor: '#EF4444',
     justifyContent: 'center',
     alignItems: 'center',
     ...shadows.premium,
     borderWidth: 8,
     borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  sosCircleDisabled: {
+    opacity: 0.78,
   },
   sendNowText: {
     color: colors.surface,
@@ -269,7 +328,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 40,
+    marginBottom: spacing.xl,
   },
   optionsList: {
     width: '100%',
@@ -280,14 +339,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    padding: 16,
-    borderRadius: 20,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   optionInfo: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    marginRight: spacing.sm,
   },
   optionIconBox: {
     width: 36,
@@ -297,6 +358,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+  },
+  optionText: {
+    flex: 1,
   },
   optionTitle: {
     color: colors.surface,
@@ -308,8 +372,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
+  includedBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.pill,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+  },
+  includedText: {
+    color: colors.surface,
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
   footer: {
-    paddingBottom: 40,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: Platform.OS === 'ios' ? 34 : spacing.lg,
     alignItems: 'center',
   },
   coordBox: {
@@ -319,7 +398,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 12,
-    marginBottom: 24,
+    marginBottom: spacing.md,
   },
   coordText: {
     color: 'rgba(255, 255, 255, 0.6)',
@@ -334,6 +413,9 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  cancelBtnDisabled: {
+    opacity: 0.7,
   },
   cancelBtnText: {
     color: '#111827',

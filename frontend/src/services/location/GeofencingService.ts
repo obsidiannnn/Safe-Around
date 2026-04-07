@@ -53,13 +53,6 @@ class GeofencingService {
     }
   }
 
-  static getInstance(): GeofencingService {
-    if (!GeofencingService.instance) {
-      GeofencingService.instance = new GeofencingService();
-    }
-    return GeofencingService.instance;
-  }
-
   async startGeofenceMonitoring(): Promise<void> {
     if (this.isMonitoring) return;
 
@@ -93,7 +86,7 @@ class GeofencingService {
     this.saveCachedZones();
   }
 
-  checkCurrentZone(location: Location): DangerZone | null {
+  checkCurrentZone(location: Location, warningDistance: number = 500): DangerZone | null {
     for (const zone of this.dangerZones) {
       const distance = locationService.calculateDistance(
         location.latitude,
@@ -111,8 +104,8 @@ class GeofencingService {
         return zone;
       }
 
-      // Check if approaching (within 500m)
-      if (distance <= zone.radius + 500 && distance > zone.radius) {
+      // Check if approaching within the user's configured warning distance.
+      if (distance <= zone.radius + warningDistance && distance > zone.radius) {
         this.triggerWarningCallbacks(zone);
       }
     }
