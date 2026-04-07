@@ -33,6 +33,23 @@ func (h *ProfileHandler) GetProfile(c *gin.Context) {
 		return
 	}
 
+	var totalAlerts int64
+	h.db.Model(&models.EmergencyAlert{}).
+		Where("user_id = ?", userID).
+		Count(&totalAlerts)
+
+	var peopleHelped int64
+	h.db.Model(&models.AlertResponse{}).
+		Where("responder_user_id = ? AND response_status IN ?", userID, []string{"accepted", "arrived", "helping"}).
+		Count(&peopleHelped)
+
+	var emergencyContacts int64
+	h.db.Model(&models.EmergencyContact{}).
+		Where("user_id = ?", userID).
+		Count(&emergencyContacts)
+
+	trustLevelScore := calculateTrustLevelScore(user, totalAlerts, peopleHelped, emergencyContacts)
+
 	c.JSON(http.StatusOK, gin.H{
 		"user": gin.H{
 			"id":                     user.ID,
@@ -42,13 +59,39 @@ func (h *ProfileHandler) GetProfile(c *gin.Context) {
 			"is_phone_verified":      user.IsPhoneVerified,
 			"profile_picture_url":    user.ProfilePictureURL,
 			"subscription_tier":      user.SubscriptionTier,
-			"total_alerts_triggered": user.TotalAlertsTriggered,
-			"people_helped_count":    user.PeopleHelpedCount,
-			"trust_level_score":      user.TrustLevelScore,
+			"total_alerts_triggered": totalAlerts,
+			"people_helped_count":    peopleHelped,
+			"trust_level_score":      trustLevelScore,
+			"emergency_contacts":     emergencyContacts,
 			"last_login":             user.LastLogin,
 			"created_at":             user.CreatedAt,
+			"updated_at":             user.UpdatedAt,
 		},
 	})
+}
+
+func calculateTrustLevelScore(user models.User, totalAlerts, peopleHelped, emergencyContacts int64) int {
+	score := 40
+	if user.IsPhoneVerified {
+		score += 25
+	}
+	if user.Email != "" {
+		score += 10
+	}
+	if emergencyContacts > 0 {
+		score += 15
+	}
+	score += int(peopleHelped * 5)
+	if totalAlerts > 0 && peopleHelped == 0 {
+		score -= 5
+	}
+	if score < 0 {
+		return 0
+	}
+	if score > 100 {
+		return 100
+	}
+	return score
 }
 
 // PUT /api/v1/users/profile

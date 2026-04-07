@@ -4,13 +4,24 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatCard } from '@/components/profile/StatCard';
 import { useAuthStore } from '@/store/authStore';
 import { useNavigation } from '@react-navigation/native';
-import { format } from 'date-fns';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
 
-export const ProfileOverviewTab: React.FC = () => {
+interface ProfileStats {
+  totalAlerts: number;
+  helpedOthers: number;
+  trustScore: number;
+  emergencyContacts: number;
+}
+
+interface ProfileOverviewTabProps {
+  stats: ProfileStats;
+}
+
+export const ProfileOverviewTab: React.FC<ProfileOverviewTabProps> = ({ stats }) => {
   const { user } = useAuthStore();
   const navigation = useNavigation();
+  const trustLabel = stats.trustScore >= 80 ? 'HIGH TRUST LEVEL' : stats.trustScore >= 50 ? 'GROWING TRUST LEVEL' : 'SET UP YOUR TRUST PROFILE';
 
   const quickActions = [
     { id: 'edit', label: 'Edit Profile', icon: 'person-outline', screen: 'EditProfile' },
@@ -25,32 +36,31 @@ export const ProfileOverviewTab: React.FC = () => {
       contentContainerStyle={styles.contentContainer}
       showsVerticalScrollIndicator={false}
     >
-      {/* Safety Score Radial Header */}
       <View style={styles.scoreHeader}>
         <View style={styles.radialContainer}>
           <View style={styles.radialOuter}>
             <View style={styles.radialInner}>
-              <Text style={styles.scoreValue}>98</Text>
-              <Text style={styles.scoreLabel}>SAFETY SCORE</Text>
+              <Text style={styles.scoreValue}>{stats.trustScore}</Text>
+              <Text style={styles.scoreLabel}>TRUST SCORE</Text>
             </View>
           </View>
         </View>
         <View style={styles.trustBadge}>
           <Ionicons name="shield-checkmark" size={16} color={colors.secondary} />
-          <Text style={styles.trustText}>HIGH TRUST LEVEL</Text>
+          <Text style={styles.trustText}>{trustLabel}</Text>
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Global Statistics</Text>
+        <Text style={styles.sectionTitle}>Your Statistics</Text>
         <View style={styles.statsGrid}>
           <View style={styles.statsRow}>
-            <StatCard icon="warning-outline" value={24} label="Total Alerts" variant="primary" />
-            <StatCard icon="heart-outline" value={12} label="Helped Others" variant="success" trend="up" />
+            <StatCard icon="warning-outline" value={stats.totalAlerts} label="Total Alerts" variant="primary" />
+            <StatCard icon="heart-outline" value={stats.helpedOthers} label="Helped Others" variant="success" trend={stats.helpedOthers > 0 ? 'up' : undefined} />
           </View>
           <View style={styles.statsRow}>
-            <StatCard icon="shield-outline" value="98%" label="Safety Rating" variant="success" />
-            <StatCard icon="star-outline" value="Verified" label="Account Status" variant="warning" />
+            <StatCard icon="shield-outline" value={`${stats.trustScore}%`} label="Trust Rating" variant="success" />
+            <StatCard icon="people-outline" value={stats.emergencyContacts} label="Emergency Contacts" variant="warning" />
           </View>
         </View>
       </View>

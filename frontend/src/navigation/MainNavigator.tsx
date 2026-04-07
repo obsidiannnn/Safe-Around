@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShakeDetection } from '@/hooks/useShakeDetection';
 import { useAlertStore } from '@/store/alertStore';
 import { useLocation } from '@/hooks/useLocation';
+import { useSettingsStore } from '@/store/settingsStore';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -20,10 +21,11 @@ export const MainNavigator = () => {
   const insets = useSafeAreaInsets();
   const { isAlertActive, createAlert } = useAlertStore();
   const { currentLocation } = useLocation();
+  const { shakeToSOS } = useSettingsStore();
   
   // Global Shake Detection for Emergency SOS
   useShakeDetection({
-    enabled: !isAlertActive,
+    enabled: shakeToSOS && !isAlertActive,
     onShake: async () => {
       console.log('Global Shake Detected! Triggering Emergency SOS.');
       if (currentLocation) {

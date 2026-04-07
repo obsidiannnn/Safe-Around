@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -57,19 +58,31 @@ func (s *AlertService) GetActiveAlerts(ctx context.Context) ([]models.EmergencyA
 }
 
 func (s *AlertService) CreateAlert(ctx context.Context, req CreateAlertRequest) (*models.EmergencyAlert, error) {
+	metadata := req.Metadata
+	if metadata != "" && !json.Valid([]byte(metadata)) {
+		wrapped, err := json.Marshal(map[string]string{"message": metadata})
+		if err != nil {
+			return nil, err
+		}
+		metadata = string(wrapped)
+	}
+
 	// 1. Create alert record
 	alert := &models.EmergencyAlert{
 		UserID:        req.UserID,
 		AlertLocation: req.Location,
 		AlertType:     req.AlertType,
 		SilentMode:    req.SilentMode,
-		Metadata:      req.Metadata,
+		Metadata:      metadata,
 		CurrentRadius: 100,
 	}
 
 	if err := s.db.Create(alert).Error; err != nil {
 		return nil, err
 	}
+	s.db.Model(&models.User{}).
+		Where("id = ?", req.UserID).
+		UpdateColumn("total_alerts_triggered", gorm.Expr("total_alerts_triggered + ?", 1))
 
 	// 2. Find nearby users (100m)
 	nearbyUsers, err := s.geofencingService.GetNearbyUsers(
@@ -239,6 +252,9 @@ func (s *AlertService) AcceptAlert(ctx context.Context, alertID uuid.UUID, respo
 	if err := s.db.Create(response).Error; err != nil {
 		return err
 	}
+	s.db.Model(&models.User{}).
+		Where("id = ?", responderID).
+		UpdateColumn("people_helped_count", gorm.Expr("people_helped_count + ?", 1))
 
 	// Update alert status
 	s.db.Model(&models.EmergencyAlert{}).

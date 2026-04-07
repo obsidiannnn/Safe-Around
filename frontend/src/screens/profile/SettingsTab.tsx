@@ -4,6 +4,7 @@ import { SettingRow } from '@/components/profile/SettingRow';
 import { useNavigation } from '@react-navigation/native';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/store/authStore';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
@@ -11,7 +12,16 @@ import { Button } from '@/components/common/Button';
 
 export const SettingsTab: React.FC = () => {
   const navigation = useNavigation();
-  const { locationSharingMode, batteryOptimization, setBatteryOptimization } = useSettingsStore();
+  const { user } = useAuthStore();
+  const {
+    locationSharingMode,
+    batteryOptimization,
+    priorityAlerts,
+    shakeToSOS,
+    setBatteryOptimization,
+    setPriorityAlerts,
+    setShakeToSOS,
+  } = useSettingsStore();
   const { logOut } = useAuth();
 
   return (
@@ -21,7 +31,7 @@ export const SettingsTab: React.FC = () => {
           <Icon name="verified-user" size={20} color={colors.secondary} />
           <Text style={styles.statusTitle}>Secure Session Active</Text>
         </View>
-        <Text style={styles.statusSubtitle}>Your data is protected with 128-bit encryption</Text>
+        <Text style={styles.statusSubtitle}>Authenticated session protected by your device and account token</Text>
       </View>
 
       <View style={styles.section}>
@@ -31,7 +41,13 @@ export const SettingsTab: React.FC = () => {
           title="Change Password"
           onPress={() => navigation.navigate('ChangePassword' as never)}
         />
-        <SettingRow icon="shield-checkmark" title="Two-Factor Auth" rightElement="toggle" rightValue={true} />
+        <SettingRow
+          icon="shield-checkmark"
+          title="Phone Verification"
+          subtitle={user?.is_phone_verified ? 'Your phone is verified for account recovery' : 'Verify your phone to improve account security'}
+          rightElement="text"
+          rightValue={user?.is_phone_verified ? 'Verified' : 'Pending'}
+        />
         <SettingRow
           icon="trash"
           title="Delete My Records"
@@ -58,8 +74,22 @@ export const SettingsTab: React.FC = () => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>SAFETY TRIGGERS</Text>
-        <SettingRow icon="notifications" title="Priority Alerts" rightElement="toggle" rightValue={true} />
-        <SettingRow icon="phone-portrait" title="Shake to SOS" rightElement="toggle" rightValue={true} />
+        <SettingRow
+          icon="notifications"
+          title="Priority Alerts"
+          subtitle="Notify you for nearby emergency alerts"
+          rightElement="toggle"
+          rightValue={priorityAlerts}
+          onToggle={setPriorityAlerts}
+        />
+        <SettingRow
+          icon="phone-portrait"
+          title="Shake to SOS"
+          subtitle="Trigger SOS from shake detection when enabled"
+          rightElement="toggle"
+          rightValue={shakeToSOS}
+          onToggle={setShakeToSOS}
+        />
       </View>
 
       <View style={styles.footer}>
@@ -73,7 +103,7 @@ export const SettingsTab: React.FC = () => {
         >
           Sign Out of Network
         </Button>
-        <Text style={styles.versionText}>SafeAround v1.8.2 • Secure Connection</Text>
+        <Text style={styles.versionText}>SafeAround - Secure Connection</Text>
       </View>
     </ScrollView>
   );
