@@ -26,11 +26,11 @@ type AlertService struct {
 	redis               *redis.Client
 	geofencingService   *GeofencingService
 	notificationService NotificationService
-	websocketHub        *customWS.Hub
+	websocketHub        customWS.AlertBroadcaster
 	schedulers          sync.Map // alert_id -> *time.Timer
 }
 
-func NewAlertService(db *gorm.DB, rdb *redis.Client, gs *GeofencingService, ns NotificationService, wh *customWS.Hub) *AlertService {
+func NewAlertService(db *gorm.DB, rdb *redis.Client, gs *GeofencingService, ns NotificationService, wh customWS.AlertBroadcaster) *AlertService {
 	return &AlertService{
 		db:                  db,
 		redis:               rdb,
@@ -82,19 +82,27 @@ func (s *AlertService) CreateAlert(ctx context.Context, req CreateAlertRequest) 
 	}
 
 	// 3. Send notifications
-	alert.UsersNotified = len(nearbyUsers)
+	usersNotified := 0
 	for _, user := range nearbyUsers {
+		if user.ID == req.UserID {
+			continue
+		}
 		s.notificationService.SendEmergencyAlert(user.ID, alert)
+		usersNotified++
 	}
+	alert.UsersNotified = usersNotified
+	s.db.Model(alert).Update("users_notified", usersNotified)
 
 	// 4. Log timeline event
-	s.logTimelineEvent(alert.ID, "created", 100, len(nearbyUsers), 0)
+	s.logTimelineEvent(alert.ID, "created", 100, usersNotified, 0)
 
 	// 5. Start radius expansion scheduler
 	s.startRadiusExpansion(alert.ID)
 
 	// 6. Broadcast via WebSocket
-	s.websocketHub.BroadcastEmergencyAlert(alert)
+	if s.websocketHub != nil {
+		s.websocketHub.BroadcastEmergencyAlert(alert)
+	}
 
 	// 7. Notify emergency contacts immediately
 	s.notificationService.NotifyEmergencyContacts(alert.UserID, alert)
@@ -206,7 +214,9 @@ func (s *AlertService) expandRadius(alertID uuid.UUID, newRadius int) error {
 	s.logTimelineEvent(alertID, "radius_expanded", newRadius, len(newUsers), int(responderCount))
 
 	// Broadcast via WebSocket
-	s.websocketHub.BroadcastRadiusExpanded(alertID, oldRadius, newRadius)
+	if s.websocketHub != nil {
+		s.websocketHub.BroadcastRadiusExpanded(alertID, oldRadius, newRadius)
+	}
 
 	return nil
 }
@@ -244,7 +254,9 @@ func (s *AlertService) AcceptAlert(ctx context.Context, alertID uuid.UUID, respo
 	s.notificationService.NotifyResponderAccepted(alert.UserID, response)
 
 	// Broadcast via WebSocket
-	s.websocketHub.BroadcastResponderAccepted(alertID, response)
+	if s.websocketHub != nil {
+		s.websocketHub.BroadcastResponderAccepted(alertID, response)
+	}
 
 	return nil
 }
@@ -271,7 +283,31 @@ func (s *AlertService) ResolveAlert(ctx context.Context, alertID uuid.UUID, reso
 	s.notificationService.NotifyAllParticipants(alertID, fmt.Sprintf("Alert resolved: %s", resolutionType))
 
 	// Close WebSocket room
-	s.websocketHub.CloseRoom("alert_" + alertID.String())
+	if s.websocketHub != nil {
+		s.websocketHub.CloseRoom("alert_" + alertID.String())
+	}
+
+	return nil
+}
+
+func (s *AlertService) CancelAlert(ctx context.Context, alertID uuid.UUID, cancelledBy uint) error {
+	now := time.Now()
+	if err := s.db.Model(&models.EmergencyAlert{}).
+		Where("id = ? AND user_id = ?", alertID, cancelledBy).
+		Updates(map[string]interface{}{
+			"alert_status": "cancelled",
+			"cancelled_at": now,
+		}).Error; err != nil {
+		return err
+	}
+
+	s.cancelRadiusExpansion(alertID)
+	s.logTimelineEvent(alertID, "cancelled", 0, 0, 0)
+	s.notificationService.NotifyAllParticipants(alertID, "Alert cancelled by the requester")
+
+	if s.websocketHub != nil {
+		s.websocketHub.CloseRoom("alert_" + alertID.String())
+	}
 
 	return nil
 }

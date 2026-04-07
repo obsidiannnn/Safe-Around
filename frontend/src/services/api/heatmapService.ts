@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import { AreaStats } from '@/types/models';
 
 interface CrimePoint {
   latitude: number;
@@ -36,10 +37,16 @@ export const heatmapService = {
   },
 
   // Get statistics for a point
-  async getStatistics(lat: number, lng: number) {
+  async getStatistics(lat: number, lng: number): Promise<AreaStats> {
     const response = await apiClient.get('/heatmap/statistics', {
       params: { lat, lng },
     });
-    return response.data;
+    return {
+      safetyScore: Number(response.data?.safetyScore ?? 0),
+      nearbyUsers: Number(response.data?.nearbyUsers ?? 0),
+      recentAlerts: Number(response.data?.recentAlerts ?? 0),
+      crimeRate: Number(response.data?.crimeRate ?? 0),
+      lastUpdated: response.data?.lastUpdated ?? new Date().toISOString(),
+    };
   },
 };

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, StyleSheet, Pressable, Platform, Text, Alert } from 'react-native';
 import MapView, { Region, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
@@ -46,10 +46,12 @@ export const MapDashboardScreen = () => {
     longitudeDelta: 0.0421,
   });
   const [dangerZones, setDangerZones] = useState<DangerZone[]>([]);
-  const [showStatsCard, setShowStatsCard] = useState(false);
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  const [showAreaStatsCard, setShowAreaStatsCard] = useState(false);
   const [showMapTypeMenu, setShowMapTypeMenu] = useState(false);
   const [heatmapKey, setHeatmapKey] = useState(0);
   const [showDangerAlert, setShowDangerAlert] = useState(false);
+  const [liveNearbyUsers, setLiveNearbyUsers] = useState(0);
   const [selectedPlace, setSelectedPlace] = useState<{ name: string; location: { latitude: number; longitude: number } } | null>(null);
   const [activeVictimLocation, setActiveVictimLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [mapBounds, setMapBounds] = useState({
@@ -168,10 +170,23 @@ export const MapDashboardScreen = () => {
     try {
       const stats = await heatmapService.getStatistics(lat, lng);
       setCurrentStats(stats);
+      setLiveNearbyUsers(stats.nearbyUsers);
     } catch (error) {
       console.error('Error fetching area stats:', error);
     }
   };
+
+  const handleNearbyUsersChange = useCallback((count: number) => {
+    setLiveNearbyUsers(count);
+  }, []);
+
+  const safetyColor = currentStats
+    ? currentStats.safetyScore >= 80
+      ? colors.success
+      : currentStats.safetyScore >= 60
+        ? colors.warning
+        : colors.error
+    : colors.textSecondary;
 
   const handleRegionChange = (newRegion: Region) => {
     setRegion(newRegion);
@@ -245,7 +260,7 @@ export const MapDashboardScreen = () => {
         {currentLocation && (
           <>
             <UserLocationMarker location={currentLocation} />
-            <NearbyUsersLayer userLocation={currentLocation} />
+            <NearbyUsersLayer userLocation={currentLocation} onUsersChange={handleNearbyUsersChange} />
           </>
         )}
 
@@ -308,10 +323,26 @@ export const MapDashboardScreen = () => {
       />
 
       {currentLocation && (
-        <View style={[styles.nearbyBadge, { top: insets.top + 185 }]}>
+        <Pressable
+          style={[styles.nearbyBadge, { top: insets.top + 185 }]}
+          onPress={() => setShowAreaStatsCard(true)}
+        >
           <View style={styles.onlineDot} />
-          <Text style={styles.nearbyText}>8 Active Citizens Nearby</Text>
-        </View>
+          <Text style={styles.nearbyText}>{liveNearbyUsers} Active Citizens Nearby</Text>
+        </Pressable>
+      )}
+
+      {currentStats && (
+        <Pressable
+          style={[styles.safetyChip, { top: insets.top + 225 }]}
+          onPress={() => setShowAreaStatsCard(true)}
+        >
+          <View style={[styles.safetyScoreDot, { backgroundColor: safetyColor }]} />
+          <View>
+            <Text style={styles.safetyChipLabel}>Safe Score</Text>
+            <Text style={[styles.safetyChipValue, { color: safetyColor }]}>{currentStats.safetyScore}/100</Text>
+          </View>
+        </Pressable>
       )}
 
       {selectedPlace && (
@@ -368,7 +399,7 @@ export const MapDashboardScreen = () => {
             styles.sosButtonInner,
             pressed && styles.sosButtonPressed
           ]}
-          onPress={() => setShowStatsCard(true)}
+          onPress={() => setShowEmergencyModal(true)}
           onLongPress={handleEmergencyTrigger}
           delayLongPress={1000}
         >
@@ -378,8 +409,27 @@ export const MapDashboardScreen = () => {
       </View>
 
       <EmergencyTriggerModal
-        visible={showStatsCard}
-        onClose={() => setShowStatsCard(false)}
+        visible={showEmergencyModal}
+        onClose={() => setShowEmergencyModal(false)}
+      />
+
+      <QuickStatsCard
+        visible={showAreaStatsCard}
+        onClose={() => setShowAreaStatsCard(false)}
+        stats={currentStats}
+        onViewCrimeHistory={() => {
+          setShowAreaStatsCard(false);
+          navigation.navigate('CrimeDetails' as never);
+        }}
+        onPlanSafeRoute={() => {
+          setShowAreaStatsCard(false);
+          navigation.navigate('SafeRoute' as never);
+        }}
+        onReportIncident={() => {
+          setShowAreaStatsCard(false);
+          Alert.alert('Report Incident', 'Incident reporting is available from the crime details screen.');
+          navigation.navigate('CrimeDetails' as never);
+        }}
       />
 
       {currentZone && (
@@ -604,5 +654,36 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.3,
     textTransform: 'uppercase',
+  },
+  safetyChip: {
+    position: 'absolute',
+    left: spacing.lg,
+    backgroundColor: colors.surfaceTranslucent,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+    ...shadows.medium,
+    zIndex: 10,
+  },
+  safetyScoreDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: spacing.sm,
+  },
+  safetyChipLabel: {
+    fontSize: 9,
+    color: colors.textSecondary,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  safetyChipValue: {
+    fontSize: 16,
+    fontWeight: '900',
   },
 });

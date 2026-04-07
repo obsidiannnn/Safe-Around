@@ -10,13 +10,16 @@ export interface User {
 }
 
 export interface EmergencyContact {
-  id: string;
-  userId: string;
+  id: number;
+  userId?: number;
   name: string;
   phoneNumber: string;
+  phone?: string; // Backend uses 'phone', frontend uses 'phoneNumber'
   relationship: string;
   isPrimary: boolean;
+  is_priority?: boolean; // Backend uses 'is_priority'
   createdAt: string;
+  created_at?: string; // Backend format
 }
 
 export interface Location {

@@ -87,6 +87,13 @@ func (h *LocationHandler) GetCurrentLocation(c *gin.Context) {
 
 // GetNearbyUsers handles GET /api/v1/location/nearby?lat=&lng=&radius=
 func (h *LocationHandler) GetNearbyUsers(c *gin.Context) {
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	userID := userIDVal.(uint)
+
 	latStr := c.Query("lat")
 	lngStr := c.Query("lng")
 	radiusStr := c.DefaultQuery("radius", "500")
@@ -100,13 +107,20 @@ func (h *LocationHandler) GetNearbyUsers(c *gin.Context) {
 		return
 	}
 
-	userIDs, err := h.locationSvc.GetNearbyUsers(lat, lng, radius)
+	users, err := h.locationSvc.GetNearbyUserLocations(lat, lng, radius, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Query failed"})
 		return
 	}
 
+	userIDs := make([]uint, 0, len(users))
+	for _, user := range users {
+		userIDs = append(userIDs, user.UserID)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
+		"success":         true,
+		"data":            users,
 		"nearby_user_ids": userIDs,
 		"count":           len(userIDs),
 		"radius_meters":   radius,

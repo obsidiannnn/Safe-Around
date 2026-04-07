@@ -64,7 +64,9 @@ func (h *AlertHandler) CreateAlert(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
+		"success": true,
 		"message": "Emergency alert created and broadcasted successfully",
+		"data":    alert,
 		"alert":   alert,
 	})
 }
@@ -114,7 +116,14 @@ func (h *AlertHandler) RespondToAlert(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Response to alert logged successfully"})
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Response to alert logged successfully",
+		"data": gin.H{
+			"alertId": alertID.String(),
+			"status":  "accepted",
+		},
+	})
 }
 
 // PATCH /api/v1/alerts/:id/status
@@ -149,11 +158,21 @@ func (h *AlertHandler) UpdateAlertStatus(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to resolve alert"})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": "Alert resolved successfully"})
+		c.JSON(http.StatusOK, gin.H{"success": true, "message": "Alert resolved successfully"})
 		return
 	}
 
-	c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported status update. Use 'resolved'."})
+	if req.Status == "cancelled" {
+		err = h.alertService.CancelAlert(c.Request.Context(), alertID, userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel alert"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true, "message": "Alert cancelled successfully"})
+		return
+	}
+
+	c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported status update. Use 'resolved' or 'cancelled'."})
 }
 
 // POST /api/v1/alerts/:id/escalate

@@ -54,6 +54,13 @@ type WebSocketMessage struct {
 	Data  map[string]interface{} `json:"data"`
 }
 
+type AlertBroadcaster interface {
+	BroadcastEmergencyAlert(alert *models.EmergencyAlert)
+	BroadcastResponderAccepted(alertID uuid.UUID, response *models.AlertResponse)
+	BroadcastRadiusExpanded(alertID uuid.UUID, oldRadius, newRadius int)
+	CloseRoom(roomID string)
+}
+
 type Location struct {
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
@@ -262,10 +269,10 @@ func (h *Hub) BroadcastResponderAccepted(alertID uuid.UUID, response *models.Ale
 	roomID := fmt.Sprintf("alert_%s", alertID.String())
 
 	h.BroadcastToRoom(roomID, "responder_accepted", map[string]interface{}{
-		"responder_id":   response.ResponderUserID,
-		"distance":       response.DistanceMeters,
-		"eta":            response.EstimatedArrivalMinutes,
-		"responded_at":   response.RespondedAt,
+		"responder_id": response.ResponderUserID,
+		"distance":     response.DistanceMeters,
+		"eta":          response.EstimatedArrivalMinutes,
+		"responded_at": response.RespondedAt,
 	})
 }
 

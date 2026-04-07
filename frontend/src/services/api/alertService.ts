@@ -25,19 +25,37 @@ export interface AlertResponse {
   notifiedUsers: number;
 }
 
+const normalizeAlert = (raw: any): Alert => ({
+  id: String(raw?.id ?? raw?.alert_id ?? ''),
+  userId: String(raw?.userId ?? raw?.user_id ?? ''),
+  type: raw?.type ?? raw?.alert_type ?? 'panic',
+  status: raw?.status ?? raw?.alert_status ?? 'active',
+  location: raw?.location ?? raw?.alert_location ?? {
+    latitude: raw?.latitude ?? 0,
+    longitude: raw?.longitude ?? 0,
+  },
+  message: raw?.message ?? raw?.metadata,
+  createdAt: raw?.createdAt ?? raw?.created_at ?? new Date().toISOString(),
+  resolvedAt: raw?.resolvedAt ?? raw?.resolved_at,
+});
+
 export const alertService = {
   /**
    * Create a new emergency alert
    */
   createAlert: async (data: CreateAlertRequest): Promise<Alert> => {
-    const response = await apiClient.post<ApiResponse<Alert>>('/alerts', {
+    const response = await apiClient.post<ApiResponse<Alert> & { alert?: any }>('/alerts', {
       alert_type: data.type,
       latitude: data.location.latitude,
       longitude: data.location.longitude,
       silent_mode: data.silentMode,
       metadata: data.message
     });
-    return response.data.data!;
+    const alert = response.data.data ?? response.data.alert;
+    if (!alert) {
+      throw new Error(response.data.error || 'Emergency alert was not returned by the server');
+    }
+    return normalizeAlert(alert);
   },
 
   /**
@@ -45,7 +63,7 @@ export const alertService = {
    */
   getAlert: async (id: string): Promise<Alert> => {
     const response = await apiClient.get<ApiResponse<Alert>>(`/alerts/${id}`);
-    return response.data.data!;
+    return normalizeAlert(response.data.data);
   },
 
   /**
@@ -58,7 +76,7 @@ export const alertService = {
     const response = await apiClient.patch<ApiResponse<Alert>>(`/alerts/${id}/status`, {
       status,
     });
-    return response.data.data!;
+    return normalizeAlert(response.data.data);
   },
 
   /**
@@ -92,14 +110,14 @@ export const alertService = {
         radius,
       },
     });
-    return response.data.data || [];
+    return (response.data.data || []).map(normalizeAlert);
   },
 
   /**
    * Escalate alert to emergency services
    */
   escalateAlert: async (id: string, type: 'police' | 'medical' | 'fire'): Promise<void> => {
-    await apiClient.post(`/alerts/${id}/escalate`, { type });
+    await apiClient.post(`/alerts/${id}/escalate`, { escalation_type: type });
   },
 
   /**
@@ -107,6 +125,6 @@ export const alertService = {
    */
   getAlertHistory: async (): Promise<Alert[]> => {
     const response = await apiClient.get<ApiResponse<Alert[]>>('/alerts/history');
-    return response.data.data || [];
+    return (response.data.data || []).map(normalizeAlert);
   },
 };

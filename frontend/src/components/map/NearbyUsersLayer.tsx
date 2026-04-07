@@ -3,24 +3,20 @@ import { View, StyleSheet } from 'react-native';
 import { Marker } from 'react-native-maps';
 import { Location } from '@/types/models';
 import { colors } from '@/theme/colors';
-import { shadows } from '@/theme/spacing';
+import { locationApiService, NearbyUserLocation } from '@/services/api/locationApiService';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
-
-interface NearbyUser {
-  id: string;
-  location: Location;
-}
 
 interface NearbyUsersLayerProps {
   userLocation: Location;
+  onUsersChange?: (count: number) => void;
 }
 
 /**
  * Shows anonymous nearby active users on the map as pulsing dots.
  * Uber/Ola style — no plain Views inside MapView to avoid native crashes.
  */
-export const NearbyUsersLayer: React.FC<NearbyUsersLayerProps> = ({ userLocation }) => {
-  const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]);
+export const NearbyUsersLayer: React.FC<NearbyUsersLayerProps> = ({ userLocation, onUsersChange }) => {
+  const [nearbyUsers, setNearbyUsers] = useState<NearbyUserLocation[]>([]);
   const pulse = useSharedValue(1);
 
   useEffect(() => {
@@ -28,20 +24,22 @@ export const NearbyUsersLayer: React.FC<NearbyUsersLayerProps> = ({ userLocation
   }, []);
 
   useEffect(() => {
-    const generate = () => {
-      const mockUsers: NearbyUser[] = Array.from({ length: 8 }).map((_, i) => ({
-        id: `user-${i}`,
-        location: {
-          latitude: userLocation.latitude + (Math.random() - 0.5) * 0.012,
-          longitude: userLocation.longitude + (Math.random() - 0.5) * 0.012,
-        },
-      }));
-      setNearbyUsers(mockUsers);
+    let cancelled = false;
+
+    const fetchNearbyUsers = async () => {
+      const users = await locationApiService.getNearbyUsers(userLocation, 1000);
+      if (cancelled) return;
+      setNearbyUsers(users);
+      onUsersChange?.(users.length);
     };
-    generate();
-    const interval = setInterval(generate, 30000);
-    return () => clearInterval(interval);
-  }, [userLocation]);
+
+    fetchNearbyUsers();
+    const interval = setInterval(fetchNearbyUsers, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [userLocation.latitude, userLocation.longitude, onUsersChange]);
 
   const animatedPulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulse.value }],
@@ -50,12 +48,12 @@ export const NearbyUsersLayer: React.FC<NearbyUsersLayerProps> = ({ userLocation
 
   return (
     <>
-      {nearbyUsers.map((user, index) => (
+      {nearbyUsers.map((user) => (
         <Marker
-          key={`${user.id}-${index}`}
+          key={user.userId}
           coordinate={{
-            latitude: user.location.latitude,
-            longitude: user.location.longitude,
+            latitude: user.latitude,
+            longitude: user.longitude,
           }}
           anchor={{ x: 0.5, y: 0.5 }}
           tracksViewChanges={false}

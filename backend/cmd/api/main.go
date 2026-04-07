@@ -41,7 +41,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("failed to connect database", zap.Error(err))
 	}
-	
+
 	// Auto Migrate existing models (Disabled for testing to avoid schema conflict with views)
 	// if err := database.RunMigrations(db); err != nil {
 	// 	logger.Fatal("failed to migrate database", zap.Error(err))
@@ -72,10 +72,10 @@ func main() {
 	notifSvc := services.NewNotificationService(fcmClient, twilioClient, db, rdb)
 
 	geoSvc := services.NewGeofencingService(db, rdb, notifSvc)
-	
+
 	crimeHub := customWS.NewCrimeHub(dbPool)
 
-	alertSvc := services.NewAlertService(db, rdb, geoSvc, notifSvc, nil) // wsHub updated to crimeHub below
+	alertSvc := services.NewAlertService(db, rdb, geoSvc, notifSvc, crimeHub)
 	_ = services.NewHeatmapService(db, rdb, nil) // keep heatmap tile service available if needed
 	locationSvc := services.NewLocationService(db, rdb, geoSvc)
 	routeSvc := services.NewRouteService(db, rdb)

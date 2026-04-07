@@ -2,7 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from '@/types/navigation';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import { EmergencyScreen } from '@/screens/emergency/EmergencyScreen';
+import { EmergencyNavigator } from './EmergencyNavigator';
 import { ProfileNavigator } from './ProfileNavigator';
 import { colors } from '@/theme/colors';
 import { borderRadius, spacing } from '@/theme/spacing';
@@ -103,8 +103,8 @@ export const MainNavigator = () => {
       />
       <Tab.Screen
         name="Emergency"
-        component={EmergencyScreen}
-        options={{
+        component={EmergencyNavigator}
+        options={({ route }) => ({
           tabBarIcon: ({ color, size, focused }) => (
             <Icon name="notifications" size={size} color={focused ? colors.primary : color} />
           ),
@@ -115,7 +115,27 @@ export const MainNavigator = () => {
             letterSpacing: 0.5,
             marginTop: 4,
           },
-        }}
+          tabBarStyle: ((route) => {
+            const routeName = getFocusedRouteNameFromRoute(route) ?? 'EmergencyDashboard';
+            if (['EmergencyActive', 'EmergencyResolution', 'ResponderNavigation'].includes(routeName)) {
+              return { display: 'none' };
+            }
+            return {
+              height: 52 + insets.bottom,
+              paddingTop: 8,
+              paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+              backgroundColor: colors.surface,
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              elevation: 10,
+              overflow: 'visible',
+            };
+          })(route),
+        })}
       />
       <Tab.Screen
         name="Profile"

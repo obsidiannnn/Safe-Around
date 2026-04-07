@@ -1,11 +1,12 @@
 package handlers
 
 import (
+	"math"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/obsidiannnn/Safe-Around/backend/internal/models"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -143,28 +144,59 @@ func (h *HeatmapHandler) GetRecentCrimes(c *gin.Context) {
 
 // GET /api/v1/heatmap/statistics
 func (h *HeatmapHandler) GetStatistics(c *gin.Context) {
-	lat := c.Query("lat")
-	lng := c.Query("lng")
-
-	// Get total crimes in a 1km radius for the area score
-	var crimeCount int64
-	h.db.Model(&models.CrimeIncident{}).
-		Where("ST_DWithin(location, ST_MakePoint(?, ?)::geography, 1000)", lng, lat).
-		Count(&crimeCount)
-
-	// Calculate a safety score 0-100
-	safetyScore := 100 - (crimeCount * 5)
-	if safetyScore < 0 {
-		safetyScore = 0
+	lat, latErr := strconv.ParseFloat(c.Query("lat"), 64)
+	lng, lngErr := strconv.ParseFloat(c.Query("lng"), 64)
+	if latErr != nil || lngErr != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid lat/lng parameters"})
+		return
 	}
 
-	// For testing purposes, we'll return some mock/calculated values
-	// that match the frontend AreaStats interface
+	type areaStats struct {
+		CrimeCount  int64
+		SeveritySum int64
+	}
+
+	var statsRow areaStats
+	h.db.Raw(`
+		SELECT
+			COUNT(*) AS crime_count,
+			COALESCE(SUM(severity), 0) AS severity_sum
+		FROM crime_incidents
+		WHERE ST_DWithin(location::geography, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, 1000)
+		  AND occurred_at > NOW() - INTERVAL '30 days'
+		  AND verified = true
+	`, lng, lat).Scan(&statsRow)
+
+	var nearbyUsers int64
+	h.db.Raw(`
+		SELECT COUNT(DISTINCT user_id)
+		FROM user_locations
+		WHERE ST_DWithin(location::geography, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, 1000)
+		  AND recorded_at > NOW() - INTERVAL '5 minutes'
+	`, lng, lat).Scan(&nearbyUsers)
+
+	var recentAlerts int64
+	h.db.Raw(`
+		SELECT COUNT(*)
+		FROM emergency_alerts
+		WHERE ST_DWithin(alert_location::geography, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, 1000)
+		  AND created_at > NOW() - INTERVAL '24 hours'
+		  AND alert_status IN ('active', 'responding')
+	`, lng, lat).Scan(&recentAlerts)
+
+	// Score penalizes both incident volume and severity, capped to the 0-100 UI range.
+	safetyScore := int64(math.Round(100 - (float64(statsRow.CrimeCount) * 3.5) - (float64(statsRow.SeveritySum) * 1.5)))
+	if safetyScore < 0 {
+		safetyScore = 0
+	} else if safetyScore > 100 {
+		safetyScore = 100
+	}
+
 	stats := gin.H{
 		"safetyScore":  safetyScore,
-		"nearbyUsers":  12, // Mock for now
-		"recentAlerts": crimeCount,
-		"crimeRate":    float64(crimeCount) * 0.1,
+		"nearbyUsers":  nearbyUsers,
+		"recentAlerts": recentAlerts,
+		"crimeRate":    math.Round((float64(statsRow.CrimeCount)/30.0)*10) / 10,
 		"lastUpdated":  time.Now(),
 	}
 
