@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SettingRow } from '@/components/profile/SettingRow';
+import { useNavigation } from '@react-navigation/native';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
@@ -10,6 +11,7 @@ import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { Button } from '@/components/common/Button';
 
 export const SettingsTab: React.FC = () => {
+  const navigation = useNavigation();
   const { user } = useAuthStore();
   const {
     locationSharingMode,
@@ -38,6 +40,12 @@ export const SettingsTab: React.FC = () => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>ACCOUNT SECURITY</Text>
+        <SettingRow
+          icon="key"
+          title="Change Password"
+          subtitle="Update your account password"
+          onPress={() => navigation.navigate('ChangePassword' as never)}
+        />
         <SettingRow
           icon="shield-checkmark"
           title="Phone Verification"
