@@ -18,6 +18,13 @@ type LocationService struct {
 	workerPool        int
 }
 
+type NearbyUserLocation struct {
+	UserID     uint      `json:"user_id"`
+	Latitude   float64   `json:"latitude"`
+	Longitude  float64   `json:"longitude"`
+	RecordedAt time.Time `json:"recorded_at"`
+}
+
 func NewLocationService(db *gorm.DB, redis *redis.Client, geoSvc *GeofencingService) *LocationService {
 	ls := &LocationService{
 		db:                db,
@@ -122,6 +129,34 @@ func (ls *LocationService) GetNearbyUsers(lat, lng float64, radius int) ([]uint,
 	// Note: GORM uses ? for interpolation normally over $1, $2
 	err := ls.db.Raw(query, lng, lat, radius).Scan(&userIDs).Error
 	return userIDs, err
+}
+
+func (ls *LocationService) GetNearbyUserLocations(lat, lng float64, radius int, excludeUserID uint) ([]NearbyUserLocation, error) {
+	query := `
+	WITH latest_locations AS (
+		SELECT DISTINCT ON (user_id)
+			user_id,
+			ST_Y(location::geometry) AS latitude,
+			ST_X(location::geometry) AS longitude,
+			recorded_at
+		FROM user_locations
+		WHERE recorded_at > NOW() - INTERVAL '5 minutes'
+		ORDER BY user_id, recorded_at DESC
+	)
+	SELECT user_id, latitude, longitude, recorded_at
+	FROM latest_locations
+	WHERE user_id <> ?
+	  AND ST_DWithin(
+		ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography,
+		ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography,
+		?
+	  )
+	ORDER BY recorded_at DESC
+	`
+
+	var users []NearbyUserLocation
+	err := ls.db.Raw(query, excludeUserID, lng, lat, radius).Scan(&users).Error
+	return users, err
 }
 
 func (ls *LocationService) cacheLocation(userID uint, loc models.UserLocation) {
