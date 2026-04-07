@@ -41,6 +41,12 @@ export interface BackendUser {
   phone: string;
   email?: string;
   is_phone_verified: boolean;
+  profile_picture_url?: string;
+  subscription_tier?: string;
+  total_alerts_triggered?: number;
+  people_helped_count?: number;
+  trust_level_score?: number;
+  emergency_contacts?: number;
   last_login?: string;
   created_at: string;
   updated_at: string;
@@ -60,4 +66,3 @@ export interface AuthResponse {
 export interface RegisterRequest extends SetupProfileRequest {
   phone: string;
 }
-

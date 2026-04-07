@@ -26,6 +26,7 @@ import { spacing, borderRadius, shadows } from '@/theme/spacing';
 import { useNavigation } from '@react-navigation/native';
 import CrimeHeatmapOverlay from '@/components/map/CrimeHeatmapOverlay';
 import { useAlertStore } from '@/store/alertStore';
+import { useSettingsStore } from '@/store/settingsStore';
 import { VolunteerRouteOverlay } from '@/components/map/VolunteerRouteOverlay';
 import { EmergencyTriggerModal } from '@/screens/emergency/EmergencyTriggerModal';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
@@ -62,6 +63,7 @@ export const MapDashboardScreen = () => {
   });
 
   const { createAlert, respondToAlert, activeAlert, respondersCount } = useAlertStore();
+  const { priorityAlerts } = useSettingsStore();
 
   // Pulse animation for the SOS button
   const pulseScale = useSharedValue(1);
@@ -128,6 +130,7 @@ export const MapDashboardScreen = () => {
     };
 
     const handleEmergencyAlert = (data: any) => {
+      if (!priorityAlerts) return;
       if (data.user?.user_id === useAuthStore.getState().user?.id) return;
 
       Alert.alert(
@@ -164,7 +167,7 @@ export const MapDashboardScreen = () => {
       CrimeWebSocketService.off('responder_accepted', handleResponderAccepted);
       CrimeWebSocketService.disconnect();
     };
-  }, [currentLocation]);
+  }, [currentLocation, priorityAlerts]);
 
   const fetchAreaStats = async (lat: number, lng: number) => {
     try {
@@ -179,14 +182,6 @@ export const MapDashboardScreen = () => {
   const handleNearbyUsersChange = useCallback((count: number) => {
     setLiveNearbyUsers(count);
   }, []);
-
-  const safetyColor = currentStats
-    ? currentStats.safetyScore >= 80
-      ? colors.success
-      : currentStats.safetyScore >= 60
-        ? colors.warning
-        : colors.error
-    : colors.textSecondary;
 
   const handleRegionChange = (newRegion: Region) => {
     setRegion(newRegion);
@@ -329,19 +324,6 @@ export const MapDashboardScreen = () => {
         >
           <View style={styles.onlineDot} />
           <Text style={styles.nearbyText}>{liveNearbyUsers} Active Citizens Nearby</Text>
-        </Pressable>
-      )}
-
-      {currentStats && (
-        <Pressable
-          style={[styles.safetyChip, { top: insets.top + 225 }]}
-          onPress={() => setShowAreaStatsCard(true)}
-        >
-          <View style={[styles.safetyScoreDot, { backgroundColor: safetyColor }]} />
-          <View>
-            <Text style={styles.safetyChipLabel}>Safe Score</Text>
-            <Text style={[styles.safetyChipValue, { color: safetyColor }]}>{currentStats.safetyScore}/100</Text>
-          </View>
         </Pressable>
       )}
 
@@ -654,36 +636,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.3,
     textTransform: 'uppercase',
-  },
-  safetyChip: {
-    position: 'absolute',
-    left: spacing.lg,
-    backgroundColor: colors.surfaceTranslucent,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
-    ...shadows.medium,
-    zIndex: 10,
-  },
-  safetyScoreDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: spacing.sm,
-  },
-  safetyChipLabel: {
-    fontSize: 9,
-    color: colors.textSecondary,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  safetyChipValue: {
-    fontSize: 16,
-    fontWeight: '900',
   },
 });

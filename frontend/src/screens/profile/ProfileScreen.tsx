@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { SettingsTab } from './SettingsTab';
 import { ActivityTab } from './ActivityTab';
 import { HelpTab } from './HelpTab';
 import { useAuthStore } from '@/store/authStore';
+import { profileApiService } from '@/services/api/profileApiService';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
@@ -15,8 +16,35 @@ import { fontSizes } from '@/theme/typography';
 type Tab = 'overview' | 'settings' | 'activity' | 'help';
 
 export const ProfileScreen: React.FC = () => {
-  const { user } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+
+  useEffect(() => {
+    let mounted = true;
+
+    const refreshProfile = async () => {
+      try {
+        const latestUser = await profileApiService.getProfile();
+        if (mounted) {
+          setUser(latestUser);
+        }
+      } catch (error) {
+        console.error('Failed to refresh profile stats:', error);
+      }
+    };
+
+    refreshProfile();
+    return () => {
+      mounted = false;
+    };
+  }, [setUser]);
+
+  const profileStats = useMemo(() => ({
+    totalAlerts: user?.total_alerts_triggered ?? 0,
+    helpedOthers: user?.people_helped_count ?? 0,
+    trustScore: Math.round(user?.trust_level_score ?? 0),
+    emergencyContacts: user?.emergency_contacts ?? 0,
+  }), [user]);
 
   const tabs = [
     { id: 'overview' as Tab, label: 'Overview', icon: 'person' },
@@ -28,7 +56,7 @@ export const ProfileScreen: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
-        return <ProfileOverviewTab />;
+        return <ProfileOverviewTab stats={profileStats} />;
       case 'settings':
         return <SettingsTab />;
       case 'activity':
@@ -58,16 +86,16 @@ export const ProfileScreen: React.FC = () => {
           </View>
           <View style={styles.stats}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>24</Text>
+              <Text style={styles.statValue}>{profileStats.totalAlerts}</Text>
               <Text style={styles.statLabel}>ALERTS</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>12</Text>
+              <Text style={styles.statValue}>{profileStats.helpedOthers}</Text>
               <Text style={styles.statLabel}>HELPED</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>98%</Text>
-              <Text style={styles.statLabel}>SAFETY</Text>
+              <Text style={styles.statValue}>{profileStats.trustScore}%</Text>
+              <Text style={styles.statLabel}>TRUST</Text>
             </View>
           </View>
         </View>
