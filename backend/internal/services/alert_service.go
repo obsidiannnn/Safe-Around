@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -127,7 +128,7 @@ func (s *AlertService) CreateAlert(ctx context.Context, req CreateAlertRequest) 
 		UpdateColumn("total_alerts_triggered", gorm.Expr("total_alerts_triggered + ?", 1))
 
 	// 2. Find nearby users (100m)
-	nearbyUsers, err := s.geofencingService.GetNearbyUsers(
+	nearbyUsers, err := s.geofencingService.GetDispatchCandidates(
 		req.Location.Latitude,
 		req.Location.Longitude,
 		100,
@@ -244,7 +245,7 @@ func (s *AlertService) expandRadius(alertID uuid.UUID, newRadius int) error {
 
 	// Find new users in expanded radius
 	oldRadius := alert.CurrentRadius
-	newUsers, err := s.geofencingService.GetUsersInRing(
+	newUsers, err := s.geofencingService.GetDispatchCandidatesInRing(
 		alert.AlertLocation.Latitude,
 		alert.AlertLocation.Longitude,
 		oldRadius,
@@ -277,6 +278,25 @@ func (s *AlertService) expandRadius(alertID uuid.UUID, newRadius int) error {
 }
 
 func (s *AlertService) AcceptAlert(ctx context.Context, alertID uuid.UUID, responderID uint, location models.Location) error {
+	var alert models.EmergencyAlert
+	if err := s.db.First(&alert, "id = ?", alertID).Error; err != nil {
+		return err
+	}
+
+	if alert.UserID == responderID {
+		return fmt.Errorf("requester cannot respond to their own alert")
+	}
+
+	if alert.AlertStatus != "active" && alert.AlertStatus != "responding" {
+		return fmt.Errorf("alert is no longer active")
+	}
+
+	var existingResponse models.AlertResponse
+	if err := s.db.Where("alert_id = ? AND responder_user_id = ? AND response_status IN ?", alertID, responderID, []string{"accepted", "arrived", "helping"}).
+		First(&existingResponse).Error; err == nil {
+		return fmt.Errorf("responder has already accepted this alert")
+	}
+
 	// Create response
 	response := &models.AlertResponse{
 		AlertID:           alertID,
@@ -286,6 +306,7 @@ func (s *AlertService) AcceptAlert(ctx context.Context, alertID uuid.UUID, respo
 	}
 
 	// Calculate distance and ETA
+	response.DistanceMeters = responderDistanceMeters(location, alert.AlertLocation)
 	if err := response.CalculateDistance(); err != nil {
 		return err
 	}
@@ -307,8 +328,6 @@ func (s *AlertService) AcceptAlert(ctx context.Context, alertID uuid.UUID, respo
 	s.cancelRadiusExpansion(alertID)
 
 	// Notify victim
-	var alert models.EmergencyAlert
-	s.db.First(&alert, "id = ?", alertID)
 	s.notificationService.NotifyResponderAccepted(alert.UserID, response)
 
 	var respondersCount int64
@@ -441,4 +460,16 @@ func (s *AlertService) make112Call(alert models.EmergencyAlert) (string, error) 
 	// In production, this would use Twilio Voice API to dial emergency services
 	// For now, we return a mock SID
 	return "CA" + uuid.New().String()[:32], nil
+}
+
+func responderDistanceMeters(a, b models.Location) float64 {
+	const earthRadius = 6371000.0
+	lat1 := a.Latitude * math.Pi / 180
+	lat2 := b.Latitude * math.Pi / 180
+	dLat := (b.Latitude - a.Latitude) * math.Pi / 180
+	dLng := (b.Longitude - a.Longitude) * math.Pi / 180
+	sinLat := math.Sin(dLat / 2)
+	sinLng := math.Sin(dLng / 2)
+	h := sinLat*sinLat + math.Cos(lat1)*math.Cos(lat2)*sinLng*sinLng
+	return earthRadius * 2 * math.Atan2(math.Sqrt(h), math.Sqrt(1-h))
 }
