@@ -18,6 +18,8 @@ type GeofencingService struct {
 	notificationService NotificationService
 }
 
+const responderFreshnessWindow = "2 minutes"
+
 func NewGeofencingService(db *gorm.DB, rdb *redis.Client, notifSvc NotificationService) *GeofencingService {
 	return &GeofencingService{
 		db:                  db,
@@ -43,6 +45,92 @@ func (gs *GeofencingService) GetNearbyUsers(lat, lng float64, radiusMeters int) 
 	return users, err
 }
 
+func (gs *GeofencingService) GetDispatchCandidates(lat, lng float64, radiusMeters int) ([]models.User, error) {
+	var users []models.User
+	query := `
+	WITH latest_locations AS (
+		SELECT
+			ul.user_id,
+			ul.location,
+			ul.recorded_at,
+			COALESCE(NULLIF(ul.accuracy, 0), 25) AS accuracy,
+			ROW_NUMBER() OVER (PARTITION BY ul.user_id ORDER BY ul.recorded_at DESC) AS rn
+		FROM user_locations ul
+		WHERE ul.recorded_at > NOW() - INTERVAL '` + responderFreshnessWindow + `'
+	),
+	eligible_candidates AS (
+		SELECT
+			u.*,
+			ST_Distance(
+				ll.location::geography,
+				ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography
+			) AS distance_meters,
+			EXTRACT(EPOCH FROM (NOW() - ll.recorded_at)) AS freshness_seconds,
+			ll.accuracy,
+			(
+				LEAST(60, GREATEST(0, 60 - (ST_Distance(
+					ll.location::geography,
+					ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography
+				) / 10.0))) +
+				LEAST(20, GREATEST(0, 20 - EXTRACT(EPOCH FROM (NOW() - ll.recorded_at)) / 6.0)) +
+				LEAST(15, COALESCE(u.trust_level_score, 0) / 8.0) +
+				LEAST(10, COALESCE(u.people_helped_count, 0)) -
+				LEAST(12, ll.accuracy / 15.0)
+			) AS dispatch_score
+		FROM latest_locations ll
+		JOIN users u ON u.id = ll.user_id
+		WHERE ll.rn = 1
+		  AND u.is_phone_verified = true
+		  AND ST_DWithin(
+			ll.location::geography,
+			ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography,
+			?
+		  )
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM emergency_alerts ea
+			WHERE ea.user_id = u.id
+			  AND ea.alert_status IN ('active', 'responding')
+		  )
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM alert_responses ar
+			JOIN emergency_alerts ea ON ea.id = ar.alert_id
+			WHERE ar.responder_user_id = u.id
+			  AND ar.response_status IN ('accepted', 'arrived', 'helping')
+			  AND ea.alert_status IN ('active', 'responding')
+		  )
+	)
+	SELECT
+		id,
+		name,
+		phone,
+		email,
+		password,
+		is_phone_verified,
+		subscription_tier,
+		total_alerts_triggered,
+		people_helped_count,
+		trust_level_score,
+		profile_picture_url,
+		last_login,
+		created_at,
+		updated_at,
+		deleted_at
+	FROM eligible_candidates
+	ORDER BY dispatch_score DESC, distance_meters ASC, freshness_seconds ASC
+	LIMIT ?
+	`
+	err := gs.db.Raw(
+		query,
+		lng, lat,
+		lng, lat,
+		lng, lat, radiusMeters,
+		gs.getDispatchLimit(radiusMeters),
+	).Scan(&users).Error
+	return users, err
+}
+
 // GetUsersInRing finds users between oldRadius and newRadius
 func (gs *GeofencingService) GetUsersInRing(lat, lng float64, oldRadius, newRadius int) ([]models.User, error) {
 	var users []models.User
@@ -55,6 +143,111 @@ func (gs *GeofencingService) GetUsersInRing(lat, lng float64, oldRadius, newRadi
 	`
 	err := gs.db.Raw(query, lng, lat, newRadius, lng, lat, oldRadius).Scan(&users).Error
 	return users, err
+}
+
+func (gs *GeofencingService) GetDispatchCandidatesInRing(lat, lng float64, oldRadius, newRadius int) ([]models.User, error) {
+	var users []models.User
+	query := `
+	WITH latest_locations AS (
+		SELECT
+			ul.user_id,
+			ul.location,
+			ul.recorded_at,
+			COALESCE(NULLIF(ul.accuracy, 0), 25) AS accuracy,
+			ROW_NUMBER() OVER (PARTITION BY ul.user_id ORDER BY ul.recorded_at DESC) AS rn
+		FROM user_locations ul
+		WHERE ul.recorded_at > NOW() - INTERVAL '` + responderFreshnessWindow + `'
+	),
+	eligible_candidates AS (
+		SELECT
+			u.*,
+			ST_Distance(
+				ll.location::geography,
+				ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography
+			) AS distance_meters,
+			EXTRACT(EPOCH FROM (NOW() - ll.recorded_at)) AS freshness_seconds,
+			ll.accuracy,
+			(
+				LEAST(60, GREATEST(0, 60 - (ST_Distance(
+					ll.location::geography,
+					ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography
+				) / 10.0))) +
+				LEAST(20, GREATEST(0, 20 - EXTRACT(EPOCH FROM (NOW() - ll.recorded_at)) / 6.0)) +
+				LEAST(15, COALESCE(u.trust_level_score, 0) / 8.0) +
+				LEAST(10, COALESCE(u.people_helped_count, 0)) -
+				LEAST(12, ll.accuracy / 15.0)
+			) AS dispatch_score
+		FROM latest_locations ll
+		JOIN users u ON u.id = ll.user_id
+		WHERE ll.rn = 1
+		  AND u.is_phone_verified = true
+		  AND ST_DWithin(
+			ll.location::geography,
+			ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography,
+			?
+		  )
+		  AND NOT ST_DWithin(
+			ll.location::geography,
+			ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography,
+			?
+		  )
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM emergency_alerts ea
+			WHERE ea.user_id = u.id
+			  AND ea.alert_status IN ('active', 'responding')
+		  )
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM alert_responses ar
+			JOIN emergency_alerts ea ON ea.id = ar.alert_id
+			WHERE ar.responder_user_id = u.id
+			  AND ar.response_status IN ('accepted', 'arrived', 'helping')
+			  AND ea.alert_status IN ('active', 'responding')
+		  )
+	)
+	SELECT
+		id,
+		name,
+		phone,
+		email,
+		password,
+		is_phone_verified,
+		subscription_tier,
+		total_alerts_triggered,
+		people_helped_count,
+		trust_level_score,
+		profile_picture_url,
+		last_login,
+		created_at,
+		updated_at,
+		deleted_at
+	FROM eligible_candidates
+	ORDER BY dispatch_score DESC, distance_meters ASC, freshness_seconds ASC
+	LIMIT ?
+	`
+	err := gs.db.Raw(
+		query,
+		lng, lat,
+		lng, lat,
+		lng, lat, newRadius,
+		lng, lat, oldRadius,
+		gs.getDispatchLimit(newRadius),
+	).Scan(&users).Error
+	return users, err
+}
+
+func (gs *GeofencingService) getDispatchLimit(radiusMeters int) int {
+	switch {
+	case radiusMeters <= 100:
+		return 12
+	case radiusMeters <= 250:
+		return 20
+	case radiusMeters <= 500:
+		return 30
+	default:
+		return 40
+	}
 }
 
 func (gs *GeofencingService) CheckDangerZone(lat, lng float64) (*models.DangerZone, error) {

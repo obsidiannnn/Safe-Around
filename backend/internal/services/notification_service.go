@@ -111,7 +111,7 @@ func (s *notifService) SendSMS(phone, message string) error {
 		return nil
 	}
 	fromNum := os.Getenv("TWILIO_FROM")
-	_, err := s.twilio.MakeCall(phone, fromNum, message) // reuse MakeCall for standalone SMS via TwiML
+	_, err := s.twilio.SendSMS(phone, fromNum, message)
 	if err != nil {
 		logger.Warn("SMS send failed", zap.String("phone", phone), zap.Error(err))
 	}
@@ -248,8 +248,7 @@ func (s *notifService) NotifyEmergencyContacts(userID uint, alert *models.Emerge
 
 		// 2. Always send SMS backup (as requested: "message will be triggered")
 		go func(phone string) {
-			fromNum := os.Getenv("TWILIO_FROM")
-			if _, err := s.twilio.MakeCall(phone, fromNum, msgText); err != nil {
+			if err := s.SendSMS(phone, msgText); err != nil {
 				logger.Warn("Emergency contact SMS/Call failed", zap.String("phone", phone), zap.Error(err))
 			}
 		}(contact.Phone)
@@ -352,8 +351,7 @@ func (s *notifService) smsFallback(task *notificationTask) {
 	if err := s.db.First(&user, task.UserID).Error; err != nil || user.Phone == "" {
 		return
 	}
-	fromNum := os.Getenv("TWILIO_FROM")
-	if _, err := s.twilio.MakeCall(user.Phone, fromNum, task.Body); err != nil {
+	if err := s.SendSMS(user.Phone, task.Body); err != nil {
 		logger.Warn("SMS fallback failed", zap.Uint("userID", task.UserID), zap.Error(err))
 	}
 }
