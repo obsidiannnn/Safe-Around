@@ -29,6 +29,11 @@ export interface SetupProfileRequest {
   password: string;
 }
 
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+}
+
 // Backend: POST /api/v1/auth/refresh
 export interface RefreshRequest {
   refresh_token: string;

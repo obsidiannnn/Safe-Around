@@ -15,14 +15,18 @@ export const SettingsTab: React.FC = () => {
   const { user } = useAuthStore();
   const {
     locationSharingMode,
-    batteryOptimization,
+    dangerZoneWarningDistance,
     priorityAlerts,
     shakeToSOS,
-    setBatteryOptimization,
+    setLocationSharingMode,
+    setDangerZoneWarningDistance,
     setPriorityAlerts,
     setShakeToSOS,
   } = useSettingsStore();
   const { logOut } = useAuth();
+  const nextLocationMode = locationSharingMode === 'always' ? 'alerts_only' : locationSharingMode === 'alerts_only' ? 'never' : 'always';
+  const locationModeLabel = locationSharingMode === 'always' ? 'Always share live location' : locationSharingMode === 'alerts_only' ? 'Only share during SOS alerts' : 'Do not share live location';
+  const nextWarningDistance = dangerZoneWarningDistance === 250 ? 500 : dangerZoneWarningDistance === 500 ? 1000 : 250;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -39,6 +43,7 @@ export const SettingsTab: React.FC = () => {
         <SettingRow
           icon="key"
           title="Change Password"
+          subtitle="Update your account password"
           onPress={() => navigation.navigate('ChangePassword' as never)}
         />
         <SettingRow
@@ -48,11 +53,6 @@ export const SettingsTab: React.FC = () => {
           rightElement="text"
           rightValue={user?.is_phone_verified ? 'Verified' : 'Pending'}
         />
-        <SettingRow
-          icon="trash"
-          title="Delete My Records"
-          onPress={() => navigation.navigate('DeleteAccount' as never)}
-        />
       </View>
 
       <View style={styles.section}>
@@ -60,15 +60,18 @@ export const SettingsTab: React.FC = () => {
         <SettingRow
           icon="location"
           title="Live Location Sharing"
-          subtitle={locationSharingMode}
-          onPress={() => navigation.navigate('PrivacySettings' as never)}
+          subtitle={locationModeLabel}
+          rightElement="text"
+          rightValue={locationSharingMode === 'always' ? 'Always' : locationSharingMode === 'alerts_only' ? 'SOS Only' : 'Off'}
+          onPress={() => setLocationSharingMode(nextLocationMode)}
         />
-        <SettingRow 
-          icon="battery-charging" 
-          title="Battery Optimization" 
-          rightElement="toggle" 
-          rightValue={batteryOptimization}
-          onToggle={setBatteryOptimization}
+        <SettingRow
+          icon="shield"
+          title="Danger Zone Warnings"
+          subtitle="Tap to cycle alert distance"
+          rightElement="text"
+          rightValue={`${dangerZoneWarningDistance}m`}
+          onPress={() => setDangerZoneWarningDistance(nextWarningDistance)}
         />
       </View>
 
@@ -77,7 +80,7 @@ export const SettingsTab: React.FC = () => {
         <SettingRow
           icon="notifications"
           title="Priority Alerts"
-          subtitle="Notify you for nearby emergency alerts"
+          subtitle={priorityAlerts ? 'Nearby emergency alerts are active' : 'Nearby emergency alerts are paused'}
           rightElement="toggle"
           rightValue={priorityAlerts}
           onToggle={setPriorityAlerts}
@@ -85,7 +88,7 @@ export const SettingsTab: React.FC = () => {
         <SettingRow
           icon="phone-portrait"
           title="Shake to SOS"
-          subtitle="Trigger SOS from shake detection when enabled"
+          subtitle={shakeToSOS ? 'Shake detection is active' : 'Shake detection is off'}
           rightElement="toggle"
           rightValue={shakeToSOS}
           onToggle={setShakeToSOS}

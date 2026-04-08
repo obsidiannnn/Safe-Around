@@ -6,4 +6,5 @@ export { ResponderNavigationScreen } from './ResponderNavigationScreen';
 export { EmergencyResolutionScreen } from './EmergencyResolutionScreen';
 export { ResponderListScreen } from './ResponderListScreen';
 export { AlertHistoryScreen } from './AlertHistoryScreen';
+export { AlertDetailScreen } from './AlertDetailScreen';
 export { ChatScreen } from './ChatScreen';

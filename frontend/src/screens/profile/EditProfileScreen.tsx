@@ -5,13 +5,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/authStore';
+import { profileApiService } from '@/services/api/profileApiService';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
 
 export const EditProfileScreen = () => {
   const navigation = useNavigation();
-  const { user, updateProfile } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
@@ -21,7 +22,8 @@ export const EditProfileScreen = () => {
   const handleSave = async () => {
     setLoading(true);
     try {
-      await updateProfile({ name, email } as any);
+      const updatedUser = await profileApiService.updateProfile({ name, email });
+      setUser(updatedUser);
       navigation.goBack();
     } catch (error) {
       console.error('Update Profile Error:', error);

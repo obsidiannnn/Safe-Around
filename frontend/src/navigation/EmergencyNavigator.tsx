@@ -8,14 +8,16 @@ import { EmergencyResolutionScreen } from '@/screens/emergency/EmergencyResoluti
 import { ResponderListScreen } from '@/screens/emergency/ResponderListScreen';
 import { ResponderNavigationScreen } from '@/screens/emergency/ResponderNavigationScreen';
 import { ChatScreen } from '@/screens/emergency/ChatScreen';
+import { AlertDetailScreen } from '@/screens/emergency/AlertDetailScreen';
 
-const Stack = createStackNavigator();
+const Stack = createStackNavigator<any>();
 
 export const EmergencyNavigator = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="EmergencyDashboard" component={EmergencyScreen} />
       <Stack.Screen name="AlertHistory" component={AlertHistoryScreen} />
+      <Stack.Screen name="AlertDetail" component={AlertDetailScreen} />
       <Stack.Screen name="EmergencyContacts" component={EmergencyContactsManagementScreen} />
       <Stack.Screen name="EmergencyActive" component={EmergencyActiveScreen} />
       <Stack.Screen name="EmergencyResolution" component={EmergencyResolutionScreen} />

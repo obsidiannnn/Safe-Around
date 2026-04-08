@@ -4,6 +4,7 @@ import {
   VerifyOTPRequest,
   LoginRequest,
   SetupProfileRequest,
+  ChangePasswordRequest,
   AuthResponse,
   BackendUser,
 } from '@/types/api';
@@ -33,9 +34,14 @@ export const authService = {
   },
 
   async updateProfile(data: Partial<SetupProfileRequest>, token: string) {
-    const response = await apiClient.patch('/users/profile', data, {
+    const response = await apiClient.put('/users/profile', data, {
       headers: { Authorization: `Bearer ${token}` }
     });
+    return response.data;
+  },
+
+  changePassword: async (data: ChangePasswordRequest): Promise<{ message: string }> => {
+    const response = await apiClient.post<{ message: string }>('/auth/password/change', data);
     return response.data;
   },
 
@@ -58,4 +64,3 @@ export const authService = {
     return response.data.tokens;
   },
 };
-

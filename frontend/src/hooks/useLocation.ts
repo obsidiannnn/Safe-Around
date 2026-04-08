@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { useLocationStore } from '@/store/locationStore';
 import { locationService } from '@/services/location/locationService';
 import { locationApiService } from '@/services/api/locationApiService';
+import { useAlertStore } from '@/store/alertStore';
+import { useSettingsStore } from '@/store/settingsStore';
 
 /**
  * Custom hook for location tracking and management
@@ -19,6 +21,8 @@ export const useLocation = () => {
     addToHistory,
     setHeading,
   } = useLocationStore();
+  const { isAlertActive } = useAlertStore();
+  const { locationSharingMode } = useSettingsStore();
 
   const startTracking = async () => {
     const hasPermission = await locationService.requestPermissions();
@@ -83,14 +87,15 @@ export const useLocation = () => {
 
       // Sync to backend
       const now = Date.now();
-      if (now - lastSyncTime > SYNC_INTERVALMs) {
+      const canShareLocation = locationSharingMode === 'always' || (locationSharingMode === 'alerts_only' && isAlertActive);
+      if (canShareLocation && now - lastSyncTime > SYNC_INTERVALMs) {
         locationApiService.updateLocation(location);
         lastSyncTime = now;
       }
     });
 
     return () => subscription.remove();
-  }, [isTracking]);
+  }, [isTracking, isAlertActive, locationSharingMode]);
 
   return {
     currentLocation,

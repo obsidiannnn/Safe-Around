@@ -3,10 +3,14 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { ProfileScreen } from '@/screens/profile/ProfileScreen';
 import { EditProfileScreen } from '../screens/profile/EditProfileScreen';
 import { EmergencyContactsManagementScreen } from '../screens/profile/EmergencyContactsManagementScreen';
+import { ChangePasswordScreen } from '@/screens/profile/ChangePasswordScreen';
+import { PrivacySettingsScreen } from '@/screens/profile/PrivacySettingsScreen';
+import { NotificationSettingsScreen } from '@/screens/profile/NotificationSettingsScreen';
 import { AlertHistoryScreen } from '../screens/emergency/AlertHistoryScreen';
+import { AlertDetailScreen } from '@/screens/emergency/AlertDetailScreen';
 import { colors } from '@/theme/colors';
 
-const Stack = createStackNavigator();
+const Stack = createStackNavigator<any>();
 
 export const ProfileNavigator = () => {
   return (
@@ -19,7 +23,11 @@ export const ProfileNavigator = () => {
       <Stack.Screen name="ProfileMain" component={ProfileScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="EmergencyContacts" component={EmergencyContactsManagementScreen} />
+      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+      <Stack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />
+      <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
       <Stack.Screen name="AlertHistory" component={AlertHistoryScreen} />
+      <Stack.Screen name="AlertDetail" component={AlertDetailScreen} />
     </Stack.Navigator>
   );
 };

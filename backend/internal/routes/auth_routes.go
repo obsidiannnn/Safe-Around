@@ -16,5 +16,6 @@ func SetupAuthRoutes(r *gin.RouterGroup, h *handlers.AuthHandler) {
 	protected := auth.Group("")
 	protected.Use(middleware.AuthRequired())
 	protected.POST("/password/setup", h.SetupProfile)
+	protected.POST("/password/change", h.ChangePassword)
 	protected.POST("/logout", h.Logout)
 }

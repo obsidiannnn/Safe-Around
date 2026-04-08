@@ -14,6 +14,7 @@ import { colors } from '@/theme/colors';
 import { spacing, borderRadius } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
 import { profileApiService } from '@/services/api/profileApiService';
+import { useUserStore } from '@/store/userStore';
 
 /**
  * Emergency contacts management screen
@@ -21,6 +22,7 @@ import { profileApiService } from '@/services/api/profileApiService';
  */
 export const EmergencyContactsManagementScreen = () => {
   const navigation = useNavigation();
+  const { setEmergencyContacts } = useUserStore();
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [isPrimary, setIsPrimary] = useState(false);
@@ -51,6 +53,7 @@ export const EmergencyContactsManagementScreen = () => {
         isPrimary: contact.is_priority ?? contact.isPrimary,
       }));
       setContacts(mappedContacts);
+      setEmergencyContacts(mappedContacts);
     } catch (error) {
       console.error('Failed to load contacts:', error);
       RNAlert.alert('Error', 'Failed to load emergency contacts');
@@ -69,7 +72,7 @@ export const EmergencyContactsManagementScreen = () => {
       setSubmitting(true);
       await profileApiService.addContact({
         name: data.name,
-        phone: data.phoneNumber,
+        phone: data.phone,
         relationship: data.relationship,
         is_priority: contacts.length === 0 ? true : isPrimary,
       });
@@ -200,13 +203,13 @@ export const EmergencyContactsManagementScreen = () => {
 
             <Controller
               control={control}
-              name="phoneNumber"
+              name="phone"
               render={({ field: { onChange, value } }) => (
                 <PhoneInput
                   label="Phone Number"
                   value={value}
                   onChangeText={onChange}
-                  error={errors.phoneNumber?.message}
+                  error={errors.phone?.message}
                 />
               )}
             />

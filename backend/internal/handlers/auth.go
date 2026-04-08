@@ -42,6 +42,11 @@ type setupProfileInput struct {
 	Password string `json:"password" binding:"required,min=6"`
 }
 
+type changePasswordInput struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password" binding:"required,min=8"`
+}
+
 func normalizePhone(phone string) string {
 	phone = strings.TrimSpace(phone)
 	if len(phone) == 10 {
@@ -77,7 +82,7 @@ func (h *AuthHandler) SendOTP(c *gin.Context) {
 	}
 
 	input.Phone = normalizePhone(input.Phone)
-	
+
 	// If this is explicitly from the Signup flow, block if they already have a password
 	if c.Query("type") == "signup" {
 		if u, err := h.repo.GetByPhone(input.Phone); err == nil && u.Password != "" {
@@ -98,7 +103,6 @@ func (h *AuthHandler) SendOTP(c *gin.Context) {
 
 	h.redis.Incr(ctx, rlKey)
 	h.redis.Expire(ctx, rlKey, 10*time.Minute)
-
 
 	_, err := h.twilio.SendOTP(input.Phone, verifySID)
 	if err != nil {
@@ -202,6 +206,57 @@ func (h *AuthHandler) SetupProfile(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "profile securely set up", "user": u})
+}
+
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	var input changePasswordInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "new password is required"})
+		return
+	}
+
+	u, err := h.repo.GetByID(userID.(uint))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	if u.Password != "" {
+		if strings.TrimSpace(input.CurrentPassword) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "current password is required"})
+			return
+		}
+
+		if !utils.ComparePassword(u.Password, input.CurrentPassword) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "current password is incorrect"})
+			return
+		}
+
+		if utils.ComparePassword(u.Password, input.NewPassword) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "please choose a new password different from your current password"})
+			return
+		}
+	}
+
+	hash, err := utils.HashPassword(input.NewPassword)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not secure password"})
+		return
+	}
+
+	u.Password = hash
+	if err := h.repo.Update(u); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to change password"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "password changed successfully"})
 }
 
 // Login permits direct phone/password login skipping OTP for fully set-up users

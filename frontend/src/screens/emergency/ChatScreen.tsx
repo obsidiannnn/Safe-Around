@@ -21,11 +21,7 @@ interface Message {
   status: 'sending' | 'sent' | 'read';
 }
 
-interface ChatScreenProps {
-  route: { params: { alertId: string; roomId: string } };
-}
-
-export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
+export const ChatScreen: React.FC<any> = ({ route }) => {
   const { alertId, roomId } = route.params;
   const { user } = useAuthStore();
   const { send, subscribe, unsubscribe, connectionStatus } = useWebSocket();
@@ -53,7 +49,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
     };
 
     const handleTyping = (data: { user_id: string; user_name: string }) => {
-      if (data.user_id !== user?.id) {
+      if (data.user_id !== String(user?.id ?? '')) {
         setTypingUser(data.user_name);
         setIsTyping(true);
         setTimeout(() => setIsTyping(false), 3000);
@@ -75,8 +71,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
 
     const message: Message = {
       id: Date.now().toString(),
-      senderId: user?.id || '',
-      senderName: `${user?.firstName} ${user?.lastName}`,
+      senderId: String(user?.id ?? ''),
+      senderName: user?.name || 'SafeAround user',
       message: inputText,
       messageType: 'text',
       timestamp: Date.now(),
@@ -113,7 +109,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
           renderItem={({ item }) => (
             <MessageBubble
               message={item}
-              isOwn={item.senderId === user?.id}
+              isOwn={item.senderId === String(user?.id ?? '')}
             />
           )}
           contentContainerStyle={styles.messageList}
