@@ -143,12 +143,13 @@ func (h *CrimeHub) BroadcastResponderAccepted(alertID uuid.UUID, response *model
 	})
 }
 
-func (h *CrimeHub) BroadcastRadiusExpanded(alertID uuid.UUID, oldRadius, newRadius int) {
+func (h *CrimeHub) BroadcastRadiusExpanded(alertID uuid.UUID, oldRadius, newRadius, usersNotified int) {
 	h.broadcastEvent("radius_expanded", map[string]interface{}{
-		"alert_id":   alertID.String(),
-		"old_radius": oldRadius,
-		"new_radius": newRadius,
-		"timestamp":  time.Now().UTC(),
+		"alert_id":       alertID.String(),
+		"old_radius":     oldRadius,
+		"new_radius":     newRadius,
+		"users_notified": usersNotified,
+		"timestamp":      time.Now().UTC(),
 	})
 }
 

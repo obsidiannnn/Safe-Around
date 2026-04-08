@@ -31,6 +31,15 @@ type AlertService struct {
 	schedulers          sync.Map // alert_id -> *time.Timer
 }
 
+const indiaEmergencyNumber = "112"
+
+type AlertDetails struct {
+	Alert           models.EmergencyAlert       `json:"alert"`
+	Timeline        []models.AlertTimelineEvent `json:"timeline"`
+	RespondersCount int64                       `json:"responders_count"`
+	EmergencyNumber string                      `json:"emergency_number"`
+}
+
 func NewAlertService(db *gorm.DB, rdb *redis.Client, gs *GeofencingService, ns NotificationService, wh customWS.AlertBroadcaster) *AlertService {
 	return &AlertService{
 		db:                  db,
@@ -57,6 +66,38 @@ func (s *AlertService) GetActiveAlerts(ctx context.Context) ([]models.EmergencyA
 	return alerts, nil
 }
 
+func (s *AlertService) GetAlertDetails(ctx context.Context, alertID uuid.UUID, userID uint) (*AlertDetails, error) {
+	var alert models.EmergencyAlert
+	if err := s.db.WithContext(ctx).
+		Where("id = ? AND user_id = ?", alertID, userID).
+		First(&alert).Error; err != nil {
+		return nil, err
+	}
+
+	var timeline []models.AlertTimelineEvent
+	if err := s.db.WithContext(ctx).
+		Where("alert_id = ?", alertID).
+		Order("occurred_at ASC").
+		Find(&timeline).Error; err != nil {
+		return nil, err
+	}
+
+	var respondersCount int64
+	if err := s.db.WithContext(ctx).
+		Model(&models.AlertResponse{}).
+		Where("alert_id = ? AND response_status = ?", alertID, "accepted").
+		Count(&respondersCount).Error; err != nil {
+		return nil, err
+	}
+
+	return &AlertDetails{
+		Alert:           alert,
+		Timeline:        timeline,
+		RespondersCount: respondersCount,
+		EmergencyNumber: indiaEmergencyNumber,
+	}, nil
+}
+
 func (s *AlertService) CreateAlert(ctx context.Context, req CreateAlertRequest) (*models.EmergencyAlert, error) {
 	metadata := req.Metadata
 	if metadata != "" && !json.Valid([]byte(metadata)) {
@@ -69,12 +110,13 @@ func (s *AlertService) CreateAlert(ctx context.Context, req CreateAlertRequest) 
 
 	// 1. Create alert record
 	alert := &models.EmergencyAlert{
-		UserID:        req.UserID,
-		AlertLocation: req.Location,
-		AlertType:     req.AlertType,
-		SilentMode:    req.SilentMode,
-		Metadata:      metadata,
-		CurrentRadius: 100,
+		UserID:          req.UserID,
+		AlertLocation:   req.Location,
+		AlertType:       req.AlertType,
+		SilentMode:      req.SilentMode,
+		Metadata:        metadata,
+		CurrentRadius:   100,
+		EmergencyNumber: indiaEmergencyNumber,
 	}
 
 	if err := s.db.Create(alert).Error; err != nil {
@@ -224,11 +266,11 @@ func (s *AlertService) expandRadius(alertID uuid.UUID, newRadius int) error {
 	s.db.Save(&alert)
 
 	// Log timeline
-	s.logTimelineEvent(alertID, "radius_expanded", newRadius, len(newUsers), int(responderCount))
+	s.logTimelineEvent(alertID, "radius_expanded", newRadius, alert.UsersNotified, int(responderCount))
 
 	// Broadcast via WebSocket
 	if s.websocketHub != nil {
-		s.websocketHub.BroadcastRadiusExpanded(alertID, oldRadius, newRadius)
+		s.websocketHub.BroadcastRadiusExpanded(alertID, oldRadius, newRadius, alert.UsersNotified)
 	}
 
 	return nil
@@ -269,10 +311,17 @@ func (s *AlertService) AcceptAlert(ctx context.Context, alertID uuid.UUID, respo
 	s.db.First(&alert, "id = ?", alertID)
 	s.notificationService.NotifyResponderAccepted(alert.UserID, response)
 
+	var respondersCount int64
+	s.db.Model(&models.AlertResponse{}).
+		Where("alert_id = ? AND response_status = ?", alertID, "accepted").
+		Count(&respondersCount)
+
 	// Broadcast via WebSocket
 	if s.websocketHub != nil {
 		s.websocketHub.BroadcastResponderAccepted(alertID, response)
 	}
+
+	s.logTimelineEvent(alertID, "responder_accepted", alert.CurrentRadius, alert.UsersNotified, int(respondersCount))
 
 	return nil
 }
@@ -350,8 +399,8 @@ func (s *AlertService) EscalateToEmergencyServices(alertID uuid.UUID, escalation
 		return err
 	}
 
-	// Make 911 call via Twilio (mock implementation for safe testing)
-	callSID, err := s.make911Call(alert)
+	// Make 112 call via Twilio (mock implementation for safe testing)
+	callSID, err := s.make112Call(alert)
 	if err != nil {
 		return err
 	}
@@ -388,7 +437,7 @@ func (s *AlertService) getUserInfo(userID uint) string {
 	return fmt.Sprintf("Name: %s, Phone: %s", user.Name, user.Phone)
 }
 
-func (s *AlertService) make911Call(alert models.EmergencyAlert) (string, error) {
+func (s *AlertService) make112Call(alert models.EmergencyAlert) (string, error) {
 	// In production, this would use Twilio Voice API to dial emergency services
 	// For now, we return a mock SID
 	return "CA" + uuid.New().String()[:32], nil

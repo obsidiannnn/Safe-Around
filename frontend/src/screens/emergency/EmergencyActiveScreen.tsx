@@ -1,194 +1,300 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Linking, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { Button } from '@/components/common';
-import { AlertTimeline } from '@/components/emergency/AlertTimeline';
+import { alertService } from '@/services/api/alertService';
 import { useAlertStore } from '@/store/alertStore';
-import { useWebSocket } from '@/hooks/useWebSocket';
-import { useRealtimeLocation } from '@/hooks/useRealtimeLocation';
+import { AlertDetails } from '@/types/models';
 import { colors } from '@/theme/colors';
-import { spacing, borderRadius } from '@/theme/spacing';
+import { borderRadius, spacing } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
+import { formatDateTime } from '@/utils/formatters';
 
-interface RadiusExpansion {
-  radius: number;
-  time: number;
-  status: 'completed' | 'in-progress' | 'pending';
-  usersNotified: number;
-}
+const RADIUS_STEPS = [
+  { radius: 100, offsetSeconds: 0 },
+  { radius: 250, offsetSeconds: 30 },
+  { radius: 500, offsetSeconds: 60 },
+  { radius: 1000, offsetSeconds: 90 },
+];
 
-/**
- * Emergency active screen showing alert status and responders
- * Real-time updates via WebSocket
- */
 export const EmergencyActiveScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { activeAlert, currentRadius, respondersCount, resolveAlert, cancelAlert } = useAlertStore();
-  const { subscribe, unsubscribe } = useWebSocket();
-  const { isStreaming } = useRealtimeLocation(activeAlert?.id || null);
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [expansions, setExpansions] = useState<RadiusExpansion[]>([
-    { radius: 100, time: 0, status: 'completed', usersNotified: 8 },
-    { radius: 250, time: 30, status: 'in-progress', usersNotified: 0 },
-    { radius: 500, time: 60, status: 'pending', usersNotified: 0 },
-    { radius: 1000, time: 90, status: 'pending', usersNotified: 0 },
-  ]);
-
   const scale = useSharedValue(1);
+  const {
+    activeAlert,
+    setActiveAlert,
+    setCurrentRadius,
+    setRespondersCount,
+    resolveAlert,
+    cancelAlert,
+  } = useAlertStore();
+  const [details, setDetails] = useState<AlertDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
 
   useEffect(() => {
-    scale.value = withRepeat(
-      withTiming(1.2, { duration: 1000 }),
-      -1,
-      true
-    );
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setElapsedTime((prev) => prev + 1);
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    // Listen for WebSocket updates
-    const handleResponder = (data: any) => {
-      console.log('New responder:', data);
-    };
-
-    const handleRadiusExpanded = (data: any) => {
-      console.log('Radius expanded:', data);
-      setExpansions((prev) =>
-        prev.map((exp) =>
-          exp.radius === data.new_radius
-            ? { ...exp, status: 'completed', usersNotified: data.users_notified }
-            : exp
-        )
-      );
-    };
-
-    subscribe('responder_accepted', handleResponder);
-    subscribe('radius_expanded', handleRadiusExpanded);
-
-    return () => {
-      unsubscribe('responder_accepted', handleResponder);
-      unsubscribe('radius_expanded', handleRadiusExpanded);
-    };
-  }, [subscribe, unsubscribe]);
+    scale.value = withRepeat(withTiming(1.16, { duration: 1100 }), -1, true);
+  }, [scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
-  const formatTime = (seconds: number): string => {
+  const loadAlertDetails = useCallback(async (showRefresh = false) => {
+    if (!activeAlert?.id) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      if (showRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      const nextDetails = await alertService.getAlertDetails(activeAlert.id);
+      setDetails(nextDetails);
+      setActiveAlert(nextDetails.alert);
+      setCurrentRadius(nextDetails.alert.currentRadius ?? 100);
+      setRespondersCount(nextDetails.respondersCount ?? 0);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [activeAlert?.id, setActiveAlert, setCurrentRadius, setRespondersCount]);
+
+  useEffect(() => {
+    loadAlertDetails();
+  }, [loadAlertDetails]);
+
+  useEffect(() => {
+    if (!activeAlert?.id) {
+      return;
+    }
+
+    const poller = setInterval(() => {
+      loadAlertDetails(true);
+    }, 5000);
+
+    return () => clearInterval(poller);
+  }, [activeAlert?.id, loadAlertDetails]);
+
+  useEffect(() => {
+    const sourceDate = details?.alert.createdAt ?? activeAlert?.createdAt;
+    if (!sourceDate) {
+      setElapsedTime(0);
+      return;
+    }
+
+    const updateElapsed = () => {
+      const diffSeconds = Math.max(
+        0,
+        Math.floor((Date.now() - new Date(sourceDate).getTime()) / 1000),
+      );
+      setElapsedTime(diffSeconds);
+    };
+
+    updateElapsed();
+    const timer = setInterval(updateElapsed, 1000);
+    return () => clearInterval(timer);
+  }, [details?.alert.createdAt, activeAlert?.createdAt]);
+
+  const currentAlert = details?.alert ?? activeAlert;
+  const emergencyNumber = details?.emergencyNumber ?? currentAlert?.emergencyNumber ?? '112';
+  const respondersCount = details?.respondersCount ?? 0;
+  const currentRadius = currentAlert?.currentRadius ?? 100;
+  const usersNotified = currentAlert?.usersNotified ?? 0;
+  const hasResponder = respondersCount > 0 || currentAlert?.status === 'responding';
+  const callButtonLabel = `Call ${emergencyNumber}`;
+
+  const timeline = useMemo(() => {
+    return RADIUS_STEPS.map((step, index) => {
+      const isReached = currentRadius >= step.radius;
+      const nextStep = RADIUS_STEPS[index + 1];
+      const timeUntilNext = nextStep
+        ? Math.max(0, nextStep.offsetSeconds - elapsedTime)
+        : 0;
+
+      let status: 'completed' | 'active' | 'pending' = 'pending';
+      if (isReached) {
+        status = 'completed';
+      } else if (!hasResponder && elapsedTime >= step.offsetSeconds) {
+        status = 'active';
+      }
+
+      return {
+        ...step,
+        status,
+        helperText: isReached
+          ? `${usersNotified} users notified so far`
+          : hasResponder
+          ? 'Search paused because a responder accepted'
+          : nextStep
+          ? `Next expansion in ${timeUntilNext}s`
+          : `Escalates to ${emergencyNumber} if still unanswered`,
+      };
+    });
+  }, [currentRadius, elapsedTime, emergencyNumber, hasResponder, usersNotified]);
+
+  const formatElapsed = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleSafe = async () => {
-    if (activeAlert) {
-      try {
-        await resolveAlert(activeAlert.id);
-        navigation.navigate('EmergencyResolution' as never);
-      } catch (error) {
-        console.error('Error resolving alert:', error);
-      }
+    if (!currentAlert) {
+      return;
+    }
+
+    try {
+      await resolveAlert(currentAlert.id);
+      navigation.navigate('EmergencyResolution' as never);
+    } catch (error) {
+      console.error('Error resolving alert:', error);
     }
   };
 
   const handleCancel = async () => {
-    if (activeAlert) {
-      try {
-        await cancelAlert(activeAlert.id);
-        navigation.goBack();
-      } catch (error) {
-        console.error('Error cancelling alert:', error);
-      }
+    if (!currentAlert) {
+      return;
     }
+
+    try {
+      await cancelAlert(currentAlert.id);
+      navigation.goBack();
+    } catch (error) {
+      console.error('Error cancelling alert:', error);
+    }
+  };
+
+  const handleCallEmergency = async () => {
+    await Linking.openURL(`tel:${emergencyNumber}`);
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <Animated.View style={animatedStyle}>
-          <Icon name="warning" size={80} color={colors.surface} />
-        </Animated.View>
-        <Text style={styles.title}>EMERGENCY ALERT ACTIVE</Text>
-        <Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.radiusCard}>
-          <Text style={styles.radiusTitle}>Notifying users within</Text>
-          <Text style={styles.radiusValue}>{currentRadius}m</Text>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.lg) }]}>
+        <View style={styles.headerTopRow}>
+          <View style={styles.liveBadge}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveBadgeText}>SOS LIVE</Text>
+          </View>
+          <Button variant="ghost" size="small" onPress={() => loadAlertDetails(true)} icon="refresh">
+            Refresh
+          </Button>
         </View>
 
-        <View style={styles.timeline}>
-          {expansions.map((expansion, index) => (
-            <View key={index} style={styles.timelineItem}>
-              <View style={styles.timelineIconContainer}>
+        <Animated.View style={[styles.heroIcon, animatedStyle]}>
+          <Icon name="warning-amber" size={72} color={colors.surface} />
+        </Animated.View>
+        <Text style={styles.title}>Emergency Alert Active</Text>
+        <Text style={styles.subtitle}>
+          Live location is being shared and the search radius expands automatically until help is found.
+        </Text>
+        <Text style={styles.timer}>{formatElapsed(elapsedTime)}</Text>
+      </View>
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => loadAlertDetails(true)} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Current search radius</Text>
+            <Text style={styles.summaryValue}>{currentRadius}m</Text>
+          </View>
+          <View style={styles.summaryDivider} />
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Emergency line</Text>
+            <Text style={styles.summaryValue}>{emergencyNumber}</Text>
+          </View>
+        </View>
+
+        <View style={styles.metaCard}>
+          <View style={styles.metaRow}>
+            <Icon name="place" size={18} color={colors.primary} />
+            <Text style={styles.metaText}>
+              Started at {currentAlert ? formatDateTime(currentAlert.createdAt) : 'just now'}
+            </Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Icon name="shield" size={18} color={colors.primary} />
+            <Text style={styles.metaText}>
+              Status: {currentAlert?.status === 'responding' ? 'Responder on the way' : 'Searching nearby responders'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.timelineCard}>
+          <Text style={styles.sectionTitle}>Search expansion</Text>
+          {timeline.map((step, index) => (
+            <View key={step.radius} style={styles.timelineRow}>
+              <View style={styles.timelineRail}>
                 <Icon
                   name={
-                    expansion.status === 'completed'
+                    step.status === 'completed'
                       ? 'check-circle'
-                      : expansion.status === 'in-progress'
+                      : step.status === 'active'
                       ? 'radio-button-checked'
                       : 'radio-button-unchecked'
                   }
-                  size={24}
+                  size={22}
                   color={
-                    expansion.status === 'completed'
+                    step.status === 'completed'
                       ? colors.success
-                      : expansion.status === 'in-progress'
+                      : step.status === 'active'
                       ? colors.warning
                       : colors.textSecondary
                   }
                 />
-                {index < expansions.length - 1 && <View style={styles.timelineLine} />}
+                {index < timeline.length - 1 && <View style={styles.timelineLine} />}
               </View>
 
               <View style={styles.timelineContent}>
                 <Text style={styles.timelineTitle}>
-                  T+{expansion.time}s: {expansion.radius}m radius
+                  T+{step.offsetSeconds}s: {step.radius}m search
                 </Text>
-                {expansion.status === 'completed' && (
-                  <Text style={styles.timelineDescription}>
-                    {expansion.usersNotified} users notified
-                  </Text>
-                )}
-                {expansion.status === 'in-progress' && (
-                  <Text style={styles.timelineDescription}>Expanding...</Text>
-                )}
-                {expansion.radius === 1000 && expansion.status === 'pending' && (
-                  <Text style={styles.timelineDescription}>+ 911 call</Text>
-                )}
+                <Text style={styles.timelineDescription}>{step.helperText}</Text>
               </View>
             </View>
           ))}
         </View>
 
-        <View style={styles.statsContainer}>
+        <View style={styles.statsRow}>
           <View style={styles.statCard}>
-            <Icon name="people" size={32} color={colors.secondary} />
+            <Icon name="groups" size={26} color={colors.secondary} />
             <Text style={styles.statValue}>{respondersCount}</Text>
             <Text style={styles.statLabel}>Responders</Text>
           </View>
-
           <View style={styles.statCard}>
-            <Icon name="notifications-active" size={32} color={colors.warning} />
-            <Text style={styles.statValue}>
-              {expansions.find((e) => e.status === 'completed')?.usersNotified || 0}
-            </Text>
-            <Text style={styles.statLabel}>Notified</Text>
+            <Icon name="notifications-active" size={26} color={colors.warning} />
+            <Text style={styles.statValue}>{usersNotified}</Text>
+            <Text style={styles.statLabel}>Users notified</Text>
           </View>
+        </View>
+
+        <View style={styles.calloutCard}>
+          <View style={styles.calloutText}>
+            <Text style={styles.calloutTitle}>National emergency support</Text>
+            <Text style={styles.calloutDescription}>
+              If you need direct escalation in India, call {emergencyNumber}. The app will keep expanding the alert radius in parallel.
+            </Text>
+          </View>
+          <Button variant="outline" size="small" onPress={handleCallEmergency} icon="call">
+            {callButtonLabel}
+          </Button>
         </View>
       </ScrollView>
 
@@ -199,16 +305,17 @@ export const EmergencyActiveScreen = () => {
           fullWidth
           onPress={handleSafe}
           icon="check-circle"
-          style={[styles.actionButton, { backgroundColor: colors.success }]}
+          style={styles.safeButton}
+          disabled={loading || !currentAlert}
         >
           I'm Safe Now
         </Button>
-
         <Button
           variant="outline"
           size="medium"
           fullWidth
           onPress={handleCancel}
+          disabled={loading || !currentAlert}
         >
           Cancel Alert
         </Button>
@@ -220,116 +327,203 @@ export const EmergencyActiveScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.error,
+    backgroundColor: '#A51230',
   },
   header: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xl,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: spacing['2xl'],
-    paddingBottom: spacing['3xl'],
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.pill,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#34D399',
+    marginRight: spacing.xs,
+  },
+  liveBadgeText: {
+    color: colors.surface,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  heroIcon: {
+    alignSelf: 'center',
+    marginTop: spacing.xl,
   },
   title: {
-    fontSize: fontSizes['2xl'],
-    fontWeight: '700',
+    marginTop: spacing.lg,
+    fontSize: fontSizes['3xl'],
+    fontWeight: '800',
     color: colors.surface,
-    marginTop: spacing.xl,
     textAlign: 'center',
   },
+  subtitle: {
+    marginTop: spacing.sm,
+    color: 'rgba(255,255,255,0.82)',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
   timer: {
+    marginTop: spacing.lg,
     fontSize: fontSizes['4xl'],
-    fontWeight: '700',
+    fontWeight: '800',
     color: colors.surface,
-    marginTop: spacing.md,
+    textAlign: 'center',
+  },
+  scroll: {
+    flex: 1,
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
   },
   content: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: spacing['2xl'],
-    borderTopRightRadius: spacing['2xl'],
-    padding: spacing['2xl'],
+    padding: spacing.xl,
     paddingBottom: spacing['3xl'],
   },
-  radiusCard: {
-    backgroundColor: colors.background,
-    padding: spacing.xl,
-    borderRadius: borderRadius.lg,
-    alignItems: 'center',
-    marginBottom: spacing['2xl'],
-  },
-  radiusTitle: {
-    fontSize: fontSizes.md,
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-  },
-  radiusValue: {
-    fontSize: fontSizes['4xl'],
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  timeline: {
-    marginBottom: spacing['2xl'],
-  },
-  timelineItem: {
+  summaryCard: {
     flexDirection: 'row',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    alignItems: 'center',
     marginBottom: spacing.lg,
   },
-  timelineIconContainer: {
+  summaryItem: {
+    flex: 1,
+  },
+  summaryDivider: {
+    width: 1,
+    height: '100%',
+    backgroundColor: colors.border,
+    marginHorizontal: spacing.md,
+  },
+  summaryLabel: {
+    color: colors.textSecondary,
+    fontSize: fontSizes.sm,
+  },
+  summaryValue: {
+    marginTop: spacing.xs,
+    fontSize: fontSizes['2xl'],
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  metaCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  metaRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginRight: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  metaText: {
+    marginLeft: spacing.sm,
+    flex: 1,
+    color: colors.textPrimary,
+  },
+  timelineCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  sectionTitle: {
+    fontSize: fontSizes.lg,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  timelineRow: {
+    flexDirection: 'row',
+  },
+  timelineRail: {
+    alignItems: 'center',
+    width: 28,
   },
   timelineLine: {
     width: 2,
     flex: 1,
     backgroundColor: colors.border,
-    marginTop: spacing.xs,
+    marginVertical: spacing.xs,
   },
   timelineContent: {
     flex: 1,
-    paddingTop: spacing.xs,
+    paddingBottom: spacing.lg,
+    paddingLeft: spacing.sm,
   },
   timelineTitle: {
     fontSize: fontSizes.md,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   timelineDescription: {
-    fontSize: fontSizes.sm,
-    color: colors.textSecondary,
     marginTop: spacing.xs,
+    color: colors.textSecondary,
+    lineHeight: 20,
   },
-  statsContainer: {
+  statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: spacing.xl,
+    gap: spacing.md,
+    marginBottom: spacing.lg,
   },
   statCard: {
-    alignItems: 'center',
-    padding: spacing.lg,
-    backgroundColor: colors.background,
-    borderRadius: borderRadius.md,
     flex: 1,
-    marginHorizontal: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    alignItems: 'center',
   },
   statValue: {
-    fontSize: fontSizes['2xl'],
-    fontWeight: '700',
-    color: colors.textPrimary,
     marginTop: spacing.sm,
+    fontSize: fontSizes['3xl'],
+    fontWeight: '800',
+    color: colors.textPrimary,
   },
   statLabel: {
-    fontSize: fontSizes.xs,
-    color: colors.textSecondary,
     marginTop: spacing.xs,
+    color: colors.textSecondary,
   },
-  actions: {
-    padding: spacing['2xl'],
-    gap: spacing.md,
+  calloutCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
   },
-  actionButton: {
+  calloutText: {
     marginBottom: spacing.md,
   },
-  disclaimer: {
-    fontSize: fontSizes.xs,
+  calloutTitle: {
+    fontSize: fontSizes.md,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  calloutDescription: {
+    marginTop: spacing.xs,
     color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: spacing.md,
+    lineHeight: 20,
+  },
+  actions: {
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: spacing.md,
+  },
+  safeButton: {
+    backgroundColor: colors.success,
   },
 });

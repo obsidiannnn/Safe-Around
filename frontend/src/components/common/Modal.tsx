@@ -85,8 +85,9 @@ export const Modal: React.FC<ModalProps> = ({
         <Animated.View
           style={[
             styles.modal,
-            fullScreen ? styles.fullScreen : styles.bottomSheet,
-            { paddingBottom: insets.bottom + spacing.lg },
+            fullScreen
+              ? [styles.fullScreen, { paddingBottom: 0 }]
+              : [styles.bottomSheet, { paddingBottom: insets.bottom + spacing.lg }],
             modalStyle,
           ]}
         >
@@ -119,6 +120,9 @@ const styles = StyleSheet.create({
   },
   fullScreen: {
     height: SCREEN_HEIGHT,
+    borderRadius: 0,
+    paddingHorizontal: 0,
+    paddingTop: 0,
   },
   handle: {
     width: 40,

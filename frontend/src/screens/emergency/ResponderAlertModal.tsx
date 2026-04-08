@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions, Alert as NativeAlert } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
@@ -48,10 +48,10 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
       setIsResponding(true);
       await respondToAlert(alert.id);
       onClose();
-      navigation.navigate('ResponderNavigation' as never, { alertId: alert.id });
+      (navigation as any).navigate('ResponderNavigation', { alertId: alert.id });
     } catch (error) {
       console.error('Error responding to alert:', error);
-      alert('Failed to respond to alert');
+      NativeAlert.alert('Could not respond', 'We could not accept this alert right now.');
     } finally {
       setIsResponding(false);
     }

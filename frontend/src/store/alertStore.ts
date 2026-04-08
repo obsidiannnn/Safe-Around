@@ -55,7 +55,12 @@ export const useAlertStore = create<AlertState>((set, get) => ({
         message: 'Emergency alert triggered',
       });
       
-      set({ activeAlert: alert, isAlertActive: true, currentRadius: 100 });
+      set({
+        activeAlert: alert,
+        isAlertActive: true,
+        currentRadius: alert.currentRadius ?? 100,
+        respondersCount: 0,
+      });
       get().addToHistory(alert);
       
       return alert;

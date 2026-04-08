@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, Vibration, Pressable, Platform, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, StyleSheet, Vibration, Pressable, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
 import { Text, Switch } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -121,7 +121,7 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
   return (
     <Modal visible={visible} onClose={onClose} dismissOnBackdrop={false} fullScreen noAnimation>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.lg) }]}>
           <View style={styles.brandRow}>
             <Icon name="security" size={24} color={colors.surface} />
             <Text style={styles.brandText}>SafeAround</Text>
@@ -255,16 +255,15 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.xl,
     flexGrow: 1,
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 56 : 28,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
   },
   brandRow: {
     flexDirection: 'row',
@@ -277,12 +276,17 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   closeButton: {
-    padding: 4,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   mainContent: {
     flex: 1,
     alignItems: 'center',
-    paddingTop: spacing.md,
+    paddingTop: spacing.sm,
   },
   alertingSub: {
     color: 'rgba(255, 255, 255, 0.6)',

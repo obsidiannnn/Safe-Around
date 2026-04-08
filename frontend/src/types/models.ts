@@ -34,11 +34,33 @@ export interface Alert {
   id: string;
   userId: string;
   type: 'panic' | 'check_in' | 'safe_zone';
-  status: 'active' | 'resolved' | 'cancelled';
+  status: 'active' | 'responding' | 'resolved' | 'cancelled';
   location: Location;
   message?: string;
+  currentRadius?: number;
+  maxRadiusReached?: number;
+  usersNotified?: number;
+  emergencyNumber?: string;
+  silentMode?: boolean;
   createdAt: string;
   resolvedAt?: string;
+}
+
+export interface AlertTimelineEvent {
+  id: string;
+  alertId: string;
+  eventType: string;
+  radiusAtEvent: number;
+  usersNotified: number;
+  respondersCount: number;
+  occurredAt: string;
+}
+
+export interface AlertDetails {
+  alert: Alert;
+  timeline: AlertTimelineEvent[];
+  respondersCount: number;
+  emergencyNumber: string;
 }
 
 export interface Notification {
