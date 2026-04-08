@@ -7,9 +7,10 @@ import { ChangePasswordScreen } from '@/screens/profile/ChangePasswordScreen';
 import { PrivacySettingsScreen } from '@/screens/profile/PrivacySettingsScreen';
 import { NotificationSettingsScreen } from '@/screens/profile/NotificationSettingsScreen';
 import { AlertHistoryScreen } from '../screens/emergency/AlertHistoryScreen';
+import { AlertDetailScreen } from '@/screens/emergency/AlertDetailScreen';
 import { colors } from '@/theme/colors';
 
-const Stack = createStackNavigator();
+const Stack = createStackNavigator<any>();
 
 export const ProfileNavigator = () => {
   return (
@@ -26,6 +27,7 @@ export const ProfileNavigator = () => {
       <Stack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />
       <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
       <Stack.Screen name="AlertHistory" component={AlertHistoryScreen} />
+      <Stack.Screen name="AlertDetail" component={AlertDetailScreen} />
     </Stack.Navigator>
   );
 };

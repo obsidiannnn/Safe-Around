@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import { Card, Badge, Button } from '@/components/common';
+import { Card, Badge } from '@/components/common';
 import { useAlertStore } from '@/store/alertStore';
 import { Alert } from '@/types/models';
 import { colors } from '@/theme/colors';
@@ -51,23 +51,32 @@ export const AlertHistoryScreen = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleExport = () => {
-    // TODO: Generate and download PDF report
-    console.log('Exporting alert history');
-  };
+  const filteredAlerts = useMemo(() => {
+    if (filter === 'all') {
+      return alertHistory;
+    }
+
+    const now = Date.now();
+    const days = filter === '7days' ? 7 : 30;
+    const threshold = now - days * 24 * 60 * 60 * 1000;
+
+    return alertHistory.filter((alert) => {
+      const createdAt = new Date(alert.createdAt).getTime();
+      return !Number.isNaN(createdAt) && createdAt >= threshold;
+    });
+  }, [alertHistory, filter]);
+
+  const activeCount = filteredAlerts.filter((alert) => alert.status === 'active').length;
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Alert History</Text>
-        <Button
-          variant="outline"
-          size="small"
-          icon="download"
-          onPress={handleExport}
-        >
-          Export
-        </Button>
+        <View>
+          <Text style={styles.title}>Alert History</Text>
+          <Text style={styles.subtitle}>
+            {filteredAlerts.length} alerts recorded, {activeCount} currently active
+          </Text>
+        </View>
       </View>
 
       <View style={styles.filters}>
@@ -98,13 +107,13 @@ export const AlertHistoryScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {alertHistory.map((alert) => (
+        {filteredAlerts.map((alert) => (
           <Card
             key={alert.id}
             variant="outlined"
             padding="lg"
             style={styles.alertCard}
-            onPress={() => navigation.navigate('AlertDetail' as never, { alertId: alert.id })}
+            onPress={() => (navigation as any).navigate('AlertDetail', { alertId: alert.id })}
           >
             <View style={styles.alertHeader}>
               <View style={styles.alertInfo}>
@@ -132,14 +141,16 @@ export const AlertHistoryScreen = () => {
               </View>
 
               <View style={styles.detailItem}>
-                <Icon name="people" size={16} color={colors.textSecondary} />
-                <Text style={styles.detailText}>0 responders</Text>
+                <Icon name="warning-amber" size={16} color={colors.textSecondary} />
+                <Text style={styles.detailText}>
+                  {alert.type === 'panic' ? 'Emergency SOS' : alert.type.replace('_', ' ')}
+                </Text>
               </View>
             </View>
           </Card>
         ))}
 
-        {alertHistory.length === 0 && (
+        {filteredAlerts.length === 0 && (
           <View style={styles.emptyState}>
             <Icon name="history" size={64} color={colors.textSecondary} />
             <Text style={styles.emptyText}>No alert history</Text>
@@ -169,6 +180,11 @@ const styles = StyleSheet.create({
     fontSize: fontSizes['2xl'],
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  subtitle: {
+    marginTop: spacing.xs,
+    fontSize: fontSizes.sm,
+    color: colors.textSecondary,
   },
   filters: {
     flexDirection: 'row',

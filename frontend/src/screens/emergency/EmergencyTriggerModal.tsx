@@ -31,6 +31,16 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
   const [isConfirming, setIsConfirming] = useState(false);
   const [hasTriggered, setHasTriggered] = useState(false);
 
+  const navigateToEmergencyActive = useCallback(() => {
+    const parentNavigation = navigation.getParent();
+    if (parentNavigation) {
+      (parentNavigation as any).navigate('Emergency', { screen: 'EmergencyActive' });
+      return;
+    }
+
+    (navigation as any).navigate('EmergencyActive');
+  }, [navigation]);
+
   useEffect(() => {
     if (visible) {
       setCountdown(5);
@@ -80,7 +90,7 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
       );
 
       onClose();
-      navigation.navigate('EmergencyActive' as never);
+      navigateToEmergencyActive();
     } catch (error) {
       console.warn('Error creating alert:', error);
       setCountdown(5);
@@ -89,7 +99,7 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
     } finally {
       setIsConfirming(false);
     }
-  }, [currentLocation, isConfirming, hasTriggered, silentMode, createAlert, onClose, navigation]);
+  }, [currentLocation, isConfirming, hasTriggered, silentMode, createAlert, onClose, navigateToEmergencyActive]);
 
   useEffect(() => {
     if (!visible || isConfirming) return;
@@ -116,7 +126,7 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
             <Icon name="security" size={24} color={colors.surface} />
             <Text style={styles.brandText}>SafeAround</Text>
           </View>
-          <Pressable onPress={onClose} style={styles.closeButton}>
+          <Pressable onPress={onClose} style={styles.closeButton} disabled={isConfirming}>
             <Icon name="close" size={28} color={colors.surface} />
           </Pressable>
         </View>
@@ -128,33 +138,39 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
         >
           <View style={styles.mainContent}>
             <Text style={styles.alertingSub}>EMERGENCY SOS ACTIVE</Text>
-            <View style={styles.countdownBadge}>
-              <Icon name="timer" size={16} color={colors.surface} />
-              <Text style={styles.countdownBadgeText}>{isConfirming ? 'Sending SOS now' : `Auto-send in ${countdown}s`}</Text>
-            </View>
-            <Text style={styles.alertingTitle}>{isConfirming ? 'Sending SOS' : 'Emergency ready'}</Text>
-            <Text style={styles.alertingDescription}>
-              Your contacts and nearby responders will receive your live location.
-            </Text>
+            <View style={styles.heroCard}>
+              <View style={styles.countdownBadge}>
+                <Icon name="timer" size={16} color={colors.surface} />
+                <Text style={styles.countdownBadgeText}>
+                  {isConfirming ? 'Sending SOS now' : `Auto-send in ${countdown}s`}
+                </Text>
+              </View>
+              <Text style={styles.alertingTitle}>
+                {isConfirming ? 'Sending your emergency SOS' : 'Ready to send emergency SOS'}
+              </Text>
+              <Text style={styles.alertingDescription}>
+                We will share your pinned location with your emergency contacts and nearby verified responders.
+              </Text>
 
-            <View style={styles.pulseContainer}>
-              <Pressable 
-                style={[styles.sosCircle, isConfirming && styles.sosCircleDisabled]}
-                onPress={handleConfirm}
-                disabled={isConfirming}
-              >
-                {isConfirming ? (
-                  <ActivityIndicator color={colors.surface} size="large" />
-                ) : (
-                  <Icon name="settings-input-antenna" size={40} color={colors.surface} />
-                )}
-                <Text style={styles.sendNowText}>{isConfirming ? 'SENDING' : 'SEND NOW'}</Text>
-              </Pressable>
-            </View>
+              <View style={styles.pulseContainer}>
+                <Pressable
+                  style={[styles.sosCircle, isConfirming && styles.sosCircleDisabled]}
+                  onPress={handleConfirm}
+                  disabled={isConfirming}
+                >
+                  {isConfirming ? (
+                    <ActivityIndicator color={colors.surface} size="large" />
+                  ) : (
+                    <Icon name="notifications-active" size={42} color={colors.surface} />
+                  )}
+                  <Text style={styles.sendNowText}>{isConfirming ? 'SENDING...' : 'SEND NOW'}</Text>
+                </Pressable>
+              </View>
 
-            <Text style={styles.instructionText}>
-              Tap send now to skip the timer, or cancel if this was accidental.
-            </Text>
+              <Text style={styles.instructionText}>
+                Tap send now to skip the countdown, or cancel below if this was accidental.
+              </Text>
+            </View>
 
             <View style={styles.optionsList}>
               <View style={styles.glassOption}>
@@ -200,19 +216,27 @@ export const EmergencyTriggerModal: React.FC<EmergencyTriggerModalProps> = ({
                 </View>
               </View>
             </View>
+
+            {currentLocation && (
+              <View style={styles.locationCard}>
+                <View style={styles.locationHeader}>
+                  <Icon name="my-location" size={18} color={colors.surface} />
+                  <Text style={styles.locationTitle}>Pinned live location</Text>
+                </View>
+                <Text style={styles.locationText}>
+                  {formatCoordinate(currentLocation.latitude, 'N', 'S')}, {formatCoordinate(currentLocation.longitude, 'E', 'W')}
+                </Text>
+              </View>
+            )}
           </View>
         </ScrollView>
 
         <View style={styles.footer}>
-          {currentLocation && (
-            <View style={styles.coordBox}>
-              <Icon name="location-pin" size={14} color={colors.surface} />
-              <Text style={styles.coordText}>
-                PINPOINTED: {formatCoordinate(currentLocation.latitude, 'N', 'S')}, {formatCoordinate(currentLocation.longitude, 'E', 'W')}
-              </Text>
-            </View>
-          )}
-          <Pressable style={[styles.cancelBtn, isConfirming && styles.cancelBtnDisabled]} onPress={onClose} disabled={isConfirming}>
+          <Pressable
+            style={[styles.cancelBtn, isConfirming && styles.cancelBtnDisabled]}
+            onPress={onClose}
+            disabled={isConfirming}
+          >
             <Text style={styles.cancelBtnText}>{isConfirming ? 'SENDING ALERT...' : 'CANCEL SOS'}</Text>
           </Pressable>
         </View>
@@ -258,19 +282,30 @@ const styles = StyleSheet.create({
   mainContent: {
     flex: 1,
     alignItems: 'center',
-    paddingTop: spacing.lg,
+    paddingTop: spacing.md,
   },
   alertingSub: {
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 2,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  heroCard: {
+    width: '100%',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: borderRadius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: spacing.lg,
   },
   countdownBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.pill,
@@ -284,24 +319,24 @@ const styles = StyleSheet.create({
   },
   alertingTitle: {
     color: colors.surface,
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: '800',
     textAlign: 'center',
   },
   alertingDescription: {
     color: 'rgba(255, 255, 255, 0.68)',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 22,
     textAlign: 'center',
     marginTop: spacing.sm,
-    marginBottom: spacing.xl,
   },
   pulseContainer: {
     width: 168,
     height: 168,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
   },
   sosCircle: {
     width: 138,
@@ -322,17 +357,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     marginTop: 8,
+    letterSpacing: 0.5,
   },
   instructionText: {
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: spacing.xl,
+    maxWidth: 280,
   },
   optionsList: {
     width: '100%',
     gap: 12,
+    marginBottom: spacing.lg,
   },
   glassOption: {
     flexDirection: 'row',
@@ -386,25 +423,34 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textTransform: 'uppercase',
   },
+  locationCard: {
+    width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+  },
+  locationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  locationTitle: {
+    marginLeft: spacing.xs,
+    color: colors.surface,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  locationText: {
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 13,
+    lineHeight: 20,
+  },
   footer: {
     paddingHorizontal: spacing.xl,
     paddingBottom: Platform.OS === 'ios' ? 34 : spacing.lg,
     alignItems: 'center',
-  },
-  coordBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    marginBottom: spacing.md,
-  },
-  coordText: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 10,
-    fontWeight: '700',
-    marginLeft: 6,
   },
   cancelBtn: {
     backgroundColor: colors.surface,

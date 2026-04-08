@@ -19,6 +19,7 @@ export const ChangePasswordScreen: React.FC = () => {
     control,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm<ChangePasswordFormData>({
     resolver: zodResolver(changePasswordSchema),
@@ -28,6 +29,18 @@ export const ChangePasswordScreen: React.FC = () => {
       confirmPassword: '',
     },
   });
+
+  const currentPassword = watch('currentPassword');
+  const newPassword = watch('newPassword');
+  const confirmPassword = watch('confirmPassword');
+
+  const passwordChecks = [
+    { label: 'At least 8 characters', passed: newPassword.length >= 8 },
+    { label: 'Contains one uppercase letter', passed: /[A-Z]/.test(newPassword) },
+    { label: 'Contains one number', passed: /[0-9]/.test(newPassword) },
+    { label: 'Different from current password', passed: !!newPassword && newPassword !== currentPassword },
+    { label: 'Confirmation matches', passed: !!confirmPassword && newPassword === confirmPassword },
+  ];
 
   const onSubmit = async (data: ChangePasswordFormData) => {
     try {
@@ -59,7 +72,9 @@ export const ChangePasswordScreen: React.FC = () => {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.infoCard}>
             <Icon name="lock" size={22} color={colors.primary} />
-            <Text style={styles.infoText}>Use a strong password with at least 8 characters, one uppercase letter, and one number.</Text>
+            <Text style={styles.infoText}>
+              We verify your current password before saving a new one. Reusing the same password is not allowed.
+            </Text>
           </View>
 
           <Controller
@@ -110,6 +125,22 @@ export const ChangePasswordScreen: React.FC = () => {
             )}
           />
 
+          <View style={styles.checklistCard}>
+            <Text style={styles.checklistTitle}>Password requirements</Text>
+            {passwordChecks.map((item) => (
+              <View key={item.label} style={styles.checkRow}>
+                <Icon
+                  name={item.passed ? 'check-circle' : 'radio-button-unchecked'}
+                  size={18}
+                  color={item.passed ? colors.success : colors.textSecondary}
+                />
+                <Text style={[styles.checkText, item.passed && styles.checkTextPassed]}>
+                  {item.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+
           <Button fullWidth size="large" loading={loading} disabled={loading} onPress={handleSubmit(onSubmit)}>
             Update Password
           </Button>
@@ -159,5 +190,32 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
     color: colors.textSecondary,
     lineHeight: 20,
+  },
+  checklistCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.lg,
+  },
+  checklistTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  checkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  checkText: {
+    marginLeft: spacing.sm,
+    color: colors.textSecondary,
+  },
+  checkTextPassed: {
+    color: colors.textPrimary,
+    fontWeight: '600',
   },
 });

@@ -44,7 +44,7 @@ type setupProfileInput struct {
 
 type changePasswordInput struct {
 	CurrentPassword string `json:"current_password"`
-	NewPassword     string `json:"new_password" binding:"required,min=6"`
+	NewPassword     string `json:"new_password" binding:"required,min=8"`
 }
 
 func normalizePhone(phone string) string {
@@ -227,9 +227,21 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	if u.Password != "" && !utils.ComparePassword(u.Password, input.CurrentPassword) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "current password is incorrect"})
-		return
+	if u.Password != "" {
+		if strings.TrimSpace(input.CurrentPassword) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "current password is required"})
+			return
+		}
+
+		if !utils.ComparePassword(u.Password, input.CurrentPassword) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "current password is incorrect"})
+			return
+		}
+
+		if utils.ComparePassword(u.Password, input.NewPassword) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "please choose a new password different from your current password"})
+			return
+		}
 	}
 
 	hash, err := utils.HashPassword(input.NewPassword)

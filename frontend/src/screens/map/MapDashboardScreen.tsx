@@ -65,6 +65,10 @@ export const MapDashboardScreen = () => {
   const { createAlert, respondToAlert, activeAlert, respondersCount } = useAlertStore();
   const { priorityAlerts } = useSettingsStore();
 
+  const openEmergencyActiveScreen = useCallback(() => {
+    (navigation.getParent() as any)?.navigate('Emergency', { screen: 'EmergencyActive' });
+  }, [navigation]);
+
   // Pulse animation for the SOS button
   const pulseScale = useSharedValue(1);
   const pulseOpacity = useSharedValue(0.3);
@@ -206,7 +210,7 @@ export const MapDashboardScreen = () => {
     }
   };
 
-  const handleEmergencyTrigger = async () => {
+  const handleEmergencyTrigger = useCallback(async () => {
     if (!currentLocation) {
       Alert.alert('Error', 'Cannot get your current location.');
       return;
@@ -217,12 +221,12 @@ export const MapDashboardScreen = () => {
         latitude: currentLocation.latitude,
         longitude: currentLocation.longitude,
       }, false);
-      navigation.navigate('EmergencyActive' as never);
+      openEmergencyActiveScreen();
     } catch (error) {
       console.error('Error creating alert:', error);
       Alert.alert('Error', 'Failed to trigger SOS alert.');
     }
-  };
+  }, [currentLocation, createAlert, openEmergencyActiveScreen]);
 
   const handleDangerZonePress = (zone: DangerZone) => {
     console.log('Danger zone pressed:', zone);
