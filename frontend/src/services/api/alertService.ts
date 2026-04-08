@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { Alert } from '@/types/models';
+import { Alert, AlertDetails, AlertTimelineEvent } from '@/types/models';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -34,9 +34,36 @@ const normalizeAlert = (raw: any): Alert => ({
     latitude: raw?.latitude ?? 0,
     longitude: raw?.longitude ?? 0,
   },
-  message: raw?.message ?? raw?.metadata,
+  message: (() => {
+    const payload = raw?.message ?? raw?.metadata;
+    if (typeof payload !== 'string') {
+      return payload;
+    }
+
+    try {
+      const parsed = JSON.parse(payload);
+      return parsed?.message ?? payload;
+    } catch {
+      return payload;
+    }
+  })(),
+  currentRadius: raw?.currentRadius ?? raw?.current_radius ?? 100,
+  maxRadiusReached: raw?.maxRadiusReached ?? raw?.max_radius_reached,
+  usersNotified: raw?.usersNotified ?? raw?.users_notified ?? 0,
+  emergencyNumber: raw?.emergencyNumber ?? raw?.emergency_number ?? '112',
+  silentMode: raw?.silentMode ?? raw?.silent_mode ?? false,
   createdAt: raw?.createdAt ?? raw?.created_at ?? new Date().toISOString(),
   resolvedAt: raw?.resolvedAt ?? raw?.resolved_at,
+});
+
+const normalizeTimelineEvent = (raw: any): AlertTimelineEvent => ({
+  id: String(raw?.id ?? ''),
+  alertId: String(raw?.alertId ?? raw?.alert_id ?? ''),
+  eventType: raw?.eventType ?? raw?.event_type ?? '',
+  radiusAtEvent: raw?.radiusAtEvent ?? raw?.radius_at_event ?? 0,
+  usersNotified: raw?.usersNotified ?? raw?.users_notified ?? 0,
+  respondersCount: raw?.respondersCount ?? raw?.responders_count ?? 0,
+  occurredAt: raw?.occurredAt ?? raw?.occurred_at ?? new Date().toISOString(),
 });
 
 export const alertService = {
@@ -62,8 +89,20 @@ export const alertService = {
    * Get alert details by ID
    */
   getAlert: async (id: string): Promise<Alert> => {
-    const response = await apiClient.get<ApiResponse<Alert>>(`/alerts/${id}`);
-    return normalizeAlert(response.data.data);
+    const response = await apiClient.get<ApiResponse<any>>(`/alerts/${id}`);
+    const payload = response.data.data?.alert ?? response.data.data;
+    return normalizeAlert(payload);
+  },
+
+  getAlertDetails: async (id: string): Promise<AlertDetails> => {
+    const response = await apiClient.get<ApiResponse<any>>(`/alerts/${id}`);
+    const payload = response.data.data;
+    return {
+      alert: normalizeAlert(payload?.alert),
+      timeline: (payload?.timeline || []).map(normalizeTimelineEvent),
+      respondersCount: payload?.responders_count ?? 0,
+      emergencyNumber: payload?.emergency_number ?? payload?.alert?.emergency_number ?? '112',
+    };
   },
 
   /**

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/models"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/services"
+	"gorm.io/gorm"
 )
 
 type AlertHandler struct {
@@ -73,9 +74,29 @@ func (h *AlertHandler) CreateAlert(c *gin.Context) {
 
 // GET /api/v1/alerts/:id
 func (h *AlertHandler) GetAlertDetails(c *gin.Context) {
-	// For now, this requires the alert service or repository to fetch it
-	// Since GetAlertDetails is not explicitly in AlertService spec, we return a stub
-	c.JSON(http.StatusNotImplemented, gin.H{"message": "Handler logic requires DB read not yet configured"})
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	alertID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid alert ID format"})
+		return
+	}
+
+	details, err := h.alertService.GetAlertDetails(c.Request.Context(), alertID, userIDVal.(uint))
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Alert not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch alert details"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": details})
 }
 
 // POST /api/v1/alerts/:id/respond

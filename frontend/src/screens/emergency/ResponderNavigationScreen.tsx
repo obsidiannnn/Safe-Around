@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Vibration } from 'react-native';
+import { View, StyleSheet, Vibration, Linking } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -171,10 +171,10 @@ export const ResponderNavigationScreen = () => {
                 size="large"
                 fullWidth
                 icon="phone"
-                onPress={() => console.log('Call 911')}
+                onPress={() => Linking.openURL('tel:112')}
                 style={styles.actionButton}
               >
-                Call 911
+                Call 112
               </Button>
             </>
           )}

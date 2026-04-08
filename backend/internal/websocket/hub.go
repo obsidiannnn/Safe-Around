@@ -57,7 +57,7 @@ type WebSocketMessage struct {
 type AlertBroadcaster interface {
 	BroadcastEmergencyAlert(alert *models.EmergencyAlert)
 	BroadcastResponderAccepted(alertID uuid.UUID, response *models.AlertResponse)
-	BroadcastRadiusExpanded(alertID uuid.UUID, oldRadius, newRadius int)
+	BroadcastRadiusExpanded(alertID uuid.UUID, oldRadius, newRadius, usersNotified int)
 	CloseRoom(roomID string)
 }
 
@@ -276,14 +276,15 @@ func (h *Hub) BroadcastResponderAccepted(alertID uuid.UUID, response *models.Ale
 	})
 }
 
-func (h *Hub) BroadcastRadiusExpanded(alertID uuid.UUID, oldRadius, newRadius int) {
+func (h *Hub) BroadcastRadiusExpanded(alertID uuid.UUID, oldRadius, newRadius, usersNotified int) {
 	roomID := fmt.Sprintf("alert_%s", alertID.String())
 
 	h.BroadcastToRoom(roomID, "radius_expanded", map[string]interface{}{
-		"alert_id":   alertID,
-		"old_radius": oldRadius,
-		"new_radius": newRadius,
-		"timestamp":  time.Now().UTC(),
+		"alert_id":       alertID,
+		"old_radius":     oldRadius,
+		"new_radius":     newRadius,
+		"users_notified": usersNotified,
+		"timestamp":      time.Now().UTC(),
 	})
 }
 
