@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -55,9 +56,9 @@ type WebSocketMessage struct {
 }
 
 type AlertBroadcaster interface {
-	BroadcastEmergencyAlert(alert *models.EmergencyAlert)
-	BroadcastResponderAccepted(alertID uuid.UUID, response *models.AlertResponse)
-	BroadcastRadiusExpanded(alertID uuid.UUID, oldRadius, newRadius, usersNotified int)
+	BroadcastEmergencyAlert(alert *models.EmergencyAlert, recipientUserIDs []uint)
+	BroadcastResponderAccepted(alertID uuid.UUID, response *models.AlertResponse, targetUserID uint)
+	BroadcastRadiusExpanded(alertID uuid.UUID, oldRadius, newRadius, usersNotified int, recipientUserIDs []uint)
 	CloseRoom(roomID string)
 }
 
@@ -240,52 +241,57 @@ func calculateAge(dob time.Time) int {
 
 // Specific broadcast methods for SafeAround events
 
-func (h *Hub) BroadcastEmergencyAlert(alert *models.EmergencyAlert) {
-	// Normally we would pre-load User via GORM Preload before casting event.
-	// Falling back to defaults since models.EmergencyAlert only explicitly holds UserID directly right now.
-	fullName := "Distressed User"
+func (h *Hub) BroadcastEmergencyAlert(alert *models.EmergencyAlert, recipientUserIDs []uint) {
+	recipients := uintSliceToStringSlice(recipientUserIDs)
+	if len(recipients) == 0 {
+		return
+	}
 
-	var lat, lng float64
-	lat = alert.AlertLocation.Latitude
-	lng = alert.AlertLocation.Longitude
-
-	// Broadcast to all connected users in vicinity
-	h.BroadcastToRoom("global", "emergency_alert", map[string]interface{}{
-		"alert_id": alert.ID,
+	data := map[string]interface{}{
+		"alert_id": alert.ID.String(),
 		"user": map[string]interface{}{
-			"full_name": fullName,
+			"full_name": "Distressed User",
 			"user_id":   alert.UserID,
 		},
 		"location": map[string]float64{
-			"latitude":  lat,
-			"longitude": lng,
+			"latitude":  alert.AlertLocation.Latitude,
+			"longitude": alert.AlertLocation.Longitude,
 		},
-		"distance":   0, // calculated per user locally by mobile client via LocationService coordinates
-		"created_at": alert.CreatedAt,
+		"distance":           0,
+		"current_radius":     alert.CurrentRadius,
+		"created_at":         alert.CreatedAt,
+		"recipient_user_ids": recipients,
+	}
+
+	for _, userID := range recipients {
+		h.SendToUser(userID, "emergency_alert", data)
+	}
+}
+
+func (h *Hub) BroadcastResponderAccepted(alertID uuid.UUID, response *models.AlertResponse, targetUserID uint) {
+	h.SendToUser(strconv.FormatUint(uint64(targetUserID), 10), "responder_accepted", map[string]interface{}{
+		"alert_id":       alertID.String(),
+		"responder_id":   response.ResponderUserID,
+		"distance":       response.DistanceMeters,
+		"eta":            response.EstimatedArrivalMinutes,
+		"responded_at":   response.RespondedAt,
+		"target_user_id": strconv.FormatUint(uint64(targetUserID), 10),
 	})
 }
 
-func (h *Hub) BroadcastResponderAccepted(alertID uuid.UUID, response *models.AlertResponse) {
-	roomID := fmt.Sprintf("alert_%s", alertID.String())
+func (h *Hub) BroadcastRadiusExpanded(alertID uuid.UUID, oldRadius, newRadius, usersNotified int, recipientUserIDs []uint) {
+	data := map[string]interface{}{
+		"alert_id":           alertID.String(),
+		"old_radius":         oldRadius,
+		"new_radius":         newRadius,
+		"users_notified":     usersNotified,
+		"timestamp":          time.Now().UTC(),
+		"recipient_user_ids": uintSliceToStringSlice(recipientUserIDs),
+	}
 
-	h.BroadcastToRoom(roomID, "responder_accepted", map[string]interface{}{
-		"responder_id": response.ResponderUserID,
-		"distance":     response.DistanceMeters,
-		"eta":          response.EstimatedArrivalMinutes,
-		"responded_at": response.RespondedAt,
-	})
-}
-
-func (h *Hub) BroadcastRadiusExpanded(alertID uuid.UUID, oldRadius, newRadius, usersNotified int) {
-	roomID := fmt.Sprintf("alert_%s", alertID.String())
-
-	h.BroadcastToRoom(roomID, "radius_expanded", map[string]interface{}{
-		"alert_id":       alertID,
-		"old_radius":     oldRadius,
-		"new_radius":     newRadius,
-		"users_notified": usersNotified,
-		"timestamp":      time.Now().UTC(),
-	})
+	for _, userID := range recipientUserIDs {
+		h.SendToUser(strconv.FormatUint(uint64(userID), 10), "radius_expanded", data)
+	}
 }
 
 func (h *Hub) BroadcastLocationUpdate(alertID uuid.UUID, userID uuid.UUID, location Location) {

@@ -35,6 +35,7 @@ export const MapDashboardScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const mapRef = useRef<MapView>(null);
+  const areaStatsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { currentLocation, startTracking, isTracking } = useLocation();
   const { user } = useAuthStore();
   const { mapType, setMapType, currentStats, setCurrentStats } = useMapStore();
@@ -55,6 +56,7 @@ export const MapDashboardScreen = () => {
   const [liveNearbyUsers, setLiveNearbyUsers] = useState(0);
   const [selectedPlace, setSelectedPlace] = useState<{ name: string; location: { latitude: number; longitude: number } } | null>(null);
   const [activeVictimLocation, setActiveVictimLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [activeVictimAlertId, setActiveVictimAlertId] = useState<string | null>(null);
   const [mapBounds, setMapBounds] = useState({
     north: 0,
     south: 0,
@@ -87,7 +89,7 @@ export const MapDashboardScreen = () => {
     startTracking();
     const initLat = currentLocation?.latitude || 28.6139;
     const initLng = currentLocation?.longitude || 77.2090;
-    fetchAreaStats(initLat, initLng);
+    scheduleAreaStatsFetch(initLat, initLng, 0);
   }, []);
 
   useEffect(() => {
@@ -106,7 +108,7 @@ export const MapDashboardScreen = () => {
       };
       setRegion(newRegion);
       mapRef.current?.animateToRegion(newRegion, 1000);
-      fetchAreaStats(currentLocation.latitude, currentLocation.longitude);
+      scheduleAreaStatsFetch(currentLocation.latitude, currentLocation.longitude, 0);
     }
   }, [currentLocation]);
 
@@ -135,7 +137,16 @@ export const MapDashboardScreen = () => {
 
     const handleEmergencyAlert = (data: any) => {
       if (!priorityAlerts) return;
-      if (data.user?.user_id === useAuthStore.getState().user?.id) return;
+      const authUserId = String(useAuthStore.getState().user?.id ?? '');
+      const sourceUserId = String(data.user?.user_id ?? '');
+      const recipientIds = Array.isArray(data.recipient_user_ids)
+        ? data.recipient_user_ids.map((id: unknown) => String(id))
+        : [];
+      const liveAlert = useAlertStore.getState().activeAlert;
+
+      if (sourceUserId === authUserId) return;
+      if (recipientIds.length > 0 && !recipientIds.includes(authUserId)) return;
+      if (liveAlert?.id === data.alert_id || useAlertStore.getState().isAlertActive) return;
 
       Alert.alert(
         '🆘 HELP NEEDED',
@@ -145,6 +156,7 @@ export const MapDashboardScreen = () => {
             text: 'I AM COMING', 
             onPress: () => {
               setActiveVictimLocation(data.location);
+              setActiveVictimAlertId(String(data.alert_id));
               respondToAlert(data.alert_id);
             },
             style: 'default' 
@@ -155,32 +167,82 @@ export const MapDashboardScreen = () => {
     };
 
     const handleResponderAccepted = (data: any) => {
+      const authUserId = String(useAuthStore.getState().user?.id ?? '');
+      const liveAlert = useAlertStore.getState().activeAlert;
+      const targetUserId = String(data.target_user_id ?? '');
+
+      if (!liveAlert?.id || String(data.alert_id ?? '') !== String(liveAlert.id)) {
+        return;
+      }
+      if (targetUserId && targetUserId !== authUserId) {
+        return;
+      }
+
       Alert.alert(
         '✅ Help is on the way!',
         `A volunteer is ${Math.round(data.distance)}m away and will arrive in approx ${data.eta} min.`
       );
     };
 
+    const handleRoomClosed = (data: any) => {
+      const roomId = String(data?.room_id ?? '');
+      if (!roomId) {
+        return;
+      }
+
+      if (activeVictimAlertId && roomId === `alert_${activeVictimAlertId}`) {
+        setActiveVictimLocation(null);
+        setActiveVictimAlertId(null);
+      }
+    };
+
     CrimeWebSocketService.on('crime_added', handleNewCrime);
     CrimeWebSocketService.on('emergency_alert', handleEmergencyAlert);
     CrimeWebSocketService.on('responder_accepted', handleResponderAccepted);
+    CrimeWebSocketService.on('room_closed', handleRoomClosed);
 
     return () => {
       CrimeWebSocketService.off('crime_added', handleNewCrime);
       CrimeWebSocketService.off('emergency_alert', handleEmergencyAlert);
       CrimeWebSocketService.off('responder_accepted', handleResponderAccepted);
+      CrimeWebSocketService.off('room_closed', handleRoomClosed);
       CrimeWebSocketService.disconnect();
     };
-  }, [priorityAlerts, respondToAlert]);
+  }, [activeVictimAlertId, priorityAlerts, respondToAlert]);
 
-  const fetchAreaStats = async (lat: number, lng: number) => {
+  useEffect(() => {
+    if (!activeAlert) {
+      setActiveVictimLocation(null);
+      setActiveVictimAlertId(null);
+    }
+  }, [activeAlert]);
+
+  const fetchAreaStats = useCallback(async (lat: number, lng: number) => {
     try {
       const stats = await heatmapService.getStatistics(lat, lng);
       setCurrentStats(stats);
     } catch (error) {
-      console.error('Error fetching area stats:', error);
+      console.warn('Area stats temporarily unavailable; keeping the current map stats.', error);
     }
-  };
+  }, [setCurrentStats]);
+
+  const scheduleAreaStatsFetch = useCallback((lat: number, lng: number, delayMs = 600) => {
+    if (areaStatsDebounceRef.current) {
+      clearTimeout(areaStatsDebounceRef.current);
+    }
+
+    areaStatsDebounceRef.current = setTimeout(() => {
+      fetchAreaStats(lat, lng);
+    }, delayMs);
+  }, [fetchAreaStats]);
+
+  useEffect(() => {
+    return () => {
+      if (areaStatsDebounceRef.current) {
+        clearTimeout(areaStatsDebounceRef.current);
+      }
+    };
+  }, []);
 
   const handleNearbyUsersChange = useCallback((count: number) => {
     setLiveNearbyUsers(count);
@@ -195,7 +257,7 @@ export const MapDashboardScreen = () => {
       west: newRegion.longitude - newRegion.longitudeDelta / 2,
     };
     setMapBounds(bounds);
-    fetchAreaStats(newRegion.latitude, newRegion.longitude);
+    scheduleAreaStatsFetch(newRegion.latitude, newRegion.longitude);
   };
 
   const handleCenterLocation = () => {

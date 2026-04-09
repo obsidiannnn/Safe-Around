@@ -80,6 +80,8 @@ const normalizeResponder = (raw: any): AlertResponderSummary => ({
 
 const normalizeIncidentReport = (raw: any): AlertIncidentReport => ({
   alertId: String(raw?.alertId ?? raw?.alert_id ?? ''),
+  requesterUserId: String(raw?.requesterUserId ?? raw?.requester_user_id ?? ''),
+  responderUserIds: (raw?.responderUserIds ?? raw?.responder_user_ids ?? []).map((id: any) => String(id)),
   status: raw?.status ?? 'resolved',
   durationSeconds: Number(raw?.durationSeconds ?? raw?.duration_seconds ?? 0),
   createdAt: raw?.createdAt ?? raw?.created_at ?? new Date().toISOString(),
@@ -140,11 +142,11 @@ export const alertService = {
   updateAlertStatus: async (
     id: string,
     status: 'active' | 'resolved' | 'cancelled'
-  ): Promise<Alert> => {
+  ): Promise<Alert | null> => {
     const response = await apiClient.patch<ApiResponse<Alert>>(`/alerts/${id}/status`, {
       status,
     });
-    return normalizeAlert(response.data.data);
+    return response.data.data ? normalizeAlert(response.data.data) : null;
   },
 
   /**

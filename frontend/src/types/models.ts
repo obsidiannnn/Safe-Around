@@ -81,6 +81,8 @@ export interface AlertResponderSummary {
 
 export interface AlertIncidentReport {
   alertId: string;
+  requesterUserId: string;
+  responderUserIds: string[];
   status: string;
   durationSeconds: number;
   createdAt: string;
