@@ -36,25 +36,28 @@ type AlertService struct {
 const indiaEmergencyNumber = "112"
 
 var (
-	ErrAlertSelfResponse     = errors.New("requester cannot respond to their own alert")
-	ErrAlertInactive         = errors.New("alert is no longer active")
-	ErrAlertAlreadyAccepted  = errors.New("responder has already accepted this alert")
+	ErrAlertSelfResponse    = errors.New("requester cannot respond to their own alert")
+	ErrAlertInactive        = errors.New("alert is no longer active")
+	ErrAlertAlreadyAccepted = errors.New("responder has already accepted this alert")
+	ErrAlertAccessDenied    = errors.New("you can only manage your own alert")
 )
 
 type AlertResponderSummary struct {
-	UserID          uint       `json:"user_id"`
-	Name            string     `json:"name"`
-	Phone           string     `json:"phone,omitempty"`
-	ResponseStatus  string     `json:"response_status"`
-	DistanceMeters  float64    `json:"distance_meters"`
-	ETASeconds      int        `json:"eta_seconds"`
-	RespondedAt     time.Time  `json:"responded_at"`
-	ArrivedAt       *time.Time `json:"arrived_at,omitempty"`
-	ResponseRating  *int       `json:"response_rating,omitempty"`
+	UserID         uint       `json:"user_id"`
+	Name           string     `json:"name"`
+	Phone          string     `json:"phone,omitempty"`
+	ResponseStatus string     `json:"response_status"`
+	DistanceMeters float64    `json:"distance_meters"`
+	ETASeconds     int        `json:"eta_seconds"`
+	RespondedAt    time.Time  `json:"responded_at"`
+	ArrivedAt      *time.Time `json:"arrived_at,omitempty"`
+	ResponseRating *int       `json:"response_rating,omitempty"`
 }
 
 type AlertIncidentReport struct {
 	AlertID                 uuid.UUID `json:"alert_id"`
+	RequesterUserID         uint      `json:"requester_user_id"`
+	ResponderUserIDs        []uint    `json:"responder_user_ids"`
 	Status                  string    `json:"status"`
 	DurationSeconds         int       `json:"duration_seconds"`
 	CreatedAt               time.Time `json:"created_at"`
@@ -93,6 +96,17 @@ func (s *AlertService) GetAlertHistory(ctx context.Context, userID uint) ([]mode
 		return nil, err
 	}
 	return alerts, nil
+}
+
+func (s *AlertService) GetOwnedAlert(ctx context.Context, alertID uuid.UUID, userID uint) (*models.EmergencyAlert, error) {
+	var alert models.EmergencyAlert
+	if err := s.db.WithContext(ctx).
+		Where("id = ? AND user_id = ?", alertID, userID).
+		First(&alert).Error; err != nil {
+		return nil, err
+	}
+
+	return &alert, nil
 }
 
 func (s *AlertService) GetActiveAlerts(ctx context.Context) ([]models.EmergencyAlert, error) {
@@ -167,6 +181,8 @@ func (s *AlertService) GetAlertDetails(ctx context.Context, alertID uuid.UUID, u
 		Responders:              responders,
 		IncidentReport: AlertIncidentReport{
 			AlertID:                 alert.ID,
+			RequesterUserID:         alert.UserID,
+			ResponderUserIDs:        extractResponderIDs(responders),
 			Status:                  alert.AlertStatus,
 			DurationSeconds:         durationSeconds,
 			CreatedAt:               alert.CreatedAt,
@@ -178,6 +194,14 @@ func (s *AlertService) GetAlertDetails(ctx context.Context, alertID uuid.UUID, u
 			EmergencyServicesStatus: emergencyServicesStatus,
 		},
 	}, nil
+}
+
+func extractResponderIDs(responders []AlertResponderSummary) []uint {
+	ids := make([]uint, 0, len(responders))
+	for _, responder := range responders {
+		ids = append(ids, responder.UserID)
+	}
+	return ids
 }
 
 func (s *AlertService) CreateAlert(ctx context.Context, req CreateAlertRequest) (*models.EmergencyAlert, error) {
@@ -219,25 +243,29 @@ func (s *AlertService) CreateAlert(ctx context.Context, req CreateAlertRequest) 
 
 	// 3. Send notifications
 	usersNotified := 0
+	recipientIDs := make([]uint, 0, len(nearbyUsers))
 	for _, user := range nearbyUsers {
 		if user.ID == req.UserID {
 			continue
 		}
 		s.notificationService.SendEmergencyAlert(user.ID, alert)
+		recipientIDs = append(recipientIDs, user.ID)
 		usersNotified++
 	}
 	alert.UsersNotified = usersNotified
 	s.db.Model(alert).Update("users_notified", usersNotified)
 
 	// 4. Log timeline event
-	s.logTimelineEvent(alert.ID, "created", 100, usersNotified, 0)
+	s.logTimelineEvent(alert.ID, "created", 100, usersNotified, 0, map[string]interface{}{
+		"requester_user_id": req.UserID,
+	})
 
 	// 5. Start radius expansion scheduler
 	s.startRadiusExpansion(alert.ID)
 
 	// 6. Broadcast via WebSocket
 	if s.websocketHub != nil {
-		s.websocketHub.BroadcastEmergencyAlert(alert)
+		s.websocketHub.BroadcastEmergencyAlert(alert, recipientIDs)
 	}
 
 	// 7. Notify emergency contacts immediately
@@ -336,8 +364,13 @@ func (s *AlertService) expandRadius(alertID uuid.UUID, newRadius int) error {
 	}
 
 	// Send notifications to new users
+	recipientIDs := make([]uint, 0, len(newUsers))
 	for _, user := range newUsers {
+		if user.ID == alert.UserID {
+			continue
+		}
 		s.notificationService.SendEmergencyAlert(user.ID, &alert)
+		recipientIDs = append(recipientIDs, user.ID)
 	}
 
 	// Update alert
@@ -347,11 +380,16 @@ func (s *AlertService) expandRadius(alertID uuid.UUID, newRadius int) error {
 	s.db.Save(&alert)
 
 	// Log timeline
-	s.logTimelineEvent(alertID, "radius_expanded", newRadius, alert.UsersNotified, int(responderCount))
+	s.logTimelineEvent(alertID, "radius_expanded", newRadius, alert.UsersNotified, int(responderCount), map[string]interface{}{
+		"requester_user_id": alert.UserID,
+		"old_radius":        oldRadius,
+		"new_radius":        newRadius,
+		"new_user_ids":      recipientIDs,
+	})
 
 	// Broadcast via WebSocket
 	if s.websocketHub != nil {
-		s.websocketHub.BroadcastRadiusExpanded(alertID, oldRadius, newRadius, alert.UsersNotified)
+		s.websocketHub.BroadcastRadiusExpanded(alertID, oldRadius, newRadius, alert.UsersNotified, recipientIDs)
 	}
 
 	return nil
@@ -417,16 +455,33 @@ func (s *AlertService) AcceptAlert(ctx context.Context, alertID uuid.UUID, respo
 
 	// Broadcast via WebSocket
 	if s.websocketHub != nil {
-		s.websocketHub.BroadcastResponderAccepted(alertID, response)
+		s.websocketHub.BroadcastResponderAccepted(alertID, response, alert.UserID)
 	}
 
-	s.logTimelineEvent(alertID, "responder_accepted", alert.CurrentRadius, alert.UsersNotified, int(respondersCount))
+	s.logTimelineEvent(alertID, "responder_accepted", alert.CurrentRadius, alert.UsersNotified, int(respondersCount), map[string]interface{}{
+		"requester_user_id": alert.UserID,
+		"responder_user_id": responderID,
+		"response_id":       response.ID.String(),
+	})
 
 	return nil
 }
 
 func (s *AlertService) ResolveAlert(ctx context.Context, alertID uuid.UUID, resolvedBy uint, resolutionType string) error {
-	// Update alert
+	var alert models.EmergencyAlert
+	if err := s.db.WithContext(ctx).First(&alert, "id = ?", alertID).Error; err != nil {
+		return err
+	}
+	if alert.UserID != resolvedBy {
+		return ErrAlertAccessDenied
+	}
+	if alert.AlertStatus == "resolved" {
+		return nil
+	}
+	if alert.AlertStatus != "active" && alert.AlertStatus != "responding" {
+		return ErrAlertInactive
+	}
+
 	now := time.Now()
 	if err := s.db.Model(&models.EmergencyAlert{}).
 		Where("id = ?", alertID).
@@ -441,7 +496,10 @@ func (s *AlertService) ResolveAlert(ctx context.Context, alertID uuid.UUID, reso
 	s.cancelRadiusExpansion(alertID)
 
 	// Log timeline
-	s.logTimelineEvent(alertID, "resolved", 0, 0, 0)
+	s.logTimelineEvent(alertID, "resolved", 0, 0, 0, map[string]interface{}{
+		"requester_user_id": resolvedBy,
+		"resolution_type":   resolutionType,
+	})
 
 	// Notify all participants
 	s.notificationService.NotifyAllParticipants(alertID, fmt.Sprintf("Alert resolved: %s", resolutionType))
@@ -455,6 +513,20 @@ func (s *AlertService) ResolveAlert(ctx context.Context, alertID uuid.UUID, reso
 }
 
 func (s *AlertService) CancelAlert(ctx context.Context, alertID uuid.UUID, cancelledBy uint) error {
+	var alert models.EmergencyAlert
+	if err := s.db.WithContext(ctx).First(&alert, "id = ?", alertID).Error; err != nil {
+		return err
+	}
+	if alert.UserID != cancelledBy {
+		return ErrAlertAccessDenied
+	}
+	if alert.AlertStatus == "cancelled" {
+		return nil
+	}
+	if alert.AlertStatus != "active" && alert.AlertStatus != "responding" {
+		return ErrAlertInactive
+	}
+
 	now := time.Now()
 	if err := s.db.Model(&models.EmergencyAlert{}).
 		Where("id = ? AND user_id = ?", alertID, cancelledBy).
@@ -466,7 +538,9 @@ func (s *AlertService) CancelAlert(ctx context.Context, alertID uuid.UUID, cance
 	}
 
 	s.cancelRadiusExpansion(alertID)
-	s.logTimelineEvent(alertID, "cancelled", 0, 0, 0)
+	s.logTimelineEvent(alertID, "cancelled", 0, 0, 0, map[string]interface{}{
+		"requester_user_id": cancelledBy,
+	})
 	s.notificationService.NotifyAllParticipants(alertID, "Alert cancelled by the requester")
 
 	if s.websocketHub != nil {
@@ -512,20 +586,31 @@ func (s *AlertService) EscalateToEmergencyServices(alertID uuid.UUID, escalation
 	s.notificationService.NotifyEmergencyContacts(alert.UserID, &alert)
 
 	// Log timeline
-	s.logTimelineEvent(alertID, "escalated", 0, 0, 0)
+	s.logTimelineEvent(alertID, "escalated", 0, 0, 0, map[string]interface{}{
+		"requester_user_id": alert.UserID,
+		"escalation_type":   escalationType,
+	})
 
 	return nil
 }
 
 // Helpers
 
-func (s *AlertService) logTimelineEvent(alertID uuid.UUID, eventType string, radius, usersNotified, respondersCount int) {
+func (s *AlertService) logTimelineEvent(alertID uuid.UUID, eventType string, radius, usersNotified, respondersCount int, eventData ...map[string]interface{}) {
+	payload := ""
+	if len(eventData) > 0 && eventData[0] != nil {
+		if raw, err := json.Marshal(eventData[0]); err == nil {
+			payload = string(raw)
+		}
+	}
+
 	event := models.AlertTimelineEvent{
 		AlertID:         alertID,
 		EventType:       eventType,
 		RadiusAtEvent:   radius,
 		UsersNotified:   usersNotified,
 		RespondersCount: respondersCount,
+		EventData:       payload,
 	}
 	s.db.Create(&event)
 }

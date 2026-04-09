@@ -90,6 +90,13 @@ func RateLimit(rdb *redis.Client, limit int, window time.Duration) gin.HandlerFu
 			endpoint = "unknown"
 		}
 
+		// High-frequency map reads are refreshed elsewhere and should not trip
+		// the generic API limiter during normal location tracking.
+		if endpoint == "/api/v1/location/nearby" || endpoint == "/api/v1/heatmap/statistics" {
+			c.Next()
+			return
+		}
+
 		key := fmt.Sprintf("ratelimit:%s:%s", endpoint, ip)
 		ctx := context.Background()
 

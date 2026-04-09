@@ -87,7 +87,7 @@ func main() {
 	alertHandler := handlers.NewAlertHandler(alertSvc)
 	heatmapHandler := handlers.NewHeatmapHandler(db, rdb)
 	wsHandler := handlers.HandleWebSocket(crimeHub)
-	locationHandler := handlers.NewLocationHandler(locationSvc)
+	locationHandler := handlers.NewLocationHandler(locationSvc, crimeHub)
 	routeHandler := handlers.NewRouteHandler(routeSvc)
 	profileHandler := handlers.NewProfileHandler(db)
 	geofencingHandler := handlers.NewGeofencingHandler(geoSvc)

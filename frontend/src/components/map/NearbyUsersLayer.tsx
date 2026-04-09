@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Marker } from 'react-native-maps';
 import { Location } from '@/types/models';
 import { colors } from '@/theme/colors';
 import { locationApiService, NearbyUserLocation } from '@/services/api/locationApiService';
 import { useAuthStore } from '@/store/authStore';
+import CrimeWebSocketService from '@/services/websocket/CrimeWebSocket';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 
 interface NearbyUsersLayerProps {
@@ -20,6 +21,7 @@ export const NearbyUsersLayer: React.FC<NearbyUsersLayerProps> = ({ userLocation
   const currentUserId = useAuthStore((state) => state.user?.id);
   const [nearbyUsers, setNearbyUsers] = useState<NearbyUserLocation[]>([]);
   const pulse = useSharedValue(1);
+  const lastFetchAtRef = useRef(0);
 
   useEffect(() => {
     pulse.value = withRepeat(withTiming(1.5, { duration: 1500 }), -1, true);
@@ -28,7 +30,13 @@ export const NearbyUsersLayer: React.FC<NearbyUsersLayerProps> = ({ userLocation
   useEffect(() => {
     let cancelled = false;
 
-    const fetchNearbyUsers = async () => {
+    const fetchNearbyUsers = async (force = false) => {
+      const now = Date.now();
+      if (!force && now - lastFetchAtRef.current < 2500) {
+        return;
+      }
+      lastFetchAtRef.current = now;
+
       const users = await locationApiService.getNearbyUsers(userLocation, 5000);
       const filteredUsers = currentUserId
         ? users.filter((user) => String(user.userId) !== String(currentUserId))
@@ -38,10 +46,16 @@ export const NearbyUsersLayer: React.FC<NearbyUsersLayerProps> = ({ userLocation
       onUsersChange?.(filteredUsers.length);
     };
 
-    fetchNearbyUsers();
-    const interval = setInterval(fetchNearbyUsers, 5000);
+    const handleNearbyUsersUpdated = () => {
+      fetchNearbyUsers();
+    };
+
+    fetchNearbyUsers(true);
+    CrimeWebSocketService.on('nearby_users_updated', handleNearbyUsersUpdated);
+    const interval = setInterval(() => fetchNearbyUsers(true), 15000);
     return () => {
       cancelled = true;
+      CrimeWebSocketService.off('nearby_users_updated', handleNearbyUsersUpdated);
       clearInterval(interval);
     };
   }, [currentUserId, userLocation.latitude, userLocation.longitude, onUsersChange]);

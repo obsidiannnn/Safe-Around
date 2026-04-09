@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"strconv"
 	"sync"
 	"time"
 
@@ -116,7 +117,19 @@ func (h *CrimeHub) broadcastEvent(event string, data map[string]interface{}) {
 	h.broadcast <- payload
 }
 
-func (h *CrimeHub) BroadcastEmergencyAlert(alert *models.EmergencyAlert) {
+func uintSliceToStringSlice(ids []uint) []string {
+	if len(ids) == 0 {
+		return []string{}
+	}
+
+	values := make([]string, 0, len(ids))
+	for _, id := range ids {
+		values = append(values, strconv.FormatUint(uint64(id), 10))
+	}
+	return values
+}
+
+func (h *CrimeHub) BroadcastEmergencyAlert(alert *models.EmergencyAlert, recipientUserIDs []uint) {
 	h.broadcastEvent("emergency_alert", map[string]interface{}{
 		"alert_id": alert.ID.String(),
 		"user": map[string]interface{}{
@@ -127,29 +140,41 @@ func (h *CrimeHub) BroadcastEmergencyAlert(alert *models.EmergencyAlert) {
 			"latitude":  alert.AlertLocation.Latitude,
 			"longitude": alert.AlertLocation.Longitude,
 		},
-		"distance":       0,
-		"current_radius": alert.CurrentRadius,
-		"created_at":     alert.CreatedAt,
+		"distance":           0,
+		"current_radius":     alert.CurrentRadius,
+		"created_at":         alert.CreatedAt,
+		"recipient_user_ids": uintSliceToStringSlice(recipientUserIDs),
 	})
 }
 
-func (h *CrimeHub) BroadcastResponderAccepted(alertID uuid.UUID, response *models.AlertResponse) {
+func (h *CrimeHub) BroadcastResponderAccepted(alertID uuid.UUID, response *models.AlertResponse, targetUserID uint) {
 	h.broadcastEvent("responder_accepted", map[string]interface{}{
-		"alert_id":     alertID.String(),
-		"responder_id": response.ResponderUserID,
-		"distance":     response.DistanceMeters,
-		"eta":          response.EstimatedArrivalMinutes,
-		"responded_at": response.RespondedAt,
+		"alert_id":       alertID.String(),
+		"responder_id":   response.ResponderUserID,
+		"distance":       response.DistanceMeters,
+		"eta":            response.EstimatedArrivalMinutes,
+		"responded_at":   response.RespondedAt,
+		"target_user_id": strconv.FormatUint(uint64(targetUserID), 10),
 	})
 }
 
-func (h *CrimeHub) BroadcastRadiusExpanded(alertID uuid.UUID, oldRadius, newRadius, usersNotified int) {
+func (h *CrimeHub) BroadcastRadiusExpanded(alertID uuid.UUID, oldRadius, newRadius, usersNotified int, recipientUserIDs []uint) {
 	h.broadcastEvent("radius_expanded", map[string]interface{}{
-		"alert_id":       alertID.String(),
-		"old_radius":     oldRadius,
-		"new_radius":     newRadius,
-		"users_notified": usersNotified,
-		"timestamp":      time.Now().UTC(),
+		"alert_id":           alertID.String(),
+		"old_radius":         oldRadius,
+		"new_radius":         newRadius,
+		"users_notified":     usersNotified,
+		"timestamp":          time.Now().UTC(),
+		"recipient_user_ids": uintSliceToStringSlice(recipientUserIDs),
+	})
+}
+
+func (h *CrimeHub) BroadcastNearbyUsersUpdated(userID uint, latitude, longitude float64) {
+	h.broadcastEvent("nearby_users_updated", map[string]interface{}{
+		"changed_user_id": strconv.FormatUint(uint64(userID), 10),
+		"latitude":        latitude,
+		"longitude":       longitude,
+		"timestamp":       time.Now().UTC(),
 	})
 }
 

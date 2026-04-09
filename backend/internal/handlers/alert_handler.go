@@ -186,20 +186,60 @@ func (h *AlertHandler) UpdateAlertStatus(c *gin.Context) {
 	if req.Status == "resolved" {
 		err = h.alertService.ResolveAlert(c.Request.Context(), alertID, userID, req.ResolutionType)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to resolve alert"})
+			switch {
+			case errors.Is(err, gorm.ErrRecordNotFound):
+				c.JSON(http.StatusNotFound, gin.H{"error": "Alert not found"})
+			case errors.Is(err, services.ErrAlertAccessDenied):
+				c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			case errors.Is(err, services.ErrAlertInactive):
+				c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			default:
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to resolve alert"})
+			}
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"success": true, "message": "Alert resolved successfully"})
+
+		alert, alertErr := h.alertService.GetOwnedAlert(c.Request.Context(), alertID, userID)
+		if alertErr != nil {
+			c.JSON(http.StatusOK, gin.H{"success": true, "message": "Alert resolved successfully"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "Alert resolved successfully",
+			"data":    alert,
+		})
 		return
 	}
 
 	if req.Status == "cancelled" {
 		err = h.alertService.CancelAlert(c.Request.Context(), alertID, userID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel alert"})
+			switch {
+			case errors.Is(err, gorm.ErrRecordNotFound):
+				c.JSON(http.StatusNotFound, gin.H{"error": "Alert not found"})
+			case errors.Is(err, services.ErrAlertAccessDenied):
+				c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			case errors.Is(err, services.ErrAlertInactive):
+				c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			default:
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel alert"})
+			}
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"success": true, "message": "Alert cancelled successfully"})
+
+		alert, alertErr := h.alertService.GetOwnedAlert(c.Request.Context(), alertID, userID)
+		if alertErr != nil {
+			c.JSON(http.StatusOK, gin.H{"success": true, "message": "Alert cancelled successfully"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "Alert cancelled successfully",
+			"data":    alert,
+		})
 		return
 	}
 

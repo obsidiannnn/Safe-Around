@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import { Button, Card, Input, Avatar } from '@/components/common';
+import { Button, Input, Avatar } from '@/components/common';
 import { alertService } from '@/services/api/alertService';
 import { useAlertStore } from '@/store/alertStore';
 import { AlertDetails } from '@/types/models';
@@ -42,8 +42,10 @@ export const EmergencyResolutionScreen = () => {
   const [details, setDetails] = useState<AlertDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState(0);
+  const [summaryNote, setSummaryNote] = useState('');
   const [feedback, setFeedback] = useState('');
   const [wasHelpful, setWasHelpful] = useState<boolean | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
 
   const loadDetails = useCallback(async () => {
     if (!alertId) {
@@ -74,6 +76,7 @@ export const EmergencyResolutionScreen = () => {
     const lines = [
       'SafeAround Incident Report',
       `Alert ID: ${details.incidentReport.alertId}`,
+      `Requester User ID: ${details.incidentReport.requesterUserId}`,
       `Status: ${details.incidentReport.status}`,
       `Started: ${formatDateTime(details.incidentReport.createdAt)}`,
       `Ended: ${formatDateTime(details.incidentReport.endedAt)}`,
@@ -83,6 +86,10 @@ export const EmergencyResolutionScreen = () => {
       `Responders: ${details.respondersCount}`,
       `Emergency services: ${details.emergencyServicesStatus}`,
     ];
+
+    if (details.incidentReport.responderUserIds.length > 0) {
+      lines.push(`Responder User IDs: ${details.incidentReport.responderUserIds.join(', ')}`);
+    }
 
     if (details.responders.length > 0) {
       lines.push('', 'Responders');
@@ -96,9 +103,14 @@ export const EmergencyResolutionScreen = () => {
     return lines.join('\n');
   }, [details]);
 
-  const handleSubmitRating = () => {
-    console.log('Rating submitted:', { rating, feedback, wasHelpful, alertId });
-    navigation.navigate('EmergencyDashboard' as never);
+  const handleSubmitRating = async () => {
+    try {
+      setIsClosing(true);
+      console.log('Resolution feedback captured:', { rating, summaryNote, feedback, wasHelpful, alertId });
+      navigation.navigate('EmergencyDashboard' as never);
+    } finally {
+      setIsClosing(false);
+    }
   };
 
   const handleShareReport = async () => {
@@ -115,6 +127,40 @@ export const EmergencyResolutionScreen = () => {
       Alert.alert('Report unavailable', 'We could not prepare the incident report right now.');
     }
   };
+
+  const summaryRows = useMemo(() => {
+    if (!details) {
+      return [];
+    }
+
+    return [
+      {
+        icon: 'schedule',
+        label: 'Duration',
+        value: formatDuration(details.durationSeconds),
+      },
+      {
+        icon: 'notifications-active',
+        label: 'People alerted',
+        value: String(details.incidentReport.usersNotified),
+      },
+      {
+        icon: 'my-location',
+        label: 'Max radius reached',
+        value: `${details.incidentReport.maxRadiusReached || details.incidentReport.currentRadius}m`,
+      },
+      {
+        icon: 'people',
+        label: 'Responders',
+        value: String(details.respondersCount),
+      },
+      {
+        icon: 'local-police',
+        label: 'Emergency Services',
+        value: details.emergencyServicesStatus || 'Not contacted',
+      },
+    ];
+  }, [details]);
 
   if (loading) {
     return (
@@ -147,33 +193,30 @@ export const EmergencyResolutionScreen = () => {
             <Icon name="check-circle" size={80} color={colors.success} />
           </View>
           <Text style={styles.title}>You're Safe!</Text>
-          <Text style={styles.subtitle}>Emergency alert has been resolved</Text>
+          <Text style={styles.subtitle}>
+            Your SOS is closed. Here is a clear summary of what happened during the alert.
+          </Text>
         </View>
 
-        <Card variant="elevated" padding="lg" style={styles.summaryCard}>
+        <View style={styles.sectionCard}>
           <Text style={styles.cardTitle}>Alert Summary</Text>
-
-          <View style={styles.summaryRow}>
-            <Icon name="schedule" size={20} color={colors.textSecondary} />
-            <Text style={styles.summaryLabel}>Duration</Text>
-            <Text style={styles.summaryValue}>{formatDuration(details.durationSeconds)}</Text>
-          </View>
-
-          <View style={styles.summaryRow}>
-            <Icon name="people" size={20} color={colors.textSecondary} />
-            <Text style={styles.summaryLabel}>Responders</Text>
-            <Text style={styles.summaryValue}>{details.respondersCount}</Text>
-          </View>
-
-          <View style={styles.summaryRow}>
-            <Icon name="local-police" size={20} color={colors.textSecondary} />
-            <Text style={styles.summaryLabel}>Emergency Services</Text>
-            <Text style={styles.summaryValue}>{details.emergencyServicesStatus}</Text>
-          </View>
-        </Card>
+          {summaryRows.map((row, index) => (
+            <View
+              key={row.label}
+              style={[
+                styles.summaryRow,
+                index === summaryRows.length - 1 && styles.summaryRowLast,
+              ]}
+            >
+              <Icon name={row.icon as any} size={20} color={colors.textSecondary} />
+              <Text style={styles.summaryLabel}>{row.label}</Text>
+              <Text style={styles.summaryValue}>{row.value}</Text>
+            </View>
+          ))}
+        </View>
 
         {details.responders.length > 0 && (
-          <Card variant="elevated" padding="lg" style={styles.respondersCard}>
+          <View style={styles.sectionCard}>
             <Text style={styles.cardTitle}>Responders Who Helped</Text>
             {details.responders.map((responder) => (
               <View key={responder.userId} style={styles.responderItem}>
@@ -186,11 +229,23 @@ export const EmergencyResolutionScreen = () => {
                 </View>
               </View>
             ))}
-          </Card>
+          </View>
         )}
 
-        <Card variant="elevated" padding="lg" style={styles.ratingCard}>
-          <Text style={styles.cardTitle}>Rate Your Experience</Text>
+        {details.responders.length === 0 && (
+          <View style={styles.sectionCard}>
+            <Text style={styles.cardTitle}>Responder status</Text>
+            <Text style={styles.emptyStateText}>
+              No verified responder accepted this SOS before it was closed. Your incident report still includes the alert timeline and notification coverage.
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.cardTitle}>Optional feedback</Text>
+          <Text style={styles.feedbackHint}>
+            You can close this incident immediately, or leave a quick rating to help improve SOS handling.
+          </Text>
 
           <View style={styles.starsContainer}>
             {[1, 2, 3, 4, 5].map((star) => (
@@ -205,9 +260,19 @@ export const EmergencyResolutionScreen = () => {
           </View>
 
           <Input
+            label="What happened?"
+            value={summaryNote}
+            onChangeText={setSummaryNote}
+            placeholder="Example: Two nearby responders reached me within 3 minutes."
+            maxLength={160}
+            showCounter
+          />
+
+          <Input
+            label="Anything else we should know?"
             value={feedback}
             onChangeText={setFeedback}
-            placeholder="Share your feedback (optional)"
+            placeholder="Share follow-up details, missing context, or anything we should improve."
             maxLength={500}
             showCounter
           />
@@ -231,7 +296,7 @@ export const EmergencyResolutionScreen = () => {
               No
             </Button>
           </View>
-        </Card>
+        </View>
 
         <View style={styles.actions}>
           <Button
@@ -250,9 +315,9 @@ export const EmergencyResolutionScreen = () => {
             size="large"
             fullWidth
             onPress={handleSubmitRating}
-            disabled={rating === 0}
+            disabled={isClosing}
           >
-            Submit & Close
+            {rating > 0 || summaryNote.trim() || feedback.trim() || wasHelpful !== null ? 'Submit & Close' : 'Close Incident'}
           </Button>
         </View>
       </ScrollView>
@@ -299,9 +364,24 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: fontSizes.md,
     color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
   },
   summaryCard: {
     marginBottom: spacing.lg,
+  },
+  sectionCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 28,
+    padding: spacing.xl,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.06)',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 6,
   },
   cardTitle: {
     fontSize: fontSizes.lg,
@@ -316,6 +396,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+  summaryRowLast: {
+    borderBottomWidth: 0,
+    paddingBottom: 0,
+  },
   summaryLabel: {
     flex: 1,
     fontSize: fontSizes.sm,
@@ -329,6 +413,10 @@ const styles = StyleSheet.create({
   },
   respondersCard: {
     marginBottom: spacing.lg,
+  },
+  emptyStateText: {
+    color: colors.textSecondary,
+    lineHeight: 22,
   },
   responderItem: {
     flexDirection: 'row',
@@ -351,6 +439,11 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   ratingCard: {
+    marginBottom: spacing.lg,
+  },
+  feedbackHint: {
+    color: colors.textSecondary,
+    lineHeight: 20,
     marginBottom: spacing.lg,
   },
   starsContainer: {

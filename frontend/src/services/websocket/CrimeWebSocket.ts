@@ -49,12 +49,16 @@ class CrimeWebSocketService {
           case 'radius_expanded':
             this.emit('radius_expanded', eventData);
             break;
+          case 'nearby_users_updated':
+            this.emit('nearby_users_updated', eventData);
+            break;
           case 'connected':
             if (eventData) {
               console.log('WS Connection data:', eventData);
             }
             break;
           case 'room_closed':
+            this.emit('room_closed', eventData);
             break;
           default:
             console.log('Unhandled WS event:', eventName);

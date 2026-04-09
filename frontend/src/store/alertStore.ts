@@ -72,24 +72,27 @@ export const useAlertStore = create<AlertState>((set, get) => ({
 
   cancelAlert: async (alertId) => {
     try {
-      await alertService.updateAlertStatus(alertId, 'cancelled');
+      const alert = await alertService.updateAlertStatus(alertId, 'cancelled');
+      if (alert) {
+        get().addToHistory(alert);
+      }
       set({ activeAlert: null, isAlertActive: false, currentRadius: 100, respondersCount: 0 });
     } catch (error) {
-      console.error('Error cancelling alert:', error);
+      console.warn('Error cancelling alert:', error);
       throw error;
     }
   },
 
   resolveAlert: async (alertId) => {
     try {
-      await alertService.updateAlertStatus(alertId, 'resolved');
-      const alert = get().activeAlert;
+      const updatedAlert = await alertService.updateAlertStatus(alertId, 'resolved');
+      const alert = updatedAlert ?? get().activeAlert;
       if (alert) {
         get().addToHistory({ ...alert, status: 'resolved', resolvedAt: new Date().toISOString() });
       }
       set({ activeAlert: null, isAlertActive: false, currentRadius: 100, respondersCount: 0 });
     } catch (error) {
-      console.error('Error resolving alert:', error);
+      console.warn('Error resolving alert:', error);
       throw error;
     }
   },

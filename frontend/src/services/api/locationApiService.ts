@@ -33,8 +33,15 @@ export const locationApiService = {
           lat: location.latitude,
           lng: location.longitude,
           radius,
-        }
+        },
+        validateStatus: (status) => status >= 200 && status < 500,
       });
+
+      if (response.status === 429) {
+        console.warn('Nearby users request was rate limited; using the last map state for now.');
+        return [];
+      }
+
       return (response.data?.data || []).map((user: any) => ({
         userId: String(user.user_id ?? user.userId ?? user.id),
         latitude: Number(user.latitude),
@@ -42,7 +49,7 @@ export const locationApiService = {
         recordedAt: user.recorded_at ?? user.recordedAt,
       })).filter((user: NearbyUserLocation) => Number.isFinite(user.latitude) && Number.isFinite(user.longitude));
     } catch (error) {
-      console.error('Failed to get nearby users:', error);
+      console.warn('Failed to get nearby users:', error);
       return [];
     }
   }

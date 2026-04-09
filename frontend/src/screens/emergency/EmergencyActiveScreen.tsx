@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Linking, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Linking, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,6 +37,7 @@ export const EmergencyActiveScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [isCompleting, setIsCompleting] = useState(false);
 
   useEffect(() => {
     scale.value = withRepeat(withTiming(1.16, { duration: 1100 }), -1, true);
@@ -155,10 +156,13 @@ export const EmergencyActiveScreen = () => {
     }
 
     try {
+      setIsCompleting(true);
       await resolveAlert(currentAlert.id);
       (navigation as any).navigate('EmergencyResolution', { alertId: currentAlert.id });
     } catch (error) {
-      console.error('Error resolving alert:', error);
+      Alert.alert('Unable to finish SOS', 'We could not close this SOS yet. Please try again.');
+    } finally {
+      setIsCompleting(false);
     }
   };
 
@@ -168,10 +172,13 @@ export const EmergencyActiveScreen = () => {
     }
 
     try {
+      setIsCompleting(true);
       await cancelAlert(currentAlert.id);
-      navigation.goBack();
+      (navigation as any).navigate('EmergencyDashboard');
     } catch (error) {
-      console.error('Error cancelling alert:', error);
+      Alert.alert('Unable to cancel alert', 'This SOS could not be cancelled right now. Please refresh and try again.');
+    } finally {
+      setIsCompleting(false);
     }
   };
 
@@ -306,7 +313,7 @@ export const EmergencyActiveScreen = () => {
           onPress={handleSafe}
           icon="check-circle"
           style={styles.safeButton}
-          disabled={loading || !currentAlert}
+          disabled={loading || isCompleting || !currentAlert}
         >
           I'm Safe Now
         </Button>
@@ -315,7 +322,7 @@ export const EmergencyActiveScreen = () => {
           size="medium"
           fullWidth
           onPress={handleCancel}
-          disabled={loading || !currentAlert}
+          disabled={loading || isCompleting || !currentAlert}
         >
           Cancel Alert
         </Button>
