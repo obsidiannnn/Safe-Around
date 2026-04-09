@@ -65,7 +65,7 @@ export const useAlertStore = create<AlertState>((set, get) => ({
       
       return alert;
     } catch (error) {
-      console.error('Error creating alert:', error);
+      console.warn('Error creating alert:', error);
       throw error;
     }
   },

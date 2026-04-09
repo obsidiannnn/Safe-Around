@@ -111,13 +111,12 @@ func (s *AlertService) CreateAlert(ctx context.Context, req CreateAlertRequest) 
 
 	// 1. Create alert record
 	alert := &models.EmergencyAlert{
-		UserID:          req.UserID,
-		AlertLocation:   req.Location,
-		AlertType:       req.AlertType,
-		SilentMode:      req.SilentMode,
-		Metadata:        metadata,
-		CurrentRadius:   100,
-		EmergencyNumber: indiaEmergencyNumber,
+		UserID:        req.UserID,
+		AlertLocation: req.Location,
+		AlertType:     req.AlertType,
+		SilentMode:    req.SilentMode,
+		Metadata:      metadata,
+		CurrentRadius: 100,
 	}
 
 	if err := s.db.Create(alert).Error; err != nil {

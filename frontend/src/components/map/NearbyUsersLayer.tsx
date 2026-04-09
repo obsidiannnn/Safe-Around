@@ -27,14 +27,14 @@ export const NearbyUsersLayer: React.FC<NearbyUsersLayerProps> = ({ userLocation
     let cancelled = false;
 
     const fetchNearbyUsers = async () => {
-      const users = await locationApiService.getNearbyUsers(userLocation, 1000);
+      const users = await locationApiService.getNearbyUsers(userLocation, 5000);
       if (cancelled) return;
       setNearbyUsers(users);
       onUsersChange?.(users.length);
     };
 
     fetchNearbyUsers();
-    const interval = setInterval(fetchNearbyUsers, 30000);
+    const interval = setInterval(fetchNearbyUsers, 10000);
     return () => {
       cancelled = true;
       clearInterval(interval);

@@ -96,7 +96,7 @@ func (h *LocationHandler) GetNearbyUsers(c *gin.Context) {
 
 	latStr := c.Query("lat")
 	lngStr := c.Query("lng")
-	radiusStr := c.DefaultQuery("radius", "500")
+	radiusStr := c.DefaultQuery("radius", "5000")
 
 	lat, err1 := strconv.ParseFloat(latStr, 64)
 	lng, err2 := strconv.ParseFloat(lngStr, 64)
