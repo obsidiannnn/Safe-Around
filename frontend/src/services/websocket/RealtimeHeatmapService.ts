@@ -1,14 +1,13 @@
 import { io, Socket } from 'socket.io-client';
 import { Alert } from 'react-native';
+import { WEBSOCKET_URL } from '@/config/env';
 
 class RealtimeHeatmapService {
   private socket: Socket | null = null;
   private listeners: Map<string, Function[]> = new Map();
 
   connect() {
-    // In a real production app, this URL would come from a config or env variable
-    // For now, we use a placeholder that matches the backend's local port
-    this.socket = io('ws://localhost:8080', {
+    this.socket = io(WEBSOCKET_URL, {
       transports: ['websocket'],
       reconnection: true,
       reconnectionDelay: 1000,

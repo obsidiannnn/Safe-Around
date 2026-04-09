@@ -21,6 +21,7 @@ export const theme = {
     backdrop: colors.backdrop,
     warning: colors.warning,
     success: colors.success,
+    info: colors.info,
   },
   spacing,
   borderRadius,

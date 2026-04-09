@@ -45,7 +45,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 
   return (
     <View style={styles.container}>
-      <Icon name={iconName} size={64} color={colors.textSecondary} />
+      <Icon name={iconName as any} size={64} color={colors.textSecondary} />
       <Text style={styles.title}>{title}</Text>
       {description && <Text style={styles.description}>{description}</Text>}
       {actionLabel && onAction && (

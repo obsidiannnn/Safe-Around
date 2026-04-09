@@ -69,7 +69,7 @@ export const Alert: React.FC<AlertProps> = ({
 
   return (
     <Animated.View style={[styles.container, { backgroundColor: config.color }, animatedStyle]}>
-      <Icon name={config.icon} size={24} color={colors.surface} style={styles.icon} />
+      <Icon name={config.icon as any} size={24} color={colors.surface} style={styles.icon} />
       
       <Text style={styles.message}>{message}</Text>
       

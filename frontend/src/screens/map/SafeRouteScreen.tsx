@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
@@ -13,6 +13,7 @@ import { spacing, borderRadius, shadows } from '@/theme/spacing';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { audioService } from '@/services/audioService';
 import { GOOGLE_MAPS_API_KEY } from '@/config/env';
+import { routeApiService } from '@/services/api/routeService';
 
 // Polyline Decoder for Google Maps Directions API string compression formula
 const decodePolyline = (t: string, e: number = 5) => {
@@ -50,6 +51,8 @@ interface Route {
   safetyScore: number;
   dangerZones: number;
   coordinates: Array<{ latitude: number; longitude: number }>;
+  riskLevel: string;
+  color: string;
 }
 
 export const SafeRouteScreen: React.FC = () => {
@@ -66,49 +69,47 @@ export const SafeRouteScreen: React.FC = () => {
   };
   
   const initialDestination = (route.params as any)?.destination || '';
-  const [destination, setDestination] = useState(initialDestination);
+  const [destinationQuery, setDestinationQuery] = useState(
+    typeof initialDestination === 'string' ? initialDestination : initialDestination?.name || '',
+  );
+  const [destinationCoords, setDestinationCoords] = useState<{ latitude: number; longitude: number } | null>(
+    typeof initialDestination === 'object' && initialDestination?.location ? initialDestination.location : null,
+  );
   const [mode, setMode] = useState<'walking' | 'driving' | 'transit'>('walking');
   const [selectedRoute, setSelectedRoute] = useState<string>('a');
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(false);
 
   React.useEffect(() => {
-    if (initialDestination || destination) {
+    if (destinationCoords) {
       fetchDirections();
     }
-  }, [initialDestination, mode]);
+  }, [destinationCoords, mode]);
 
   const fetchDirections = async () => {
-    if (!currentLocation || !destination) return;
+    if (!currentLocation || !destinationCoords) {
+      return;
+    }
     setLoading(true);
     try {
       const modeString = mode === 'walking' ? 'walking' : mode === 'driving' ? 'driving' : 'transit';
-      const origin = `${currentLocation.latitude},${currentLocation.longitude}`;
-      // Added alternatives=true and departure_time=now for better transit results
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${encodeURIComponent(destination)}&mode=${modeString}&alternatives=true&departure_time=now&key=${GOOGLE_MAPS_API_KEY}`;
-      
-      const res = await fetch(url);
-      const data = await res.json();
+      const data = await routeApiService.getSafeRoutes(currentLocation, destinationCoords, modeString);
 
-      if (data.status === 'OK' && data.routes.length > 0) {
-        const newRoutes = data.routes.map((routeData: any, index: number) => {
-          const leg = routeData.legs[0];
-          const points = decodePolyline(routeData.overview_polyline.points);
-          
-          return {
-            id: String.fromCharCode(97 + index), // 'a', 'b', etc.
-            name: index === 0 ? `Recommended ${modeString}` : `Alternative ${index}`,
-            distance: parseFloat(leg.distance.text.replace(/[^0-9.]/g, '')),
-            duration: Math.round(leg.duration.value / 60),
-            safetyScore: Math.floor(Math.random() * 15) + 85 - (index * 5), // Slightly lower score for alternatives
-            dangerZones: 0,
-            coordinates: points,
-            steps: leg.steps,
-          };
-        });
+      if (data.length > 0) {
+        const newRoutes = data.map((routeData: any) => ({
+          id: routeData.route_id,
+          name: routeData.name,
+          distance: Math.round((routeData.distance_meters / 1000) * 10) / 10,
+          duration: routeData.duration_minutes,
+          safetyScore: routeData.safety_score,
+          dangerZones: routeData.danger_zones_count,
+          coordinates: decodePolyline(routeData.polyline),
+          riskLevel: routeData.risk_level,
+          color: routeData.color,
+        }));
 
         setRoutes(newRoutes);
-        setSelectedRoute('a');
+        setSelectedRoute(newRoutes[0].id);
 
         // Fit map to first route
         if (newRoutes[0].coordinates.length > 0) {
@@ -123,7 +124,8 @@ export const SafeRouteScreen: React.FC = () => {
         setRoutes([]);
       }
     } catch (err) {
-      console.error('Directions Error:', err);
+      console.warn('Safe route calculation failed:', err);
+      Alert.alert('Route unavailable', 'We could not calculate a safe route right now. Please try again in a moment.');
     } finally {
       setLoading(false);
     }
@@ -141,7 +143,7 @@ export const SafeRouteScreen: React.FC = () => {
       (navigation as any).navigate('Navigation', { 
         route: selectedRouteData, 
         mode,
-        destinationName: destination.includes(',') ? 'Selected Location' : destination
+        destinationName: destinationQuery || 'Selected Location'
       });
     }
   };
@@ -169,12 +171,15 @@ export const SafeRouteScreen: React.FC = () => {
           debounce={400}
           minLength={3}
           onPress={(data, details = null) => {
-            console.log('SafeRoute destination selected:', data.description);
             if (details?.geometry?.location) {
-              const coords = `${details.geometry.location.lat},${details.geometry.location.lng}`;
-              setDestination(coords);
+              setDestinationQuery(data.description);
+              setDestinationCoords({
+                latitude: details.geometry.location.lat,
+                longitude: details.geometry.location.lng,
+              });
             } else {
-              setDestination(data.description);
+              setDestinationQuery(data.description);
+              setDestinationCoords(null);
             }
           }}
           query={{
@@ -184,7 +189,7 @@ export const SafeRouteScreen: React.FC = () => {
             location: currentLocation ? `${currentLocation.latitude},${currentLocation.longitude}` : undefined,
             radius: '20000', // 20km bias
           }}
-          onFail={(error) => console.error('SafeRoute Places Error:', error)}
+          onFail={(error) => console.warn('SafeRoute Places Error:', error)}
           keyboardShouldPersistTaps="always"
           enablePoweredByContainer={false}
           styles={{
@@ -217,7 +222,10 @@ export const SafeRouteScreen: React.FC = () => {
             separator: { height: 1, backgroundColor: colors.border },
           }}
           textInputProps={{
-            onChangeText: (text) => setDestination(text),
+            onChangeText: (text) => {
+              setDestinationQuery(text);
+              setDestinationCoords(null);
+            },
             placeholderTextColor: colors.textSecondary,
           }}
           renderLeftButton={() => (
@@ -231,7 +239,7 @@ export const SafeRouteScreen: React.FC = () => {
           size="medium" 
           onPress={fetchDirections} 
           style={{ marginTop: spacing.md, borderRadius: borderRadius.lg }}
-          disabled={loading || !destination}
+          disabled={loading || !destinationCoords}
         >
           {loading ? 'Analyzing Safety Data...' : 'Calculate Safe Paths'}
         </Button>
@@ -270,21 +278,18 @@ export const SafeRouteScreen: React.FC = () => {
             }}
           >
             <Marker coordinate={currentLocation} title="You're Here" pinColor={colors.secondary} />
-            {destination.includes(',') && (
+            {destinationCoords && (
               <Marker 
-                coordinate={{ 
-                  latitude: parseFloat(destination.split(',')[0]), 
-                  longitude: parseFloat(destination.split(',')[1]) 
-                }} 
+                coordinate={destinationCoords}
                 title="Goal"
                 pinColor={colors.primary}
               />
             )}
             {routes.length > 0 && routes[0].coordinates.length > 0 && (
               <Polyline
-                coordinates={routes[0].coordinates}
+                coordinates={routes.find((item) => item.id === selectedRoute)?.coordinates || routes[0].coordinates}
                 strokeWidth={5}
-                strokeColor={colors.primary}
+                strokeColor={routes.find((item) => item.id === selectedRoute)?.color || colors.primary}
               />
             )}
           </MapView>
@@ -307,8 +312,8 @@ export const SafeRouteScreen: React.FC = () => {
           >
             <View style={styles.routeHeader}>
               <View>
-                <Text style={styles.routeName}>Safe Heritage Route</Text>
-                <Text style={styles.routeSubname}>{route.name}</Text>
+                <Text style={styles.routeName}>{route.name}</Text>
+                <Text style={styles.routeSubname}>{route.dangerZones} danger zones on this path</Text>
               </View>
               <View style={[styles.scoreBadge, { backgroundColor: getScoreColor(route.safetyScore) }]}>
                 <Text style={styles.scoreText}>{route.safetyScore}% SAFE</Text>
@@ -325,7 +330,7 @@ export const SafeRouteScreen: React.FC = () => {
               </View>
               <View style={styles.stat}>
                 <Icon name="verified-user" size={16} color={colors.secondary} />
-                <Text style={[styles.statText, { color: colors.secondary }]}>Verified Safe</Text>
+                <Text style={[styles.statText, { color: colors.secondary }]}>{route.riskLevel}</Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -338,7 +343,7 @@ export const SafeRouteScreen: React.FC = () => {
           size="large"
           fullWidth
           onPress={handleStartNavigation}
-          disabled={!destination}
+          disabled={!destinationCoords || routes.length === 0}
           style={styles.startButton}
         >
           Begin Secure Journey

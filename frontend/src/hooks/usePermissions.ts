@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
-import * as Camera from 'expo-camera';
+import { Camera } from 'expo-camera';
 import { Linking, Platform } from 'react-native';
 
 export type PermissionType = 'location' | 'notifications' | 'camera' | 'microphone' | 'motion';

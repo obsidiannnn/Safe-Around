@@ -61,7 +61,7 @@ export const AlertTimeline: React.FC<AlertTimelineProps> = ({ events }) => {
         <View key={event.id} style={styles.eventItem}>
           <View style={styles.iconContainer}>
             <View style={[styles.iconCircle, { backgroundColor: `${getStatusColor(event.status)}20` }]}>
-              <Icon name={getIcon(event.type)} size={20} color={getStatusColor(event.status)} />
+              <Icon name={getIcon(event.type) as any} size={20} color={getStatusColor(event.status)} />
             </View>
             {index < events.length - 1 && (
               <View style={[styles.line, { backgroundColor: getStatusColor(event.status) }]} />

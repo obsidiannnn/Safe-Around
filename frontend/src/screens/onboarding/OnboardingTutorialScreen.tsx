@@ -92,7 +92,7 @@ export const OnboardingTutorialScreen = () => {
         {slides.map((slide, index) => (
           <View key={index} style={styles.slide}>
             <View style={styles.iconContainer}>
-              <Icon name={slide.icon} size={80} color={colors.primary} />
+              <Icon name={slide.icon as any} size={80} color={colors.primary} />
             </View>
             <Text style={styles.slideTitle}>{slide.title}</Text>
             <Text style={styles.slideDescription}>{slide.description}</Text>

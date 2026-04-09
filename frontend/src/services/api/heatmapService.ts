@@ -36,6 +36,18 @@ export const heatmapService = {
     return response.data.data;
   },
 
+  async getTile(z: number, x: number, y: number): Promise<string | null> {
+    const response = await apiClient.get(`/heatmap/tiles/${z}/${x}/${y}`, {
+      validateStatus: (status) => status >= 200 && status < 500,
+    });
+
+    if (response.status !== 200) {
+      return null;
+    }
+
+    return response.request?.responseURL ?? null;
+  },
+
   // Get statistics for a point
   async getStatistics(lat: number, lng: number): Promise<AreaStats> {
     const response = await apiClient.get('/heatmap/statistics', {

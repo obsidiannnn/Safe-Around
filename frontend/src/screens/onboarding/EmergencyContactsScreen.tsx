@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert as RNAlert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Checkbox } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
@@ -39,10 +39,11 @@ export const EmergencyContactsScreen = () => {
     }
 
     const newContact: EmergencyContact = {
-      id: Date.now().toString(),
-      userId: '',
+      id: Date.now(),
+      userId: 0,
       name: data.name,
-      phoneNumber: data.phoneNumber,
+      phoneNumber: data.phone,
+      phone: data.phone,
       relationship: data.relationship,
       isPrimary: contacts.length === 0 ? true : isPrimary,
       createdAt: new Date().toISOString(),
@@ -54,7 +55,7 @@ export const EmergencyContactsScreen = () => {
     reset();
   };
 
-  const removeContact = (contactId: string) => {
+  const removeContact = (contactId: number) => {
     setContacts(contacts.filter((c) => c.id !== contactId));
   };
 
@@ -72,7 +73,7 @@ export const EmergencyContactsScreen = () => {
       navigation.navigate('OnboardingTutorial' as never);
     } catch (error) {
       console.error('Failed to save contacts:', error);
-      Alert.alert('Error', 'Failed to save emergency contacts. Please try again.');
+      RNAlert.alert('Error', 'Failed to save emergency contacts. Please try again.');
     }
   };
 
@@ -141,13 +142,13 @@ export const EmergencyContactsScreen = () => {
 
           <Controller
             control={control}
-            name="phoneNumber"
+            name="phone"
             render={({ field: { onChange, value } }) => (
               <PhoneInput
                 label="Phone Number"
                 value={value}
                 onChangeText={onChange}
-                error={errors.phoneNumber?.message}
+                error={errors.phone?.message}
               />
             )}
           />

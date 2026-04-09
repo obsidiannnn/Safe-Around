@@ -156,7 +156,7 @@ export const EmergencyActiveScreen = () => {
 
     try {
       await resolveAlert(currentAlert.id);
-      navigation.navigate('EmergencyResolution' as never, { alertId: currentAlert.id } as never);
+      (navigation as any).navigate('EmergencyResolution', { alertId: currentAlert.id });
     } catch (error) {
       console.error('Error resolving alert:', error);
     }

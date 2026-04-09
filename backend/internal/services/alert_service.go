@@ -106,7 +106,19 @@ func (s *AlertService) GetActiveAlerts(ctx context.Context) ([]models.EmergencyA
 func (s *AlertService) GetAlertDetails(ctx context.Context, alertID uuid.UUID, userID uint) (*AlertDetails, error) {
 	var alert models.EmergencyAlert
 	if err := s.db.WithContext(ctx).
-		Where("id = ? AND user_id = ?", alertID, userID).
+		Where(`
+			id = ?
+			AND (
+				user_id = ?
+				OR EXISTS (
+					SELECT 1
+					FROM alert_responses ar
+					WHERE ar.alert_id = emergency_alerts.id
+					  AND ar.responder_user_id = ?
+					  AND ar.response_status IN ('accepted', 'arrived', 'helping')
+				)
+			)
+		`, alertID, userID, userID).
 		First(&alert).Error; err != nil {
 		return nil, err
 	}
