@@ -1,165 +1,259 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { Button, Card, Input, Avatar } from '@/components/common';
+import { alertService } from '@/services/api/alertService';
+import { useAlertStore } from '@/store/alertStore';
+import { AlertDetails } from '@/types/models';
 import { colors } from '@/theme/colors';
-import { spacing, borderRadius } from '@/theme/spacing';
+import { spacing } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
+import { formatDateTime } from '@/utils/formatters';
 
-interface Responder {
-  id: string;
-  name: string;
-  avatar?: string;
-  rating?: number;
-}
+const formatDuration = (durationSeconds: number) => {
+  const safeSeconds = Math.max(0, durationSeconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
 
-/**
- * Emergency resolution screen shown after alert is resolved
- * Allows rating experience and viewing incident report
- */
+const formatDistance = (distanceMeters: number) => {
+  if (distanceMeters >= 1000) {
+    return `${(distanceMeters / 1000).toFixed(1)} km`;
+  }
+  return `${Math.round(distanceMeters)} m`;
+};
+
+const formatEta = (etaSeconds: number) => {
+  const minutes = Math.max(1, Math.round(etaSeconds / 60));
+  return `${minutes} min ETA`;
+};
+
 export const EmergencyResolutionScreen = () => {
   const navigation = useNavigation();
+  const route = useRoute<any>();
+  const alertHistory = useAlertStore((state) => state.alertHistory);
+  const fallbackAlertId = alertHistory.find((alert) => alert.status === 'resolved')?.id;
+  const alertId = route.params?.alertId ?? fallbackAlertId;
+
+  const [details, setDetails] = useState<AlertDetails | null>(null);
+  const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [wasHelpful, setWasHelpful] = useState<boolean | null>(null);
 
-  const alertDuration = '3:45'; // Mock data
-  const responders: Responder[] = [
-    { id: '1', name: 'Sarah K.', rating: 5 },
-    { id: '2', name: 'Mike T.', rating: 5 },
-  ];
+  const loadDetails = useCallback(async () => {
+    if (!alertId) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const nextDetails = await alertService.getAlertDetails(alertId);
+      setDetails(nextDetails);
+    } catch (error) {
+      console.warn('Failed to load resolved alert details:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [alertId]);
+
+  useEffect(() => {
+    loadDetails();
+  }, [loadDetails]);
+
+  const reportText = useMemo(() => {
+    if (!details) {
+      return '';
+    }
+
+    const lines = [
+      'SafeAround Incident Report',
+      `Alert ID: ${details.incidentReport.alertId}`,
+      `Status: ${details.incidentReport.status}`,
+      `Started: ${formatDateTime(details.incidentReport.createdAt)}`,
+      `Ended: ${formatDateTime(details.incidentReport.endedAt)}`,
+      `Duration: ${formatDuration(details.durationSeconds)}`,
+      `Max search radius: ${details.incidentReport.maxRadiusReached}m`,
+      `Users notified: ${details.incidentReport.usersNotified}`,
+      `Responders: ${details.respondersCount}`,
+      `Emergency services: ${details.emergencyServicesStatus}`,
+    ];
+
+    if (details.responders.length > 0) {
+      lines.push('', 'Responders');
+      details.responders.forEach((responder, index) => {
+        lines.push(
+          `${index + 1}. ${responder.name} | ${formatDistance(responder.distanceMeters)} | ${formatEta(responder.etaSeconds)} | ${responder.responseStatus}`,
+        );
+      });
+    }
+
+    return lines.join('\n');
+  }, [details]);
 
   const handleSubmitRating = () => {
-    // TODO: Submit rating to API
-    console.log('Rating submitted:', { rating, feedback, wasHelpful });
-    navigation.navigate('Map' as never);
+    console.log('Rating submitted:', { rating, feedback, wasHelpful, alertId });
+    navigation.navigate('EmergencyDashboard' as never);
   };
+
+  const handleShareReport = async () => {
+    if (!reportText) {
+      return;
+    }
+
+    try {
+      await Share.share({
+        title: 'SafeAround Incident Report',
+        message: reportText,
+      });
+    } catch (error) {
+      Alert.alert('Report unavailable', 'We could not prepare the incident report right now.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.centeredState}>
+          <Text style={styles.loadingText}>Loading incident summary...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!details) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.centeredState}>
+          <Text style={styles.loadingText}>We could not load this alert summary.</Text>
+          <Button variant="outline" onPress={() => navigation.goBack()}>
+            Go Back
+          </Button>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.header}>
-        <View style={styles.iconContainer}>
-          <Icon name="check-circle" size={80} color={colors.success} />
+          <View style={styles.iconContainer}>
+            <Icon name="check-circle" size={80} color={colors.success} />
+          </View>
+          <Text style={styles.title}>You're Safe!</Text>
+          <Text style={styles.subtitle}>Emergency alert has been resolved</Text>
         </View>
-        <Text style={styles.title}>You're Safe!</Text>
-        <Text style={styles.subtitle}>Emergency alert has been resolved</Text>
-      </View>
 
         <Card variant="elevated" padding="lg" style={styles.summaryCard}>
-        <Text style={styles.cardTitle}>Alert Summary</Text>
+          <Text style={styles.cardTitle}>Alert Summary</Text>
 
-        <View style={styles.summaryRow}>
-          <Icon name="schedule" size={20} color={colors.textSecondary} />
-          <Text style={styles.summaryLabel}>Duration</Text>
-          <Text style={styles.summaryValue}>{alertDuration}</Text>
-        </View>
+          <View style={styles.summaryRow}>
+            <Icon name="schedule" size={20} color={colors.textSecondary} />
+            <Text style={styles.summaryLabel}>Duration</Text>
+            <Text style={styles.summaryValue}>{formatDuration(details.durationSeconds)}</Text>
+          </View>
 
-        <View style={styles.summaryRow}>
-          <Icon name="people" size={20} color={colors.textSecondary} />
-          <Text style={styles.summaryLabel}>Responders</Text>
-          <Text style={styles.summaryValue}>{responders.length}</Text>
-        </View>
+          <View style={styles.summaryRow}>
+            <Icon name="people" size={20} color={colors.textSecondary} />
+            <Text style={styles.summaryLabel}>Responders</Text>
+            <Text style={styles.summaryValue}>{details.respondersCount}</Text>
+          </View>
 
-        <View style={styles.summaryRow}>
-          <Icon name="local-police" size={20} color={colors.textSecondary} />
-          <Text style={styles.summaryLabel}>Emergency Services</Text>
-          <Text style={styles.summaryValue}>Not contacted</Text>
-        </View>
-      </Card>
+          <View style={styles.summaryRow}>
+            <Icon name="local-police" size={20} color={colors.textSecondary} />
+            <Text style={styles.summaryLabel}>Emergency Services</Text>
+            <Text style={styles.summaryValue}>{details.emergencyServicesStatus}</Text>
+          </View>
+        </Card>
 
-        {responders.length > 0 && (
-        <Card variant="elevated" padding="lg" style={styles.respondersCard}>
-          <Text style={styles.cardTitle}>Responders Who Helped</Text>
-          {responders.map((responder) => (
-            <View key={responder.id} style={styles.responderItem}>
-              <Avatar name={responder.name} size="medium" />
-              <View style={styles.responderInfo}>
-                <Text style={styles.responderName}>{responder.name}</Text>
-                <View style={styles.stars}>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Icon
-                      key={star}
-                      name="star"
-                      size={16}
-                      color={star <= (responder.rating || 0) ? '#FDD835' : colors.border}
-                    />
-                  ))}
+        {details.responders.length > 0 && (
+          <Card variant="elevated" padding="lg" style={styles.respondersCard}>
+            <Text style={styles.cardTitle}>Responders Who Helped</Text>
+            {details.responders.map((responder) => (
+              <View key={responder.userId} style={styles.responderItem}>
+                <Avatar name={responder.name} size="medium" />
+                <View style={styles.responderInfo}>
+                  <Text style={styles.responderName}>{responder.name}</Text>
+                  <Text style={styles.responderMeta}>
+                    {formatDistance(responder.distanceMeters)} • {formatEta(responder.etaSeconds)}
+                  </Text>
                 </View>
               </View>
-            </View>
-          ))}
-        </Card>
-      )}
+            ))}
+          </Card>
+        )}
 
         <Card variant="elevated" padding="lg" style={styles.ratingCard}>
-        <Text style={styles.cardTitle}>Rate Your Experience</Text>
+          <Text style={styles.cardTitle}>Rate Your Experience</Text>
 
-        <View style={styles.starsContainer}>
-          {[1, 2, 3, 4, 5].map((star) => (
-            <Icon
-              key={star}
-              name={star <= rating ? 'star' : 'star-border'}
-              size={40}
-              color={star <= rating ? '#FDD835' : colors.border}
-              onPress={() => setRating(star)}
-            />
-          ))}
-        </View>
+          <View style={styles.starsContainer}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Icon
+                key={star}
+                name={star <= rating ? 'star' : 'star-border'}
+                size={40}
+                color={star <= rating ? '#FDD835' : colors.border}
+                onPress={() => setRating(star)}
+              />
+            ))}
+          </View>
 
-        <Input
-          value={feedback}
-          onChangeText={setFeedback}
-          placeholder="Share your feedback (optional)"
-          maxLength={500}
-          showCounter
-        />
+          <Input
+            value={feedback}
+            onChangeText={setFeedback}
+            placeholder="Share your feedback (optional)"
+            maxLength={500}
+            showCounter
+          />
 
-        <Text style={styles.helpfulQuestion}>Was the response helpful?</Text>
-        <View style={styles.helpfulButtons}>
-          <Button
-            variant={wasHelpful === true ? 'primary' : 'outline'}
-            size="medium"
-            onPress={() => setWasHelpful(true)}
-            style={styles.helpfulButton}
-          >
-            Yes
-          </Button>
-          <Button
-            variant={wasHelpful === false ? 'primary' : 'outline'}
-            size="medium"
-            onPress={() => setWasHelpful(false)}
-            style={styles.helpfulButton}
-          >
-            No
-          </Button>
-        </View>
-      </Card>
+          <Text style={styles.helpfulQuestion}>Was the response helpful?</Text>
+          <View style={styles.helpfulButtons}>
+            <Button
+              variant={wasHelpful === true ? 'primary' : 'outline'}
+              size="medium"
+              onPress={() => setWasHelpful(true)}
+              style={styles.helpfulButton}
+            >
+              Yes
+            </Button>
+            <Button
+              variant={wasHelpful === false ? 'primary' : 'outline'}
+              size="medium"
+              onPress={() => setWasHelpful(false)}
+              style={styles.helpfulButton}
+            >
+              No
+            </Button>
+          </View>
+        </Card>
 
         <View style={styles.actions}>
-        <Button
-          variant="outline"
-          size="large"
-          fullWidth
-          icon="description"
-          onPress={() => console.log('View incident report')}
-          style={styles.actionButton}
-        >
-          View Incident Report
-        </Button>
+          <Button
+            variant="outline"
+            size="large"
+            fullWidth
+            icon="description"
+            onPress={handleShareReport}
+            style={styles.actionButton}
+          >
+            Download Incident Report
+          </Button>
 
-        <Button
-          variant="primary"
-          size="large"
-          fullWidth
-          onPress={handleSubmitRating}
-          disabled={rating === 0}
-        >
-          Submit & Close
-        </Button>
+          <Button
+            variant="primary"
+            size="large"
+            fullWidth
+            onPress={handleSubmitRating}
+            disabled={rating === 0}
+          >
+            Submit & Close
+          </Button>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -172,8 +266,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
+    flex: 1,
     padding: spacing['2xl'],
     paddingBottom: spacing['4xl'],
+  },
+  centeredState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+    gap: spacing.lg,
+  },
+  loadingText: {
+    fontSize: fontSizes.md,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   header: {
     alignItems: 'center',
@@ -238,11 +345,10 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.md,
     fontWeight: '600',
     color: colors.textPrimary,
-    marginBottom: spacing.xs,
   },
-  stars: {
-    flexDirection: 'row',
-    gap: 2,
+  responderMeta: {
+    marginTop: spacing.xs,
+    color: colors.textSecondary,
   },
   ratingCard: {
     marginBottom: spacing.lg,
@@ -258,7 +364,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
     marginBottom: spacing.md,
-    textAlign: 'center',
   },
   helpfulButtons: {
     flexDirection: 'row',
@@ -268,9 +373,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   actions: {
-    marginTop: spacing.lg,
+    gap: spacing.md,
   },
   actionButton: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
 });

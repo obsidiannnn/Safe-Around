@@ -4,6 +4,7 @@ import { Marker } from 'react-native-maps';
 import { Location } from '@/types/models';
 import { colors } from '@/theme/colors';
 import { locationApiService, NearbyUserLocation } from '@/services/api/locationApiService';
+import { useAuthStore } from '@/store/authStore';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 
 interface NearbyUsersLayerProps {
@@ -16,6 +17,7 @@ interface NearbyUsersLayerProps {
  * Uber/Ola style — no plain Views inside MapView to avoid native crashes.
  */
 export const NearbyUsersLayer: React.FC<NearbyUsersLayerProps> = ({ userLocation, onUsersChange }) => {
+  const currentUserId = useAuthStore((state) => state.user?.id);
   const [nearbyUsers, setNearbyUsers] = useState<NearbyUserLocation[]>([]);
   const pulse = useSharedValue(1);
 
@@ -28,18 +30,21 @@ export const NearbyUsersLayer: React.FC<NearbyUsersLayerProps> = ({ userLocation
 
     const fetchNearbyUsers = async () => {
       const users = await locationApiService.getNearbyUsers(userLocation, 5000);
+      const filteredUsers = currentUserId
+        ? users.filter((user) => String(user.userId) !== String(currentUserId))
+        : users;
       if (cancelled) return;
-      setNearbyUsers(users);
-      onUsersChange?.(users.length);
+      setNearbyUsers(filteredUsers);
+      onUsersChange?.(filteredUsers.length);
     };
 
     fetchNearbyUsers();
-    const interval = setInterval(fetchNearbyUsers, 10000);
+    const interval = setInterval(fetchNearbyUsers, 5000);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [userLocation.latitude, userLocation.longitude, onUsersChange]);
+  }, [currentUserId, userLocation.latitude, userLocation.longitude, onUsersChange]);
 
   const animatedPulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulse.value }],

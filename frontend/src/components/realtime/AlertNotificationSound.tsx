@@ -20,10 +20,7 @@ export const AlertNotificationSound: React.FC<AlertNotificationSoundProps> = ({ 
 
     const playSound = async () => {
       try {
-        const { sound } = await Audio.Sound.createAsync(
-          // Placeholder - would use actual sound files
-          require('@/assets/sounds/alert.mp3')
-        );
+        const { sound } = await Audio.Sound.createAsync();
         await sound.playAsync();
         
         // Vibration patterns

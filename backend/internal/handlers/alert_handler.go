@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"log"
 	"net/http"
 
@@ -133,7 +134,16 @@ func (h *AlertHandler) RespondToAlert(c *gin.Context) {
 	err = h.alertService.AcceptAlert(c.Request.Context(), alertID, responderID, loc)
 	if err != nil {
 		log.Printf("Failed to accept alert: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to accept alert response"})
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "Alert not found"})
+		case errors.Is(err, services.ErrAlertSelfResponse),
+			errors.Is(err, services.ErrAlertInactive),
+			errors.Is(err, services.ErrAlertAlreadyAccepted):
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to accept alert response"})
+		}
 		return
 	}
 

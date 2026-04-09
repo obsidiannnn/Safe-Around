@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, Alert, Share } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
@@ -17,11 +17,10 @@ import { formatDateTime } from '@/utils/formatters';
  */
 export const CrimeDetailsScreen = () => {
   const navigation = useNavigation();
-  const route = useRoute();
-  // const crime = route.params?.crime as Crime; // Would come from navigation params
+  const route = useRoute<any>();
+  const routeCrime = route.params?.crime as Crime | undefined;
 
-  // Mock data for now
-  const crime: Crime = {
+  const crime: Crime = routeCrime ?? {
     id: '1',
     type: 'Theft',
     severity: 'high',
@@ -72,7 +71,7 @@ export const CrimeDetailsScreen = () => {
       <Card variant="elevated" padding="lg" style={styles.card}>
         <View style={styles.iconContainer}>
           <View style={[styles.iconCircle, { backgroundColor: `${getSeverityColor(crime.severity)}20` }]}>
-            <Icon name={getCrimeIcon(crime.type)} size={40} color={getSeverityColor(crime.severity)} />
+            <Icon name={getCrimeIcon(crime.type) as any} size={40} color={getSeverityColor(crime.severity)} />
           </View>
         </View>
 
@@ -126,7 +125,7 @@ export const CrimeDetailsScreen = () => {
           size="large"
           fullWidth
           icon="block"
-          onPress={() => console.log('Avoid this area')}
+          onPress={() => Alert.alert('Safety Tip', 'Use Safe Route to navigate around this incident area.')}
           style={styles.actionButton}
         >
           Avoid This Area
@@ -137,7 +136,7 @@ export const CrimeDetailsScreen = () => {
           size="large"
           fullWidth
           icon="flag"
-          onPress={() => console.log('Report inaccurate')}
+          onPress={() => Alert.alert('Report review', 'Incident review requests are not wired yet. This should be linked to the report flow next.')}
           style={styles.actionButton}
         >
           Report Inaccurate
@@ -148,7 +147,11 @@ export const CrimeDetailsScreen = () => {
           size="large"
           fullWidth
           icon="share"
-          onPress={() => console.log('Share warning')}
+          onPress={() => {
+            Share.share({
+              message: `Safety warning: ${crime.type} reported near ${crime.location.latitude.toFixed(5)}, ${crime.location.longitude.toFixed(5)} on ${formatDateTime(crime.date)}.`,
+            });
+          }}
         >
           Share Warning
         </Button>

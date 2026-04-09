@@ -61,6 +61,35 @@ export interface AlertDetails {
   timeline: AlertTimelineEvent[];
   respondersCount: number;
   emergencyNumber: string;
+  durationSeconds: number;
+  emergencyServicesStatus: string;
+  responders: AlertResponderSummary[];
+  incidentReport: AlertIncidentReport;
+}
+
+export interface AlertResponderSummary {
+  userId: string;
+  name: string;
+  phone?: string;
+  responseStatus: string;
+  distanceMeters: number;
+  etaSeconds: number;
+  respondedAt: string;
+  arrivedAt?: string;
+  responseRating?: number;
+}
+
+export interface AlertIncidentReport {
+  alertId: string;
+  status: string;
+  durationSeconds: number;
+  createdAt: string;
+  endedAt: string;
+  currentRadius: number;
+  maxRadiusReached: number;
+  usersNotified: number;
+  respondersCount: number;
+  emergencyServicesStatus: string;
 }
 
 export interface Notification {

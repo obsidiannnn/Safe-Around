@@ -106,7 +106,7 @@ export const useAlertStore = create<AlertState>((set, get) => ({
       });
       set((state) => ({ respondersCount: state.respondersCount + 1 }));
     } catch (error) {
-      console.error('Error responding to alert:', error);
+      console.warn('Error responding to alert:', error);
       throw error;
     }
   },

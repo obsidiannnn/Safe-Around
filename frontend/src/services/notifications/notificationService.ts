@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 export enum NotificationCategory {
@@ -36,7 +37,8 @@ class NotificationService {
         const category = notification.request.content.data?.category;
         
         return {
-          shouldShowAlert: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
           shouldPlaySound: category === NotificationCategory.EMERGENCY_ALERT,
           shouldSetBadge: true,
           priority: category === NotificationCategory.EMERGENCY_ALERT 
@@ -68,11 +70,24 @@ class NotificationService {
     if (this.token) return this.token;
 
     try {
-      const token = (await Notifications.getExpoPushTokenAsync()).data;
+      const appOwnership = Constants.appOwnership;
+      if (appOwnership === 'expo') {
+        console.warn('Push token registration is skipped in Expo Go. Use a development build for remote notifications.');
+        return null;
+      }
+
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!projectId || !uuidPattern.test(projectId)) {
+        console.warn('Push token registration skipped because the Expo projectId is not configured as a valid EAS UUID.');
+        return null;
+      }
+
+      const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
       this.token = token;
       return token;
     } catch (error) {
-      console.error('Error getting push token:', error);
+      console.warn('Error getting push token:', error);
       return null;
     }
   }

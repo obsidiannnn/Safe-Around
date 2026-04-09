@@ -4,6 +4,7 @@ export const fontSizes = {
   md: 16,
   lg: 18,
   xl: 20,
+  xxl: 24,
   '2xl': 24,
   '3xl': 28,
   '4xl': 32,
@@ -12,6 +13,7 @@ export const fontSizes = {
 export const fontWeights = {
   regular: '400' as const,
   medium: '500' as const,
+  semibold: '600' as const,
   bold: '700' as const,
 };
 

@@ -5,6 +5,7 @@ export const colors = {
   error: '#C41E3A',          // Deep Emergency Red
   success: '#10B981',        // Emerald Green
   warning: '#F59E0B',        // Amber
+  info: '#2D5AF0',           // Informational blue
   background: '#F9FAFB',     // Very Light Gray
   backgroundSecondary: '#F3F4F6', // Slightly darker gray
   surface: '#FFFFFF',        // Pure White

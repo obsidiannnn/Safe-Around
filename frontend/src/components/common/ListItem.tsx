@@ -67,7 +67,7 @@ export const ListItem: React.FC<ListItemProps> = ({
 
   const content = (
     <View style={styles.container}>
-      {leftIcon && <Icon name={leftIcon} size={24} color={colors.textSecondary} style={styles.leftIcon} />}
+      {leftIcon && <Icon name={leftIcon as any} size={24} color={colors.textSecondary} style={styles.leftIcon} />}
       {leftComponent && <View style={styles.leftComponent}>{leftComponent}</View>}
       
       <View style={styles.content}>
@@ -76,7 +76,7 @@ export const ListItem: React.FC<ListItemProps> = ({
       </View>
       
       {rightComponent && <View style={styles.rightComponent}>{rightComponent}</View>}
-      {rightIcon && <Icon name={rightIcon} size={24} color={colors.textSecondary} />}
+      {rightIcon && <Icon name={rightIcon as any} size={24} color={colors.textSecondary} />}
     </View>
   );
 

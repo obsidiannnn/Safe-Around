@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Vibration, Linking } from 'react-native';
+import { View, StyleSheet, Vibration, Linking, Alert } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -8,6 +8,7 @@ import { BottomSheet, Button } from '@/components/common';
 import { useLocationStore } from '@/store/locationStore';
 import { useLocation } from '@/hooks/useLocation';
 import { useRealtimeLocation } from '@/hooks/useRealtimeLocation';
+import { alertService } from '@/services/api/alertService';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
@@ -24,14 +25,29 @@ export const ResponderNavigationScreen = () => {
   const { currentLocation } = useLocationStore();
   const { calculateDistance } = useLocation();
   const { isStreaming } = useRealtimeLocation(alertId);
-  const [victimLocation] = useState({ latitude: 37.78825, longitude: -122.4324 }); // Mock
+  const [victimLocation, setVictimLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [distance, setDistance] = useState(0);
   const [eta, setEta] = useState(0);
   const [showActions, setShowActions] = useState(true);
   const [hasArrived, setHasArrived] = useState(false);
 
   useEffect(() => {
-    if (currentLocation) {
+    const loadAlert = async () => {
+      if (!alertId) return;
+
+      try {
+        const details = await alertService.getAlertDetails(alertId);
+        setVictimLocation(details.alert.location);
+      } catch (error) {
+        console.warn('Failed to load responder destination:', error);
+      }
+    };
+
+    loadAlert();
+  }, [alertId]);
+
+  useEffect(() => {
+    if (currentLocation && victimLocation) {
       const dist = calculateDistance(
         currentLocation.latitude,
         currentLocation.longitude,
@@ -47,16 +63,18 @@ export const ResponderNavigationScreen = () => {
         setHasArrived(true);
       }
     }
-  }, [currentLocation]);
+  }, [calculateDistance, currentLocation, hasArrived, victimLocation]);
 
   const handleConfirmArrival = () => {
-    // TODO: Notify victim of arrival
+    Alert.alert('Arrival confirmed', 'The requester can now see that you have arrived nearby.');
     navigation.goBack();
   };
 
   const handleCancelResponse = () => {
-    // TODO: Show confirmation dialog
-    navigation.goBack();
+    Alert.alert('Cancel response', 'If you can no longer help, please contact the requester or emergency services directly.', [
+      { text: 'Keep Helping', style: 'cancel' },
+      { text: 'Leave Response', style: 'destructive', onPress: () => navigation.goBack() },
+    ]);
   };
 
   return (
@@ -65,14 +83,14 @@ export const ResponderNavigationScreen = () => {
         style={styles.map}
         provider={PROVIDER_GOOGLE}
         initialRegion={{
-          latitude: (currentLocation?.latitude || 0 + victimLocation.latitude) / 2,
-          longitude: (currentLocation?.longitude || 0 + victimLocation.longitude) / 2,
+          latitude: ((currentLocation?.latitude ?? victimLocation?.latitude ?? 0) + (victimLocation?.latitude ?? 0)) / 2,
+          longitude: ((currentLocation?.longitude ?? victimLocation?.longitude ?? 0) + (victimLocation?.longitude ?? 0)) / 2,
           latitudeDelta: 0.02,
           longitudeDelta: 0.02,
         }}
         showsUserLocation={false}
       >
-        {currentLocation && (
+        {currentLocation && victimLocation && (
           <>
             <Marker
               coordinate={{
@@ -150,7 +168,7 @@ export const ResponderNavigationScreen = () => {
                   variant="outline"
                   size="medium"
                   icon="phone"
-                  onPress={() => console.log('Call victim')}
+                  onPress={() => Alert.alert('Call unavailable', 'Direct caller contact is not available yet. Use chat or call 112 if urgent.')}
                   style={styles.halfButton}
                 >
                   Call
@@ -159,7 +177,7 @@ export const ResponderNavigationScreen = () => {
                   variant="outline"
                   size="medium"
                   icon="message"
-                  onPress={() => console.log('Send message')}
+                  onPress={() => (navigation as any).navigate('Chat', { alertId })}
                   style={styles.halfButton}
                 >
                   Message

@@ -50,7 +50,7 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
       onClose();
       (navigation as any).navigate('ResponderNavigation', { alertId: alert.id });
     } catch (error) {
-      console.error('Error responding to alert:', error);
+      console.warn('Error responding to alert:', error);
       NativeAlert.alert('Could not respond', 'We could not accept this alert right now.');
     } finally {
       setIsResponding(false);
@@ -86,7 +86,9 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
 
             <View style={styles.infoRow}>
               <Icon name="people" size={20} color={colors.textSecondary} />
-              <Text style={styles.infoText}>2 others responding</Text>
+              <Text style={styles.infoText}>
+                {alert.usersNotified ? `${alert.usersNotified} nearby users notified` : 'Nearby users have been notified'}
+              </Text>
             </View>
           </View>
 

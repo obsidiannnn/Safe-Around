@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { Alert, AlertDetails, AlertTimelineEvent } from '@/types/models';
+import { Alert, AlertDetails, AlertIncidentReport, AlertResponderSummary, AlertTimelineEvent } from '@/types/models';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -66,6 +66,31 @@ const normalizeTimelineEvent = (raw: any): AlertTimelineEvent => ({
   occurredAt: raw?.occurredAt ?? raw?.occurred_at ?? new Date().toISOString(),
 });
 
+const normalizeResponder = (raw: any): AlertResponderSummary => ({
+  userId: String(raw?.userId ?? raw?.user_id ?? ''),
+  name: raw?.name ?? 'Verified responder',
+  phone: raw?.phone,
+  responseStatus: raw?.responseStatus ?? raw?.response_status ?? 'accepted',
+  distanceMeters: Number(raw?.distanceMeters ?? raw?.distance_meters ?? 0),
+  etaSeconds: Number(raw?.etaSeconds ?? raw?.eta_seconds ?? 0),
+  respondedAt: raw?.respondedAt ?? raw?.responded_at ?? new Date().toISOString(),
+  arrivedAt: raw?.arrivedAt ?? raw?.arrived_at,
+  responseRating: raw?.responseRating ?? raw?.response_rating,
+});
+
+const normalizeIncidentReport = (raw: any): AlertIncidentReport => ({
+  alertId: String(raw?.alertId ?? raw?.alert_id ?? ''),
+  status: raw?.status ?? 'resolved',
+  durationSeconds: Number(raw?.durationSeconds ?? raw?.duration_seconds ?? 0),
+  createdAt: raw?.createdAt ?? raw?.created_at ?? new Date().toISOString(),
+  endedAt: raw?.endedAt ?? raw?.ended_at ?? new Date().toISOString(),
+  currentRadius: Number(raw?.currentRadius ?? raw?.current_radius ?? 0),
+  maxRadiusReached: Number(raw?.maxRadiusReached ?? raw?.max_radius_reached ?? 0),
+  usersNotified: Number(raw?.usersNotified ?? raw?.users_notified ?? 0),
+  respondersCount: Number(raw?.respondersCount ?? raw?.responders_count ?? 0),
+  emergencyServicesStatus: raw?.emergencyServicesStatus ?? raw?.emergency_services_status ?? 'Not contacted',
+});
+
 export const alertService = {
   /**
    * Create a new emergency alert
@@ -100,8 +125,12 @@ export const alertService = {
     return {
       alert: normalizeAlert(payload?.alert),
       timeline: (payload?.timeline || []).map(normalizeTimelineEvent),
-      respondersCount: payload?.responders_count ?? 0,
+      respondersCount: payload?.respondersCount ?? payload?.responders_count ?? 0,
       emergencyNumber: payload?.emergency_number ?? payload?.alert?.emergency_number ?? '112',
+      durationSeconds: Number(payload?.durationSeconds ?? payload?.duration_seconds ?? 0),
+      emergencyServicesStatus: payload?.emergencyServicesStatus ?? payload?.emergency_services_status ?? 'Not contacted',
+      responders: (payload?.responders || []).map(normalizeResponder),
+      incidentReport: normalizeIncidentReport(payload?.incidentReport ?? payload?.incident_report ?? {}),
     };
   },
 
