@@ -20,7 +20,6 @@ type EmergencyAlert struct {
 	SilentMode        bool       `gorm:"default:false" json:"silent_mode"`
 	AudioRecordingURL string     `gorm:"type:text" json:"audio_recording_url"`
 	Metadata          string     `gorm:"type:jsonb" json:"metadata"` // JSON mapped as string for simplicity
-	EmergencyNumber   string     `gorm:"type:varchar(20);default:'112'" json:"emergency_number"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 	ResolvedAt        *time.Time `json:"resolved_at,omitempty"`

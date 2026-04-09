@@ -140,7 +140,7 @@ func (ls *LocationService) GetNearbyUserLocations(lat, lng float64, radius int, 
 			ST_X(location::geometry) AS longitude,
 			recorded_at
 		FROM user_locations
-		WHERE recorded_at > NOW() - INTERVAL '5 minutes'
+		WHERE recorded_at > NOW() - INTERVAL '10 minutes'
 		ORDER BY user_id, recorded_at DESC
 	)
 	SELECT user_id, latitude, longitude, recorded_at
@@ -151,11 +151,14 @@ func (ls *LocationService) GetNearbyUserLocations(lat, lng float64, radius int, 
 		ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography,
 		?
 	  )
-	ORDER BY recorded_at DESC
+	ORDER BY ST_Distance(
+		ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography,
+		ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography
+	  ) ASC, recorded_at DESC
 	`
 
 	var users []NearbyUserLocation
-	err := ls.db.Raw(query, excludeUserID, lng, lat, radius).Scan(&users).Error
+	err := ls.db.Raw(query, excludeUserID, lng, lat, radius, lng, lat).Scan(&users).Error
 	return users, err
 }
 

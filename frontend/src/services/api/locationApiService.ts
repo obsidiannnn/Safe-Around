@@ -26,7 +26,7 @@ export const locationApiService = {
   /**
    * Get nearby users from backend
    */
-  getNearbyUsers: async (location: Location, radius: number = 1000): Promise<NearbyUserLocation[]> => {
+  getNearbyUsers: async (location: Location, radius: number = 5000): Promise<NearbyUserLocation[]> => {
     try {
       const response = await apiClient.get('/location/nearby', {
         params: {
