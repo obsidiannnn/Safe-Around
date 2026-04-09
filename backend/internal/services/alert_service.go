@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -34,11 +35,46 @@ type AlertService struct {
 
 const indiaEmergencyNumber = "112"
 
+var (
+	ErrAlertSelfResponse     = errors.New("requester cannot respond to their own alert")
+	ErrAlertInactive         = errors.New("alert is no longer active")
+	ErrAlertAlreadyAccepted  = errors.New("responder has already accepted this alert")
+)
+
+type AlertResponderSummary struct {
+	UserID          uint       `json:"user_id"`
+	Name            string     `json:"name"`
+	Phone           string     `json:"phone,omitempty"`
+	ResponseStatus  string     `json:"response_status"`
+	DistanceMeters  float64    `json:"distance_meters"`
+	ETASeconds      int        `json:"eta_seconds"`
+	RespondedAt     time.Time  `json:"responded_at"`
+	ArrivedAt       *time.Time `json:"arrived_at,omitempty"`
+	ResponseRating  *int       `json:"response_rating,omitempty"`
+}
+
+type AlertIncidentReport struct {
+	AlertID                 uuid.UUID `json:"alert_id"`
+	Status                  string    `json:"status"`
+	DurationSeconds         int       `json:"duration_seconds"`
+	CreatedAt               time.Time `json:"created_at"`
+	EndedAt                 time.Time `json:"ended_at"`
+	CurrentRadius           int       `json:"current_radius"`
+	MaxRadiusReached        int       `json:"max_radius_reached"`
+	UsersNotified           int       `json:"users_notified"`
+	RespondersCount         int64     `json:"responders_count"`
+	EmergencyServicesStatus string    `json:"emergency_services_status"`
+}
+
 type AlertDetails struct {
-	Alert           models.EmergencyAlert       `json:"alert"`
-	Timeline        []models.AlertTimelineEvent `json:"timeline"`
-	RespondersCount int64                       `json:"responders_count"`
-	EmergencyNumber string                      `json:"emergency_number"`
+	Alert                   models.EmergencyAlert       `json:"alert"`
+	Timeline                []models.AlertTimelineEvent `json:"timeline"`
+	RespondersCount         int64                       `json:"responders_count"`
+	EmergencyNumber         string                      `json:"emergency_number"`
+	DurationSeconds         int                         `json:"duration_seconds"`
+	EmergencyServicesStatus string                      `json:"emergency_services_status"`
+	Responders              []AlertResponderSummary     `json:"responders"`
+	IncidentReport          AlertIncidentReport         `json:"incident_report"`
 }
 
 func NewAlertService(db *gorm.DB, rdb *redis.Client, gs *GeofencingService, ns NotificationService, wh customWS.AlertBroadcaster) *AlertService {
@@ -86,16 +122,49 @@ func (s *AlertService) GetAlertDetails(ctx context.Context, alertID uuid.UUID, u
 	var respondersCount int64
 	if err := s.db.WithContext(ctx).
 		Model(&models.AlertResponse{}).
-		Where("alert_id = ? AND response_status = ?", alertID, "accepted").
+		Where("alert_id = ? AND response_status IN ?", alertID, []string{"accepted", "arrived", "helping"}).
 		Count(&respondersCount).Error; err != nil {
 		return nil, err
 	}
 
+	responders, err := s.getAlertResponders(ctx, alertID)
+	if err != nil {
+		return nil, err
+	}
+
+	emergencyServicesStatus, err := s.getEmergencyServicesStatus(ctx, alertID)
+	if err != nil {
+		return nil, err
+	}
+
+	durationSeconds := s.calculateAlertDuration(alert)
+	reportEndedAt := alert.CreatedAt.Add(time.Duration(durationSeconds) * time.Second)
+	if alert.ResolvedAt != nil {
+		reportEndedAt = *alert.ResolvedAt
+	} else if alert.CancelledAt != nil {
+		reportEndedAt = *alert.CancelledAt
+	}
+
 	return &AlertDetails{
-		Alert:           alert,
-		Timeline:        timeline,
-		RespondersCount: respondersCount,
-		EmergencyNumber: indiaEmergencyNumber,
+		Alert:                   alert,
+		Timeline:                timeline,
+		RespondersCount:         respondersCount,
+		EmergencyNumber:         indiaEmergencyNumber,
+		DurationSeconds:         durationSeconds,
+		EmergencyServicesStatus: emergencyServicesStatus,
+		Responders:              responders,
+		IncidentReport: AlertIncidentReport{
+			AlertID:                 alert.ID,
+			Status:                  alert.AlertStatus,
+			DurationSeconds:         durationSeconds,
+			CreatedAt:               alert.CreatedAt,
+			EndedAt:                 reportEndedAt,
+			CurrentRadius:           alert.CurrentRadius,
+			MaxRadiusReached:        alert.MaxRadiusReached,
+			UsersNotified:           alert.UsersNotified,
+			RespondersCount:         respondersCount,
+			EmergencyServicesStatus: emergencyServicesStatus,
+		},
 	}, nil
 }
 
@@ -283,17 +352,17 @@ func (s *AlertService) AcceptAlert(ctx context.Context, alertID uuid.UUID, respo
 	}
 
 	if alert.UserID == responderID {
-		return fmt.Errorf("requester cannot respond to their own alert")
+		return ErrAlertSelfResponse
 	}
 
 	if alert.AlertStatus != "active" && alert.AlertStatus != "responding" {
-		return fmt.Errorf("alert is no longer active")
+		return ErrAlertInactive
 	}
 
 	var existingResponse models.AlertResponse
 	if err := s.db.Where("alert_id = ? AND responder_user_id = ? AND response_status IN ?", alertID, responderID, []string{"accepted", "arrived", "helping"}).
 		First(&existingResponse).Error; err == nil {
-		return fmt.Errorf("responder has already accepted this alert")
+		return ErrAlertAlreadyAccepted
 	}
 
 	// Create response
@@ -459,6 +528,98 @@ func (s *AlertService) make112Call(alert models.EmergencyAlert) (string, error) 
 	// In production, this would use Twilio Voice API to dial emergency services
 	// For now, we return a mock SID
 	return "CA" + uuid.New().String()[:32], nil
+}
+
+func (s *AlertService) calculateAlertDuration(alert models.EmergencyAlert) int {
+	endTime := time.Now()
+	if alert.ResolvedAt != nil {
+		endTime = *alert.ResolvedAt
+	} else if alert.CancelledAt != nil {
+		endTime = *alert.CancelledAt
+	}
+
+	if endTime.Before(alert.CreatedAt) {
+		return 0
+	}
+
+	return int(endTime.Sub(alert.CreatedAt).Seconds())
+}
+
+func (s *AlertService) getEmergencyServicesStatus(ctx context.Context, alertID uuid.UUID) (string, error) {
+	var escalation models.AlertEscalation
+	err := s.db.WithContext(ctx).
+		Where("alert_id = ?", alertID).
+		Order("escalated_at DESC").
+		First(&escalation).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return "Not contacted", nil
+	}
+	if err != nil {
+		return "", err
+	}
+
+	switch escalation.EscalationStatus {
+	case "dispatched":
+		return fmt.Sprintf("%s contacted", escalation.EscalationType), nil
+	case "pending":
+		return fmt.Sprintf("%s being contacted", escalation.EscalationType), nil
+	default:
+		return escalation.EscalationStatus, nil
+	}
+}
+
+func (s *AlertService) getAlertResponders(ctx context.Context, alertID uuid.UUID) ([]AlertResponderSummary, error) {
+	type responderRow struct {
+		UserID         uint       `gorm:"column:user_id"`
+		Name           string     `gorm:"column:name"`
+		Phone          string     `gorm:"column:phone"`
+		ResponseStatus string     `gorm:"column:response_status"`
+		DistanceMeters float64    `gorm:"column:distance_meters"`
+		ETASeconds     int        `gorm:"column:eta_seconds"`
+		RespondedAt    time.Time  `gorm:"column:responded_at"`
+		ArrivedAt      *time.Time `gorm:"column:arrived_at"`
+		ResponseRating *int       `gorm:"column:response_rating"`
+	}
+
+	var rows []responderRow
+	err := s.db.WithContext(ctx).Raw(`
+		SELECT
+			u.id AS user_id,
+			COALESCE(NULLIF(u.name, ''), 'Verified responder') AS name,
+			u.phone AS phone,
+			ar.response_status,
+			COALESCE(ar.distance_meters, 0) AS distance_meters,
+			GREATEST(COALESCE(ar.estimated_arrival_minutes, 0), 0) * 60 AS eta_seconds,
+			ar.responded_at,
+			ar.arrived_at,
+			ar.response_rating
+		FROM alert_responses ar
+		JOIN users u ON u.id = ar.responder_user_id
+		WHERE ar.alert_id = ?
+		  AND ar.response_status IN ('accepted', 'arrived', 'helping')
+		ORDER BY ar.responded_at ASC
+	`, alertID).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	responders := make([]AlertResponderSummary, 0, len(rows))
+	for _, row := range rows {
+		responders = append(responders, AlertResponderSummary{
+			UserID:         row.UserID,
+			Name:           row.Name,
+			Phone:          row.Phone,
+			ResponseStatus: row.ResponseStatus,
+			DistanceMeters: row.DistanceMeters,
+			ETASeconds:     row.ETASeconds,
+			RespondedAt:    row.RespondedAt,
+			ArrivedAt:      row.ArrivedAt,
+			ResponseRating: row.ResponseRating,
+		})
+	}
+
+	return responders, nil
 }
 
 func responderDistanceMeters(a, b models.Location) float64 {

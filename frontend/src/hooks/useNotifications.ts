@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import * as Notifications from 'expo-notifications';
-import { notificationService, NotificationCategory } from '@/services/notifications/NotificationService';
+import { notificationService, NotificationCategory } from '@/services/notifications/notificationService';
 import { useNavigation } from '@react-navigation/native';
 
 export const useNotifications = () => {
@@ -60,13 +60,13 @@ export const useNotifications = () => {
 
     switch (category) {
       case NotificationCategory.EMERGENCY_ALERT:
-        navigation.navigate('ResponderNavigation' as never, { alertId: alert_id } as never);
+        (navigation as any).navigate('ResponderNavigation', { alertId: alert_id });
         break;
       case NotificationCategory.DANGER_ZONE:
-        navigation.navigate('CrimeDetails' as never, { zoneId: zone_id } as never);
+        (navigation as any).navigate('CrimeDetails', { zoneId: zone_id });
         break;
       case NotificationCategory.CRIME_REPORT:
-        navigation.navigate('CrimeDetails' as never, { zoneId: crime_id } as never);
+        (navigation as any).navigate('CrimeDetails', { zoneId: crime_id });
         break;
       default:
         break;

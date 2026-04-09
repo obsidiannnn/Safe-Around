@@ -130,8 +130,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logOut: async () => {
     try {
       await authService.logout();
-    } catch (error) {
-      console.error('Logout error:', error);
+    } catch (error: any) {
+      if (error?.response?.status !== 401) {
+        console.warn('Logout error:', error);
+      }
     } finally {
       set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
       await AsyncStorage.multiRemove([KEYS.user, KEYS.accessToken, KEYS.refreshToken]);
@@ -238,4 +240,3 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   clearError: () => set({ error: null }),
   setError: (error) => set({ error }),
 }));
-

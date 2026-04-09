@@ -2,8 +2,10 @@ package models
 
 import (
 	"database/sql/driver"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"strings"
 	"strconv"
 )
@@ -26,43 +28,124 @@ func (l *Location) Scan(value interface{}) error {
 		return nil
 	}
 
-	var wkbStr string
 	switch v := value.(type) {
 	case string:
-		wkbStr = v
+		if parsed, ok, err := parseLocationString(v); ok || err != nil {
+			if err != nil {
+				return err
+			}
+			*l = parsed
+			return nil
+		}
 	case []byte:
-		wkbStr = string(v)
+		if parsed, err := parseLocationBytes(v); err == nil {
+			*l = parsed
+			return nil
+		}
+
+		if parsed, ok, err := parseLocationString(string(v)); ok || err != nil {
+			if err != nil {
+				return err
+			}
+			*l = parsed
+			return nil
+		}
 	default:
 		return fmt.Errorf("failed to scan Location: unsupported type %T", value)
 	}
 
-	// This is a naive parser for the Hex EWKB typical of PostGIS
-	// A robust robust impl would use twpayne/go-geom or similar
-	// But since PostGIS stores it in little-endian hex: 
-	// 0101000020E6100000 <longitude_hex> <latitude_hex>
-	// where E6100000 is SRID 4326 in little endian
-	// Since mapping is complex in pure string parsing, we'll try to extract it
-	if len(wkbStr) >= 50 {
-		// PostGIS hex WKB format:
-		b, err := hex.DecodeString(wkbStr)
-		if err == nil && len(b) >= 21 {
-			// bytes 9-16 are X (longitude), bytes 17-24 are Y (latitude) in IEEE 754
-			// However doing this natively is brittle. 
-			// We'll rely on explicitly using ST_AsText when querying if possible.
-		}
+	return fmt.Errorf("failed to scan Location: unsupported location value")
+}
+
+func parseLocationString(raw string) (Location, bool, error) {
+	wkbStr := strings.TrimSpace(raw)
+	if wkbStr == "" {
+		return Location{}, false, nil
 	}
-	
-	// If it's pure WKT string "POINT(12.34 56.78)"
-	if strings.HasPrefix(wkbStr, "POINT(") {
-		coords := strings.Trim(wkbStr, "POINT()")
-		parts := strings.Split(coords, " ")
+
+	if strings.HasPrefix(wkbStr, "SRID=") {
+		parts := strings.SplitN(wkbStr, ";", 2)
 		if len(parts) == 2 {
-			lon, _ := strconv.ParseFloat(parts[0], 64)
-			lat, _ := strconv.ParseFloat(parts[1], 64)
-			l.Longitude = lon
-			l.Latitude = lat
+			wkbStr = parts[1]
 		}
 	}
 
-	return nil
+	if strings.HasPrefix(strings.ToUpper(wkbStr), "POINT(") {
+		coords := strings.TrimPrefix(strings.TrimSuffix(wkbStr, ")"), "POINT(")
+		parts := strings.Fields(coords)
+		if len(parts) != 2 {
+			return Location{}, true, fmt.Errorf("failed to parse POINT coordinates")
+		}
+
+		lon, err := strconv.ParseFloat(parts[0], 64)
+		if err != nil {
+			return Location{}, true, err
+		}
+		lat, err := strconv.ParseFloat(parts[1], 64)
+		if err != nil {
+			return Location{}, true, err
+		}
+		return Location{Latitude: lat, Longitude: lon}, true, nil
+	}
+
+	if decoded, err := hex.DecodeString(wkbStr); err == nil {
+		loc, err := parseEWKBPoint(decoded)
+		return loc, true, err
+	}
+
+	return Location{}, false, nil
+}
+
+func parseLocationBytes(raw []byte) (Location, error) {
+	trimmed := strings.TrimSpace(string(raw))
+	if decoded, err := hex.DecodeString(trimmed); err == nil {
+		return parseEWKBPoint(decoded)
+	}
+
+	return parseEWKBPoint(raw)
+}
+
+func parseEWKBPoint(data []byte) (Location, error) {
+	if len(data) < 1+4+16 {
+		return Location{}, fmt.Errorf("invalid EWKB point length")
+	}
+
+	var order binary.ByteOrder = binary.BigEndian
+	switch data[0] {
+	case 0:
+		order = binary.BigEndian
+	case 1:
+		order = binary.LittleEndian
+	default:
+		return Location{}, fmt.Errorf("invalid EWKB byte order")
+	}
+
+	offset := 1
+	geomType := order.Uint32(data[offset : offset+4])
+	offset += 4
+
+	hasSRID := geomType&0x20000000 != 0
+	baseType := geomType &^ 0x20000000 &^ 0x40000000 &^ 0x80000000
+	if baseType != 1 {
+		return Location{}, fmt.Errorf("unsupported EWKB geometry type %d", baseType)
+	}
+
+	if hasSRID {
+		if len(data) < offset+4+16 {
+			return Location{}, fmt.Errorf("invalid EWKB SRID point length")
+		}
+		offset += 4
+	}
+
+	if len(data) < offset+16 {
+		return Location{}, fmt.Errorf("invalid EWKB coordinate length")
+	}
+
+	xBits := order.Uint64(data[offset : offset+8])
+	yBits := order.Uint64(data[offset+8 : offset+16])
+
+	return Location{
+		Latitude:  math.Float64frombits(yBits),
+		Longitude: math.Float64frombits(xBits),
+	}, nil
 }

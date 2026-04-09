@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Marker, Polyline } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { View, StyleSheet } from 'react-native';
 import { colors } from '@/theme/colors';
+import { GOOGLE_MAPS_API_KEY } from '@/config/env';
 
 interface Props {
   origin: { latitude: number; longitude: number };
@@ -12,9 +13,9 @@ interface Props {
   onError?: (errorMessage: string) => void;
 }
 
-const GOOGLE_MAPS_APIKEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyBfi1CO-cAF0aJBxktzJLQYwq2IuzqXVMY';
-
 export const VolunteerRouteOverlay: React.FC<Props> = ({ origin, destination, onReady, onError }) => {
+  const [useDirections, setUseDirections] = useState(Boolean(GOOGLE_MAPS_API_KEY));
+
   return (
     <>
       {/* Victim Marker */}
@@ -30,17 +31,29 @@ export const VolunteerRouteOverlay: React.FC<Props> = ({ origin, destination, on
       </Marker>
 
       {/* Route Path */}
-      <MapViewDirections
-        origin={origin}
-        destination={destination}
-        apikey={GOOGLE_MAPS_APIKEY}
-        strokeWidth={4}
-        strokeColor={colors.primary}
-        optimizeWaypoints={true}
-        mode="DRIVING"
-        onReady={onReady}
-        onError={onError}
-      />
+      {useDirections ? (
+        <MapViewDirections
+          origin={origin}
+          destination={destination}
+          apikey={GOOGLE_MAPS_API_KEY}
+          strokeWidth={4}
+          strokeColor={colors.primary}
+          optimizeWaypoints={true}
+          mode="DRIVING"
+          onReady={onReady}
+          onError={(errorMessage) => {
+            setUseDirections(false);
+            onError?.(errorMessage);
+          }}
+        />
+      ) : (
+        <Polyline
+          coordinates={[origin, destination]}
+          strokeWidth={4}
+          strokeColor={colors.primary}
+          lineDashPattern={[6, 4]}
+        />
+      )}
     </>
   );
 };

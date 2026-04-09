@@ -50,7 +50,11 @@ class CrimeWebSocketService {
             this.emit('radius_expanded', eventData);
             break;
           case 'connected':
-            console.log('WS Connection data:', eventData);
+            if (eventData) {
+              console.log('WS Connection data:', eventData);
+            }
+            break;
+          case 'room_closed':
             break;
           default:
             console.log('Unhandled WS event:', eventName);

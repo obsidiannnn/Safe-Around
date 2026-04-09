@@ -171,13 +171,12 @@ export const MapDashboardScreen = () => {
       CrimeWebSocketService.off('responder_accepted', handleResponderAccepted);
       CrimeWebSocketService.disconnect();
     };
-  }, [currentLocation, priorityAlerts]);
+  }, [priorityAlerts, respondToAlert]);
 
   const fetchAreaStats = async (lat: number, lng: number) => {
     try {
       const stats = await heatmapService.getStatistics(lat, lng);
       setCurrentStats(stats);
-      setLiveNearbyUsers(stats.nearbyUsers);
     } catch (error) {
       console.error('Error fetching area stats:', error);
     }
@@ -223,7 +222,7 @@ export const MapDashboardScreen = () => {
       }, false);
       openEmergencyActiveScreen();
     } catch (error) {
-      console.error('Error creating alert:', error);
+      console.warn('Error creating alert:', error);
       Alert.alert('Error', 'Failed to trigger SOS alert.');
     }
   }, [currentLocation, createAlert, openEmergencyActiveScreen]);

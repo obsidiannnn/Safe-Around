@@ -1,131 +1,137 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Card, Avatar, Button } from '@/components/common';
-import { useWebSocket } from '@/hooks/useWebSocket';
+import { alertService } from '@/services/api/alertService';
+import { useAlertStore } from '@/store/alertStore';
+import { AlertDetails, AlertResponderSummary } from '@/types/models';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius } from '@/theme/spacing';
 import { fontSizes } from '@/theme/typography';
 
-interface Responder {
-  id: string;
-  name: string;
-  avatar?: string;
-  distance: number;
-  eta: number;
-  location: {
-    latitude: number;
-    longitude: number;
-  };
-}
+const formatDistance = (distanceMeters: number) => {
+  if (distanceMeters >= 1000) {
+    return `${(distanceMeters / 1000).toFixed(1)} km away`;
+  }
+  return `${Math.round(distanceMeters)}m away`;
+};
 
-/**
- * List of responders heading to emergency location
- * Real-time updates of distance and ETA
- */
+const formatEta = (etaSeconds: number) => {
+  return `${Math.max(1, Math.round(etaSeconds / 60))} min ETA`;
+};
+
 export const ResponderListScreen = () => {
-  const { on, off } = useWebSocket();
-  const [responders, setResponders] = useState<Responder[]>([
-    {
-      id: '1',
-      name: 'Sarah K.',
-      distance: 150,
-      eta: 2,
-      location: { latitude: 37.78825, longitude: -122.4324 },
-    },
-    {
-      id: '2',
-      name: 'Mike T.',
-      distance: 320,
-      eta: 4,
-      location: { latitude: 37.78925, longitude: -122.4334 },
-    },
-  ]);
+  const navigation = useNavigation();
+  const route = useRoute<any>();
+  const activeAlert = useAlertStore((state) => state.activeAlert);
+  const alertId = route.params?.alertId ?? activeAlert?.id;
+  const [details, setDetails] = useState<AlertDetails | null>(null);
+
+  const loadDetails = useCallback(async () => {
+    if (!alertId) {
+      return;
+    }
+
+    try {
+      const nextDetails = await alertService.getAlertDetails(alertId);
+      setDetails(nextDetails);
+    } catch (error) {
+      console.warn('Failed to load responder list:', error);
+    }
+  }, [alertId]);
 
   useEffect(() => {
-    on('responder:location-update', (data) => {
-      setResponders((prev) =>
-        prev.map((r) => (r.id === data.responderId ? { ...r, ...data } : r))
-      );
-    });
+    loadDetails();
+  }, [loadDetails]);
 
-    return () => {
-      off('responder:location-update');
-    };
-  }, []);
+  useEffect(() => {
+    if (!alertId) {
+      return;
+    }
 
-  const handleCall = (responderId: string) => {
-    // TODO: Initiate Twilio VOIP call
-    console.log('Calling responder:', responderId);
+    const poller = setInterval(loadDetails, 5000);
+    return () => clearInterval(poller);
+  }, [alertId, loadDetails]);
+
+  const responders = details?.responders ?? [];
+
+  const handleCall = async (responder: AlertResponderSummary) => {
+    if (!responder.phone) {
+      return;
+    }
+    await Linking.openURL(`tel:${responder.phone}`);
   };
 
   const handleMessage = (responderId: string) => {
-    // TODO: Open chat
-    console.log('Messaging responder:', responderId);
+    (navigation as any).navigate('Chat', { responderId });
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.header}>
-        <Text style={styles.title}>Responders</Text>
-        <Text style={styles.subtitle}>{responders.length} people on their way</Text>
-      </View>
+          <Text style={styles.title}>Responders</Text>
+          <Text style={styles.subtitle}>{responders.length} people on their way</Text>
+        </View>
 
         {responders.map((responder) => (
-        <Card key={responder.id} variant="elevated" padding="lg" style={styles.responderCard}>
-          <View style={styles.responderHeader}>
-            <Avatar name={responder.name} size="large" showStatus isOnline />
-            <View style={styles.responderInfo}>
-              <Text style={styles.responderName}>{responder.name}</Text>
-              <View style={styles.responderStats}>
-                <View style={styles.stat}>
-                  <Icon name="location-on" size={16} color={colors.textSecondary} />
-                  <Text style={styles.statText}>{responder.distance}m away</Text>
-                </View>
-                <View style={styles.stat}>
-                  <Icon name="schedule" size={16} color={colors.textSecondary} />
-                  <Text style={styles.statText}>{responder.eta} min ETA</Text>
+          <Card key={responder.userId} variant="elevated" padding="lg" style={styles.responderCard}>
+            <View style={styles.responderHeader}>
+              <Avatar name={responder.name} size="large" showStatus isOnline />
+              <View style={styles.responderInfo}>
+                <Text style={styles.responderName}>{responder.name}</Text>
+                <View style={styles.responderStats}>
+                  <View style={styles.stat}>
+                    <Icon name="location-on" size={16} color={colors.textSecondary} />
+                    <Text style={styles.statText}>{formatDistance(responder.distanceMeters)}</Text>
+                  </View>
+                  <View style={styles.stat}>
+                    <Icon name="schedule" size={16} color={colors.textSecondary} />
+                    <Text style={styles.statText}>{formatEta(responder.etaSeconds)}</Text>
+                  </View>
                 </View>
               </View>
             </View>
-          </View>
 
-          <View style={styles.miniMap}>
-            <Text style={styles.miniMapPlaceholder}>Mini map showing live location</Text>
-          </View>
+            <View style={styles.statusBanner}>
+              <Text style={styles.statusText}>
+                Status: {responder.responseStatus === 'accepted' ? 'On the way' : responder.responseStatus}
+              </Text>
+            </View>
 
-          <View style={styles.responderActions}>
-            <Button
-              variant="primary"
-              size="medium"
-              icon="phone"
-              onPress={() => handleCall(responder.id)}
-              style={styles.responderButton}
-            >
-              Call
-            </Button>
-            <Button
-              variant="outline"
-              size="medium"
-              icon="message"
-              onPress={() => handleMessage(responder.id)}
-              style={styles.responderButton}
-            >
-              Message
-            </Button>
-          </View>
-        </Card>
-      ))}
+            <View style={styles.responderActions}>
+              <Button
+                variant="primary"
+                size="medium"
+                icon="phone"
+                onPress={() => handleCall(responder)}
+                disabled={!responder.phone}
+                style={styles.responderButton}
+              >
+                Call
+              </Button>
+              <Button
+                variant="outline"
+                size="medium"
+                icon="message"
+                onPress={() => handleMessage(responder.userId)}
+                style={styles.responderButton}
+              >
+                Message
+              </Button>
+            </View>
+          </Card>
+        ))}
 
         {responders.length === 0 && (
           <View style={styles.emptyState}>
             <Icon name="people-outline" size={64} color={colors.textSecondary} />
             <Text style={styles.emptyText}>No responders yet</Text>
             <Text style={styles.emptyDescription}>
-              Nearby users are being notified of your emergency
+              Nearby users are still being notified of your emergency.
             </Text>
           </View>
         )}
@@ -185,17 +191,15 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginLeft: spacing.xs,
   },
-  miniMap: {
-    height: 120,
+  statusBanner: {
     backgroundColor: colors.background,
     borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: spacing.md,
     marginBottom: spacing.lg,
   },
-  miniMapPlaceholder: {
-    fontSize: fontSizes.sm,
-    color: colors.textSecondary,
+  statusText: {
+    color: colors.textPrimary,
+    fontWeight: '600',
   },
   responderActions: {
     flexDirection: 'row',
