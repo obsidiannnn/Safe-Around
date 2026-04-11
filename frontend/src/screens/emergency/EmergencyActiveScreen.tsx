@@ -39,6 +39,22 @@ export const EmergencyActiveScreen = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isCompleting, setIsCompleting] = useState(false);
 
+  const resetLocalAlertState = useCallback(() => {
+    setActiveAlert(null);
+    setCurrentRadius(100);
+    setRespondersCount(0);
+  }, [setActiveAlert, setCurrentRadius, setRespondersCount]);
+
+  const replaceWithResolution = useCallback((alertId: string) => {
+    resetLocalAlertState();
+    (navigation as any).replace('EmergencyResolution', { alertId });
+  }, [navigation, resetLocalAlertState]);
+
+  const replaceWithDashboard = useCallback(() => {
+    resetLocalAlertState();
+    (navigation as any).replace('EmergencyDashboard');
+  }, [navigation, resetLocalAlertState]);
+
   useEffect(() => {
     scale.value = withRepeat(withTiming(1.16, { duration: 1100 }), -1, true);
   }, [scale]);
@@ -158,8 +174,18 @@ export const EmergencyActiveScreen = () => {
     try {
       setIsCompleting(true);
       await resolveAlert(currentAlert.id);
-      (navigation as any).navigate('EmergencyResolution', { alertId: currentAlert.id });
+      replaceWithResolution(currentAlert.id);
     } catch (error) {
+      try {
+        const latestAlert = await alertService.getAlert(currentAlert.id);
+        if (latestAlert.status === 'resolved' || latestAlert.status === 'cancelled') {
+          replaceWithResolution(currentAlert.id);
+          return;
+        }
+      } catch {
+        // Keep the user-facing fallback below if the alert could not be reloaded.
+      }
+
       Alert.alert('Unable to finish SOS', 'We could not close this SOS yet. Please try again.');
     } finally {
       setIsCompleting(false);
@@ -174,8 +200,18 @@ export const EmergencyActiveScreen = () => {
     try {
       setIsCompleting(true);
       await cancelAlert(currentAlert.id);
-      (navigation as any).navigate('EmergencyDashboard');
+      replaceWithDashboard();
     } catch (error) {
+      try {
+        const latestAlert = await alertService.getAlert(currentAlert.id);
+        if (latestAlert.status === 'cancelled' || latestAlert.status === 'resolved') {
+          replaceWithDashboard();
+          return;
+        }
+      } catch {
+        // Keep the user-facing fallback below if the alert could not be reloaded.
+      }
+
       Alert.alert('Unable to cancel alert', 'This SOS could not be cancelled right now. Please refresh and try again.');
     } finally {
       setIsCompleting(false);
@@ -306,26 +342,27 @@ export const EmergencyActiveScreen = () => {
       </ScrollView>
 
       <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-        <Button
-          variant="primary"
-          size="large"
-          fullWidth
-          onPress={handleSafe}
-          icon="check-circle"
-          style={styles.safeButton}
-          disabled={loading || isCompleting || !currentAlert}
-        >
-          I'm Safe Now
-        </Button>
-        <Button
-          variant="outline"
-          size="medium"
-          fullWidth
-          onPress={handleCancel}
-          disabled={loading || isCompleting || !currentAlert}
-        >
-          Cancel Alert
-        </Button>
+        <View style={styles.actionRow}>
+          <Button
+            variant="primary"
+            size="medium"
+            onPress={handleSafe}
+            icon="check-circle"
+            style={styles.safeButton}
+            disabled={loading || isCompleting || !currentAlert}
+          >
+            I'm Safe
+          </Button>
+          <Button
+            variant="outline"
+            size="medium"
+            onPress={handleCancel}
+            style={styles.cancelButton}
+            disabled={loading || isCompleting || !currentAlert}
+          >
+            Cancel SOS
+          </Button>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -525,12 +562,21 @@ const styles = StyleSheet.create({
   actions: {
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
+    paddingTop: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+  },
+  actionRow: {
+    flexDirection: 'row',
     gap: spacing.md,
   },
   safeButton: {
     backgroundColor: colors.success,
+    flex: 1,
+    minHeight: 48,
+  },
+  cancelButton: {
+    flex: 1,
+    minHeight: 48,
   },
 });

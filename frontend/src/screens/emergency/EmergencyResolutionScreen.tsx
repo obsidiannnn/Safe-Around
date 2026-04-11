@@ -187,7 +187,11 @@ export const EmergencyResolutionScreen = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.header}>
           <View style={styles.iconContainer}>
             <Icon name="check-circle" size={80} color={colors.success} />
@@ -331,7 +335,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     padding: spacing['2xl'],
     paddingBottom: spacing['4xl'],
   },
