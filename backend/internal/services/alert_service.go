@@ -205,13 +205,18 @@ func extractResponderIDs(responders []AlertResponderSummary) []uint {
 }
 
 func (s *AlertService) CreateAlert(ctx context.Context, req CreateAlertRequest) (*models.EmergencyAlert, error) {
-	metadata := req.Metadata
-	if metadata != "" && !json.Valid([]byte(metadata)) {
-		wrapped, err := json.Marshal(map[string]string{"message": metadata})
-		if err != nil {
-			return nil, err
+	var metadata *string
+	if req.Metadata != "" {
+		if !json.Valid([]byte(req.Metadata)) {
+			wrapped, err := json.Marshal(map[string]string{"message": req.Metadata})
+			if err != nil {
+				return nil, err
+			}
+			metadataStr := string(wrapped)
+			metadata = &metadataStr
+		} else {
+			metadata = &req.Metadata
 		}
-		metadata = string(wrapped)
 	}
 
 	// 1. Create alert record

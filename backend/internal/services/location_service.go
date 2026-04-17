@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/obsidiannnn/Safe-Around/backend/internal/models"
@@ -97,7 +98,31 @@ func (ls *LocationService) batchInsertLocations(locations []*models.UserLocation
 }
 
 func (ls *LocationService) GetCurrentLocation(userID uint) (*models.UserLocation, error) {
-	// Query database (last 5 minutes) fallback
+	// Try Redis cache first (faster and includes recently updated locations)
+	key := fmt.Sprintf("location:user_%d", userID)
+	ctx := context.Background()
+	
+	if exists, _ := ls.redis.Exists(ctx, key).Result(); exists == 1 {
+		data, err := ls.redis.HGetAll(ctx, key).Result()
+		if err == nil && len(data) > 0 {
+			lat, latErr := strconv.ParseFloat(data["lat"], 64)
+			lng, lngErr := strconv.ParseFloat(data["lng"], 64)
+			ts, tsErr := strconv.ParseInt(data["ts"], 10, 64)
+			
+			if latErr == nil && lngErr == nil && tsErr == nil {
+				return &models.UserLocation{
+					UserID: userID,
+					Location: models.Location{
+						Latitude:  lat,
+						Longitude: lng,
+					},
+					RecordedAt: time.Unix(ts, 0),
+				}, nil
+			}
+		}
+	}
+	
+	// Fallback to database (last 5 minutes)
 	var location models.UserLocation
 	err := ls.db.Where("user_id = ? AND recorded_at > ?", userID, time.Now().Add(-5*time.Minute)).
 		Order("recorded_at DESC").
