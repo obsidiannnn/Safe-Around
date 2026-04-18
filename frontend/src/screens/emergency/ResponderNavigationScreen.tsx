@@ -126,8 +126,10 @@ export const ResponderNavigationScreen = () => {
   }, []);
 
   const handleConfirmArrival = () => {
-    NativeAlert.alert('Arrival confirmed', 'The requester can now see that you have arrived nearby.');
-    // Navigate back to the main Emergency dashboard
+    // Close the bottom sheet first
+    setShowActions(false);
+    
+    // Navigate back immediately without alert
     navigation.dispatch(
       CommonActions.reset({
         index: 0,
