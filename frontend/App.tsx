@@ -40,7 +40,13 @@ export default function App() {
   }, []);
 
   if (isInitializing) {
-    return <LoadingOverlay visible={true} message="Initializing SafeAround..." onLayout={() => SplashScreen.hideAsync()} />;
+    return (
+      <LoadingOverlay
+        visible={true}
+        message="Preparing your live protection network"
+        onLayout={() => SplashScreen.hideAsync()}
+      />
+    );
   }
 
   return (
@@ -57,4 +63,3 @@ export default function App() {
     </ErrorBoundary>
   );
 }
-

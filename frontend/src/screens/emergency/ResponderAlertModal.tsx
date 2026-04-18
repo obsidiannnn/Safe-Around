@@ -48,6 +48,15 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
       setIsResponding(true);
       await respondToAlert(alert.id);
       onClose();
+      const parentNavigation = (navigation as any).getParent?.();
+      if (parentNavigation?.navigate) {
+        parentNavigation.navigate('Emergency', {
+          screen: 'ResponderNavigation',
+          params: { alertId: alert.id },
+        });
+        return;
+      }
+
       (navigation as any).navigate('ResponderNavigation', { alertId: alert.id });
     } catch (error) {
       console.warn('Error responding to alert:', error);

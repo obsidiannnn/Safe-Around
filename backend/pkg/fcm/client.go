@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/obsidiannnn/Safe-Around/backend/pkg/logger"
@@ -69,6 +70,10 @@ func (c *Client) OverrideBaseURL(url string) {
 }
 
 func (c *Client) SendNotification(token, title, body string, data map[string]string) (string, error) {
+	if isExpoPushToken(token) {
+		return c.sendExpoNotification(token, title, body, data)
+	}
+
 	payload := Payload{
 		To: token,
 		Notification: &NotificationItem{
@@ -93,6 +98,80 @@ func (c *Client) SendNotification(token, title, body string, data map[string]str
 		msgID = resp.Results[0].MessageID
 	}
 	return msgID, nil
+}
+
+type expoPushRequest struct {
+	To    string            `json:"to"`
+	Title string            `json:"title"`
+	Body  string            `json:"body"`
+	Data  map[string]string `json:"data,omitempty"`
+	Sound string            `json:"sound,omitempty"`
+}
+
+type expoPushResponse struct {
+	Data struct {
+		Status  string `json:"status"`
+		ID      string `json:"id"`
+		Message string `json:"message"`
+	} `json:"data"`
+	Errors []struct {
+		Message string `json:"message"`
+	} `json:"errors"`
+}
+
+func isExpoPushToken(token string) bool {
+	return strings.HasPrefix(token, "ExponentPushToken[") || strings.HasPrefix(token, "ExpoPushToken[")
+}
+
+func (c *Client) sendExpoNotification(token, title, body string, data map[string]string) (string, error) {
+	payload := expoPushRequest{
+		To:    token,
+		Title: title,
+		Body:  body,
+		Data:  data,
+		Sound: "default",
+	}
+
+	bodyBytes, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest("POST", "https://exp.host/--/api/v2/push/send", bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	httpResp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode >= 400 {
+		return "", fmt.Errorf("expo push server error: %d", httpResp.StatusCode)
+	}
+
+	var resp expoPushResponse
+	if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
+		return "", err
+	}
+
+	if len(resp.Errors) > 0 {
+		return "", errors.New(resp.Errors[0].Message)
+	}
+	if resp.Data.Status != "ok" {
+		if resp.Data.Message != "" {
+			return "", errors.New(resp.Data.Message)
+		}
+		return "", errors.New("expo push rejected the notification")
+	}
+
+	return resp.Data.ID, nil
 }
 
 func (c *Client) SendMulticast(tokens []string, title, body string, data map[string]string) (*Response, error) {

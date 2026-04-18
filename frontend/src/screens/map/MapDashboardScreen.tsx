@@ -14,7 +14,7 @@ import { MapTypeSwitch } from '@/components/map/MapTypeSwitch';
 import { NearbyUsersLayer } from '@/components/map/NearbyUsersLayer';
 import { DangerZoneAlert } from '@/components/location/DangerZoneAlert';
 import { BackgroundLocationIndicator } from '@/components/location/BackgroundLocationIndicator';
-import { API_URL, WEBSOCKET_URL, GOOGLE_MAPS_API_KEY } from '@/config/env';
+import { API_URL, GOOGLE_MAPS_API_KEY } from '@/config/env';
 import { useMapStore } from '@/store/mapStore';
 import { useAuthStore } from '@/store/authStore';
 import { useLocation } from '@/hooks/useLocation';
@@ -65,8 +65,7 @@ export const MapDashboardScreen = () => {
     west: 0,
   });
 
-  const { createAlert, respondToAlert, activeAlert, respondersCount } = useAlertStore();
-  const { priorityAlerts } = useSettingsStore();
+  const { createAlert, activeAlert, respondersCount } = useAlertStore();
 
   const openEmergencyActiveScreen = useCallback(() => {
     (navigation.getParent() as any)?.navigate('Emergency', { screen: 'EmergencyActive' });
@@ -114,9 +113,6 @@ export const MapDashboardScreen = () => {
   }, [currentLocation]);
 
   useEffect(() => {
-    const WS_URL = `${WEBSOCKET_URL}/ws/crime`;
-    CrimeWebSocketService.connect(WS_URL);
-
     const handleNewCrime = (data: any) => {
       Alert.alert(
         '🚨 Crime Alert',
@@ -134,46 +130,6 @@ export const MapDashboardScreen = () => {
         ]
       );
       setHeatmapKey(prev => prev + 1);
-    };
-
-    const handleEmergencyAlert = (data: any) => {
-      if (!priorityAlerts) return;
-      const authUserId = String(useAuthStore.getState().user?.id ?? '');
-      const sourceUserId = String(data.user?.user_id ?? '');
-      const recipientIds = Array.isArray(data.recipient_user_ids)
-        ? data.recipient_user_ids.map((id: unknown) => String(id))
-        : [];
-      const liveAlert = useAlertStore.getState().activeAlert;
-
-      if (sourceUserId === authUserId) return;
-      if (recipientIds.length > 0 && !recipientIds.includes(authUserId)) return;
-      if (liveAlert?.id === data.alert_id || useAlertStore.getState().isAlertActive) return;
-
-      Alert.alert(
-        '🆘 HELP NEEDED',
-        `A person is in danger nearby. Can you help?`,
-        [
-          { 
-            text: 'I AM COMING', 
-            onPress: async () => {
-              try {
-                setActiveVictimLocation(data.location);
-                setActiveVictimAlertId(String(data.alert_id));
-                await respondToAlert(String(data.alert_id));
-                (navigation.getParent() as any)?.navigate('Emergency', {
-                  screen: 'ResponderNavigation',
-                  params: { alertId: String(data.alert_id) },
-                });
-              } catch (error) {
-                console.warn('Unable to accept emergency alert from map:', error);
-                Alert.alert('Could not accept alert', 'We could not open the helper route right now. Please try again.');
-              }
-            },
-            style: 'default' 
-          },
-          { text: 'I Can\'t Help', style: 'cancel' }
-        ]
-      );
     };
 
     const handleResponderAccepted = (data: any) => {
@@ -207,18 +163,15 @@ export const MapDashboardScreen = () => {
     };
 
     CrimeWebSocketService.on('crime_added', handleNewCrime);
-    CrimeWebSocketService.on('emergency_alert', handleEmergencyAlert);
     CrimeWebSocketService.on('responder_accepted', handleResponderAccepted);
     CrimeWebSocketService.on('room_closed', handleRoomClosed);
 
     return () => {
       CrimeWebSocketService.off('crime_added', handleNewCrime);
-      CrimeWebSocketService.off('emergency_alert', handleEmergencyAlert);
       CrimeWebSocketService.off('responder_accepted', handleResponderAccepted);
       CrimeWebSocketService.off('room_closed', handleRoomClosed);
-      CrimeWebSocketService.disconnect();
     };
-  }, [activeVictimAlertId, priorityAlerts, respondToAlert]);
+  }, [activeVictimAlertId]);
 
   useEffect(() => {
     if (!activeAlert) {

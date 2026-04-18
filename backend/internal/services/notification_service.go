@@ -3,8 +3,10 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,6 +27,7 @@ type NotificationService interface {
 	QueueNotification(userID uint, title, body, notifType string) error
 	GetHistory(userID uint, limit, offset int) ([]models.Notification, int64, error)
 	MarkAsRead(notifID uint) error
+	RegisterDeviceToken(userID uint, token, platform string) error
 	SendEmergencyAlert(userID uint, alert *models.EmergencyAlert) error
 	NotifyResponderAccepted(userID uint, response *models.AlertResponse) error
 	NotifyAllParticipants(alertID uuid.UUID, message string) error
@@ -153,6 +156,33 @@ func (s *notifService) MarkAsRead(notifID uint) error {
 	return s.db.Model(&models.NotificationLog{}).
 		Where("id = ?", notifID).
 		Updates(map[string]interface{}{"status": "read", "read_at": &now}).Error
+}
+
+func (s *notifService) RegisterDeviceToken(userID uint, token, platform string) error {
+	token = strings.TrimSpace(token)
+	platform = strings.ToLower(strings.TrimSpace(platform))
+	if token == "" {
+		return errors.New("device token is required")
+	}
+
+	var session models.UserSession
+	err := s.db.
+		Where("user_id = ? AND is_revoked = ?", userID, false).
+		Order("created_at DESC").
+		First(&session).Error
+	if err != nil {
+		return err
+	}
+
+	if platform == "ios" {
+		session.APNsToken = token
+		session.FCMToken = ""
+	} else {
+		session.FCMToken = token
+		session.APNsToken = ""
+	}
+
+	return s.db.Save(&session).Error
 }
 
 // ---- Emergency-specific methods ----
