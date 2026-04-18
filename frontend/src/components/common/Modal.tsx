@@ -41,12 +41,11 @@ export const Modal: React.FC<ModalProps> = ({
   useEffect(() => {
     if (noAnimation) {
       if (visible) {
-        opacity.value = 1;
+        opacity.value = 0; // No backdrop for noAnimation modals
         translateY.value = 0;
       } else {
         opacity.value = 0;
         translateY.value = SCREEN_HEIGHT;
-        onClose();
       }
       return;
     }
@@ -74,8 +73,8 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <RNModal transparent visible={visible} animationType="none" onRequestClose={onClose} statusBarTranslucent={false}>
-      <View style={styles.container}>
-        {!noAnimation && (
+      <View style={[styles.container, noAnimation && styles.containerNoBackdrop]}>
+        {opacity.value > 0 && (
           <Animated.View style={[styles.backdrop, backdropStyle]}>
             <Pressable
               style={StyleSheet.absoluteFill}
@@ -89,7 +88,7 @@ export const Modal: React.FC<ModalProps> = ({
             styles.modal,
             fullScreen
               ? [styles.fullScreen, { paddingBottom: 0 }]
-              : [styles.bottomSheet, { paddingBottom: insets.bottom + spacing.lg }],
+              : [styles.bottomSheet, { paddingBottom: Math.max(insets.bottom, 80) }],
             modalStyle,
           ]}
         >
@@ -106,6 +105,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
+  containerNoBackdrop: {
+    backgroundColor: 'transparent',
+  },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: colors.backdrop,
@@ -118,7 +120,7 @@ const styles = StyleSheet.create({
   bottomSheet: {
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
-    maxHeight: SCREEN_HEIGHT * 0.85,
+    maxHeight: SCREEN_HEIGHT * 0.75,
   },
   fullScreen: {
     height: SCREEN_HEIGHT,

@@ -126,27 +126,8 @@ export const ResponderNavigationScreen = () => {
   }, []);
 
   const handleConfirmArrival = () => {
-    // Navigate back to Emergency tab, clearing the navigation stack
-    navigation.dispatch(
-      CommonActions.reset({
-        index: 0,
-        routes: [
-          {
-            name: 'Main',
-          },
-        ],
-      })
-    );
-    
-    // Then navigate to Emergency tab specifically
-    setTimeout(() => {
-      (navigation as any).navigate('Main', {
-        screen: 'Emergency',
-        params: {
-          screen: 'EmergencyDashboard',
-        },
-      });
-    }, 100);
+    // Simply go back to the previous screen (EmergencyDashboard)
+    navigation.goBack();
   };
 
   const handleCancelResponse = () => {
