@@ -126,26 +126,27 @@ export const ResponderNavigationScreen = () => {
   }, []);
 
   const handleConfirmArrival = () => {
-    // Close the bottom sheet first
-    setShowActions(false);
-    
-    // Navigate back immediately without alert
+    // Navigate back to Emergency tab, clearing the navigation stack
     navigation.dispatch(
       CommonActions.reset({
         index: 0,
         routes: [
           {
             name: 'Main',
-            params: {
-              screen: 'Emergency',
-              params: {
-                screen: 'EmergencyDashboard',
-              },
-            },
           },
         ],
       })
     );
+    
+    // Then navigate to Emergency tab specifically
+    setTimeout(() => {
+      (navigation as any).navigate('Main', {
+        screen: 'Emergency',
+        params: {
+          screen: 'EmergencyDashboard',
+        },
+      });
+    }, 100);
   };
 
   const handleCancelResponse = () => {

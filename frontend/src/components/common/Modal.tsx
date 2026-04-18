@@ -73,14 +73,16 @@ export const Modal: React.FC<ModalProps> = ({
   if (!visible) return null;
 
   return (
-    <RNModal transparent visible={visible} animationType="none" onRequestClose={onClose}>
+    <RNModal transparent visible={visible} animationType="none" onRequestClose={onClose} statusBarTranslucent={false}>
       <View style={styles.container}>
-        <Animated.View style={[styles.backdrop, backdropStyle]}>
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={dismissOnBackdrop ? onClose : undefined}
-          />
-        </Animated.View>
+        {!noAnimation && (
+          <Animated.View style={[styles.backdrop, backdropStyle]}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={dismissOnBackdrop ? onClose : undefined}
+            />
+          </Animated.View>
+        )}
 
         <Animated.View
           style={[
@@ -116,7 +118,7 @@ const styles = StyleSheet.create({
   bottomSheet: {
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
-    maxHeight: SCREEN_HEIGHT * 0.9,
+    maxHeight: SCREEN_HEIGHT * 0.85,
   },
   fullScreen: {
     height: SCREEN_HEIGHT,
