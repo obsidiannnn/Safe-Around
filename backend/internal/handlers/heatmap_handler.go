@@ -1,9 +1,13 @@
 package handlers
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -113,8 +117,16 @@ func (h *HeatmapHandler) GetTile(c *gin.Context) {
 
 // GET /api/v1/heatmap/zone
 func (h *HeatmapHandler) GetZoneInfo(c *gin.Context) {
-	lat := c.Query("lat")
-	lng := c.Query("lng")
+	lat, latErr := strconv.ParseFloat(c.Query("lat"), 64)
+	lng, lngErr := strconv.ParseFloat(c.Query("lng"), 64)
+	if latErr != nil || lngErr != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid lat/lng parameters"})
+		return
+	}
+	if err := validateCoordinates(lat, lng); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	var stats struct {
 		CrimeCount   int     `json:"crime_count"`
@@ -150,39 +162,61 @@ func (h *HeatmapHandler) GetStatistics(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid lat/lng parameters"})
 		return
 	}
+	if err := validateCoordinates(lat, lng); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	cacheKey := statsCacheKey(lat, lng)
+	if cached, ok := h.getCachedJSON(c.Request.Context(), cacheKey); ok {
+		c.JSON(http.StatusOK, cached)
+		return
+	}
 
 	type areaStats struct {
-		CrimeCount  int64
-		SeveritySum int64
+		CrimeCount   int64 `json:"crime_count"`
+		SeveritySum  int64 `json:"severity_sum"`
+		NearbyUsers  int64 `json:"nearby_users"`
+		RecentAlerts int64 `json:"recent_alerts"`
 	}
 
 	var statsRow areaStats
-	h.db.Raw(`
+	if err := h.db.Raw(`
+		WITH target AS (
+			SELECT ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography AS point
+		),
+		crime_stats AS (
+			SELECT
+				COUNT(*)::bigint AS crime_count,
+				COALESCE(SUM(severity), 0)::bigint AS severity_sum
+			FROM crime_incidents, target
+			WHERE ST_DWithin(location::geography, target.point, 1000)
+			  AND occurred_at > NOW() - INTERVAL '30 days'
+			  AND verified = true
+		),
+		nearby_stats AS (
+			SELECT COUNT(DISTINCT user_id)::bigint AS nearby_users
+			FROM user_locations, target
+			WHERE ST_DWithin(location::geography, target.point, 1000)
+			  AND recorded_at > NOW() - INTERVAL '5 minutes'
+		),
+		alert_stats AS (
+			SELECT COUNT(*)::bigint AS recent_alerts
+			FROM emergency_alerts, target
+			WHERE ST_DWithin(alert_location::geography, target.point, 1000)
+			  AND created_at > NOW() - INTERVAL '24 hours'
+			  AND alert_status IN ('active', 'responding')
+		)
 		SELECT
-			COUNT(*) AS crime_count,
-			COALESCE(SUM(severity), 0) AS severity_sum
-		FROM crime_incidents
-		WHERE ST_DWithin(location::geography, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, 1000)
-		  AND occurred_at > NOW() - INTERVAL '30 days'
-		  AND verified = true
-	`, lng, lat).Scan(&statsRow)
-
-	var nearbyUsers int64
-	h.db.Raw(`
-		SELECT COUNT(DISTINCT user_id)
-		FROM user_locations
-		WHERE ST_DWithin(location::geography, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, 1000)
-		  AND recorded_at > NOW() - INTERVAL '5 minutes'
-	`, lng, lat).Scan(&nearbyUsers)
-
-	var recentAlerts int64
-	h.db.Raw(`
-		SELECT COUNT(*)
-		FROM emergency_alerts
-		WHERE ST_DWithin(alert_location::geography, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, 1000)
-		  AND created_at > NOW() - INTERVAL '24 hours'
-		  AND alert_status IN ('active', 'responding')
-	`, lng, lat).Scan(&recentAlerts)
+			crime_stats.crime_count,
+			crime_stats.severity_sum,
+			nearby_stats.nearby_users,
+			alert_stats.recent_alerts
+		FROM crime_stats, nearby_stats, alert_stats
+	`, lng, lat).Scan(&statsRow).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load area statistics"})
+		return
+	}
 
 	// Score penalizes both incident volume and severity, capped to the 0-100 UI range.
 	safetyScore := int64(math.Round(100 - (float64(statsRow.CrimeCount) * 3.5) - (float64(statsRow.SeveritySum) * 1.5)))
@@ -194,17 +228,20 @@ func (h *HeatmapHandler) GetStatistics(c *gin.Context) {
 
 	stats := gin.H{
 		"safetyScore":  safetyScore,
-		"nearbyUsers":  nearbyUsers,
-		"recentAlerts": recentAlerts,
+		"nearbyUsers":  statsRow.NearbyUsers,
+		"recentAlerts": statsRow.RecentAlerts,
 		"crimeRate":    math.Round((float64(statsRow.CrimeCount)/30.0)*10) / 10,
 		"lastUpdated":  time.Now(),
 	}
 
+	h.cacheJSON(c.Request.Context(), cacheKey, stats, 15*time.Second)
 	c.JSON(200, stats)
 }
 
 // POST /api/v1/heatmap/report
 func (h *HeatmapHandler) ReportIncident(c *gin.Context) {
+	userIDVal, _ := c.Get("user_id")
+
 	var input struct {
 		CrimeType   string  `json:"crime_type" binding:"required"`
 		Severity    int     `json:"severity" binding:"required"`
@@ -217,15 +254,111 @@ func (h *HeatmapHandler) ReportIncident(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if err := validateCoordinates(input.Latitude, input.Longitude); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if input.Severity < 1 || input.Severity > 4 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "severity must be between 1 and 4"})
+		return
+	}
+
+	var availableColumns []string
+	if err := h.db.Raw(`
+		SELECT column_name
+		FROM information_schema.columns
+		WHERE table_schema = current_schema()
+		  AND table_name = 'crime_incidents'
+	`).Scan(&availableColumns).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to inspect incident schema"})
+		return
+	}
+
+	columnSet := make(map[string]bool, len(availableColumns))
+	for _, column := range availableColumns {
+		columnSet[column] = true
+	}
+
+	columns := make([]string, 0, 8)
+	values := make([]string, 0, 8)
+	args := make([]interface{}, 0, 8)
+
+	addColumn := func(column, placeholder string, value ...interface{}) {
+		if !columnSet[column] {
+			return
+		}
+		columns = append(columns, column)
+		values = append(values, placeholder)
+		args = append(args, value...)
+	}
+
+	addColumn("type", "?", input.CrimeType)
+	addColumn("crime_type", "?", input.CrimeType)
+	addColumn("incident_type", "?", input.CrimeType)
+	addColumn("severity", "?", input.Severity)
+	addColumn("location", "ST_SetSRID(ST_MakePoint(?, ?), 4326)", input.Longitude, input.Latitude)
+	addColumn("description", "?", input.Description)
+	addColumn("occurred_at", "NOW()")
+	addColumn("reported_at", "NOW()")
+	addColumn("source", "?", "user_report")
+	addColumn("verified", "?", false)
+	if userID, ok := userIDVal.(uint); ok {
+		addColumn("reported_by", "?", userID)
+	}
+
+	if len(columns) == 0 || (!columnSet["type"] && !columnSet["crime_type"] && !columnSet["incident_type"]) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "crime incidents schema is missing a type column"})
+		return
+	}
 
 	query := `
-        INSERT INTO crime_incidents (crime_type, severity, location, description, occurred_at)
-        VALUES (?, ?, ST_SetSRID(ST_MakePoint(?, ?), 4326), ?, NOW())
+        INSERT INTO crime_incidents (` + strings.Join(columns, ", ") + `)
+        VALUES (` + strings.Join(values, ", ") + `)
     `
-	if err := h.db.Exec(query, input.CrimeType, input.Severity, input.Longitude, input.Latitude, input.Description).Error; err != nil {
+	if err := h.db.Exec(query, args...).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(200, gin.H{"success": true, "message": "Incident reported successfully"})
+}
+
+func statsCacheKey(lat, lng float64) string {
+	return fmt.Sprintf("heatmap:stats:%0.4f:%0.4f", roundCoord(lat, 4), roundCoord(lng, 4))
+}
+
+func roundCoord(value float64, decimals int) float64 {
+	pow := math.Pow10(decimals)
+	return math.Round(value*pow) / pow
+}
+
+func (h *HeatmapHandler) getCachedJSON(ctx context.Context, cacheKey string) (gin.H, bool) {
+	if h.redis == nil {
+		return nil, false
+	}
+
+	cached, err := h.redis.Get(ctx, cacheKey).Result()
+	if err != nil || cached == "" {
+		return nil, false
+	}
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal([]byte(cached), &payload); err != nil {
+		return nil, false
+	}
+
+	return gin.H(payload), true
+}
+
+func (h *HeatmapHandler) cacheJSON(ctx context.Context, cacheKey string, payload gin.H, ttl time.Duration) {
+	if h.redis == nil {
+		return
+	}
+
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+
+	h.redis.Set(ctx, cacheKey, encoded, ttl)
 }

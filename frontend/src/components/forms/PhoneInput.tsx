@@ -27,6 +27,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
   onCountryCodeChange,
 }) => {
   const [isFocused, setIsFocused] = useState(false);
+  const supportedCountryCodes = ['+91', '+1'];
 
   const formatPhoneNumber = (text: string): string => {
     const cleaned = text.replace(/\D/g, '');
@@ -51,6 +52,16 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
     return colors.border;
   };
 
+  const handleCountryCodePress = () => {
+    if (!onCountryCodeChange) {
+      return;
+    }
+
+    const currentIndex = supportedCountryCodes.indexOf(countryCode);
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % supportedCountryCodes.length;
+    onCountryCodeChange(supportedCountryCodes[nextIndex]);
+  };
+
   return (
     <View style={styles.container}>
       {label && <Text style={styles.label}>{label}</Text>}
@@ -58,9 +69,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
       <View style={[styles.inputContainer, { borderColor: getBorderColor() }]}>
         <Pressable
           style={styles.countryCodeButton}
-          onPress={() => {
-            // TODO: Open country code picker
-          }}
+          onPress={handleCountryCodePress}
         >
           <Text style={styles.countryCode}>{countryCode}</Text>
           <Icon name="arrow-drop-down" size={20} color={colors.textSecondary} />

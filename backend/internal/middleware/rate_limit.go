@@ -25,6 +25,13 @@ const (
 	anonLimit    = 30
 )
 
+var endpointLimitOverrides = map[string]int{
+	"/api/v1/location/nearby":    300,
+	"/api/v1/heatmap/statistics": 240,
+	"/api/v1/heatmap/data":       180,
+	"/api/v1/heatmap/grid":       180,
+}
+
 // RateLimitMiddleware enforces per-user, tier-based rate limits backed by Redis.
 // Key format: rate_limit:<userID>:<YYYYMMDDHHMM>  (70s TTL)
 // Unauthenticated callers are limited to 30 req/min per IP.
@@ -90,11 +97,9 @@ func RateLimit(rdb *redis.Client, limit int, window time.Duration) gin.HandlerFu
 			endpoint = "unknown"
 		}
 
-		// High-frequency map reads are refreshed elsewhere and should not trip
-		// the generic API limiter during normal location tracking.
-		if endpoint == "/api/v1/location/nearby" || endpoint == "/api/v1/heatmap/statistics" {
-			c.Next()
-			return
+		effectiveLimit := limit
+		if override, ok := endpointLimitOverrides[endpoint]; ok {
+			effectiveLimit = override
 		}
 
 		key := fmt.Sprintf("ratelimit:%s:%s", endpoint, ip)
@@ -106,8 +111,8 @@ func RateLimit(rdb *redis.Client, limit int, window time.Duration) gin.HandlerFu
 			return
 		}
 
-		if current >= limit {
-			c.Writer.Header().Set("X-RateLimit-Limit", strconv.Itoa(limit))
+		if current >= effectiveLimit {
+			c.Writer.Header().Set("X-RateLimit-Limit", strconv.Itoa(effectiveLimit))
 			c.Writer.Header().Set("X-RateLimit-Remaining", "0")
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"error": "too many requests, please slow down",
@@ -123,8 +128,13 @@ func RateLimit(rdb *redis.Client, limit int, window time.Duration) gin.HandlerFu
 		}
 		pipe.Exec(ctx) //nolint:errcheck
 
-		c.Writer.Header().Set("X-RateLimit-Limit", strconv.Itoa(limit))
-		c.Writer.Header().Set("X-RateLimit-Remaining", strconv.Itoa(limit-(current+1)))
+		remaining := effectiveLimit - (current + 1)
+		if remaining < 0 {
+			remaining = 0
+		}
+
+		c.Writer.Header().Set("X-RateLimit-Limit", strconv.Itoa(effectiveLimit))
+		c.Writer.Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
 		c.Next()
 	}
 }

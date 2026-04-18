@@ -89,7 +89,7 @@ func main() {
 	wsHandler := handlers.HandleWebSocket(crimeHub)
 	locationHandler := handlers.NewLocationHandler(locationSvc, crimeHub)
 	routeHandler := handlers.NewRouteHandler(routeSvc)
-	profileHandler := handlers.NewProfileHandler(db)
+	profileHandler := handlers.NewProfileHandler(db, rdb)
 	geofencingHandler := handlers.NewGeofencingHandler(geoSvc)
 
 	// 6. Setup Routes

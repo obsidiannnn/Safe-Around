@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Marker } from 'react-native-maps';
 import { Location } from '@/types/models';
@@ -22,43 +22,63 @@ export const NearbyUsersLayer: React.FC<NearbyUsersLayerProps> = ({ userLocation
   const [nearbyUsers, setNearbyUsers] = useState<NearbyUserLocation[]>([]);
   const pulse = useSharedValue(1);
   const lastFetchAtRef = useRef(0);
+  const latestLocationRef = useRef(userLocation);
+  const lastFetchCenterRef = useRef<Location | null>(null);
 
   useEffect(() => {
     pulse.value = withRepeat(withTiming(1.5, { duration: 1500 }), -1, true);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
+  const fetchNearbyUsers = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (!force && now - lastFetchAtRef.current < 4000) {
+      return;
+    }
+    lastFetchAtRef.current = now;
 
-    const fetchNearbyUsers = async (force = false) => {
-      const now = Date.now();
-      if (!force && now - lastFetchAtRef.current < 2500) {
+    const users = await locationApiService.getNearbyUsers(latestLocationRef.current, 5000, force);
+    const filteredUsers = currentUserId
+      ? users.filter((user) => String(user.userId) !== String(currentUserId))
+      : users;
+
+    setNearbyUsers(filteredUsers);
+    onUsersChange?.(filteredUsers.length);
+    lastFetchCenterRef.current = latestLocationRef.current;
+  }, [currentUserId, onUsersChange]);
+
+  useEffect(() => {
+    latestLocationRef.current = userLocation;
+
+    const previousFetchCenter = lastFetchCenterRef.current;
+    if (!previousFetchCenter || getDistanceMeters(previousFetchCenter, userLocation) >= 150) {
+      fetchNearbyUsers(true);
+    }
+  }, [fetchNearbyUsers, userLocation]);
+
+  useEffect(() => {
+    const handleNearbyUsersUpdated = (event?: { latitude?: number; longitude?: number }) => {
+      const changedLocation = event?.latitude != null && event?.longitude != null
+        ? { latitude: event.latitude, longitude: event.longitude }
+        : null;
+
+      if (
+        changedLocation &&
+        getDistanceMeters(latestLocationRef.current, changedLocation) > 6000
+      ) {
         return;
       }
-      lastFetchAtRef.current = now;
 
-      const users = await locationApiService.getNearbyUsers(userLocation, 5000);
-      const filteredUsers = currentUserId
-        ? users.filter((user) => String(user.userId) !== String(currentUserId))
-        : users;
-      if (cancelled) return;
-      setNearbyUsers(filteredUsers);
-      onUsersChange?.(filteredUsers.length);
-    };
-
-    const handleNearbyUsersUpdated = () => {
-      fetchNearbyUsers();
+      fetchNearbyUsers(true);
     };
 
     fetchNearbyUsers(true);
     CrimeWebSocketService.on('nearby_users_updated', handleNearbyUsersUpdated);
-    const interval = setInterval(() => fetchNearbyUsers(true), 15000);
+    const interval = setInterval(() => fetchNearbyUsers(true), 20000);
     return () => {
-      cancelled = true;
       CrimeWebSocketService.off('nearby_users_updated', handleNearbyUsersUpdated);
       clearInterval(interval);
     };
-  }, [currentUserId, userLocation.latitude, userLocation.longitude, onUsersChange]);
+  }, [fetchNearbyUsers]);
 
   const animatedPulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulse.value }],
@@ -110,3 +130,20 @@ const styles = StyleSheet.create({
     borderColor: colors.surface,
   },
 });
+
+function getDistanceMeters(
+  origin: Pick<Location, 'latitude' | 'longitude'>,
+  destination: Pick<Location, 'latitude' | 'longitude'>
+) {
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+  const earthRadius = 6371000;
+  const dLat = toRadians(destination.latitude - origin.latitude);
+  const dLng = toRadians(destination.longitude - origin.longitude);
+  const lat1 = toRadians(origin.latitude);
+  const lat2 = toRadians(destination.latitude);
+
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+
+  return 2 * earthRadius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}

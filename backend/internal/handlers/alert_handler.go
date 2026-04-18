@@ -42,6 +42,10 @@ func (h *AlertHandler) CreateAlert(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if err := validateCoordinates(req.Latitude, req.Longitude); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	createReq := services.CreateAlertRequest{
 		UserID: userID,
@@ -122,6 +126,10 @@ func (h *AlertHandler) RespondToAlert(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := validateCoordinates(req.Latitude, req.Longitude); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

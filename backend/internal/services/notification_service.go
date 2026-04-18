@@ -103,7 +103,14 @@ func (s *notifService) SendPushNotification(userID uint, deviceToken, title, bod
 		notif.Status = "sent"
 		notif.MessageID = msgID
 	}
-	return s.db.Save(&notif).Error
+	saveErr := s.db.Save(&notif).Error
+	if err != nil {
+		if saveErr != nil {
+			return fmt.Errorf("push delivery failed: %w (additionally failed to persist notification status: %v)", err, saveErr)
+		}
+		return err
+	}
+	return saveErr
 }
 
 func (s *notifService) SendSMS(phone, message string) error {
