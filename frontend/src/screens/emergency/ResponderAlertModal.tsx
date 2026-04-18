@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Dimensions, Alert as NativeAlert, ScrollView, Linking, Platform } from 'react-native';
+import { View, StyleSheet, Dimensions, Alert as NativeAlert, ScrollView, Linking, Platform, Pressable } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
@@ -104,13 +104,23 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
 
   const handleDecline = (reasonId: string) => {
     console.info('Responder declined alert', { alertId: alert.id, reasonId });
-    setShowDeclineReasons(false);
-    onClose();
+    // Add a small delay to prevent accidental quick dismissal
+    setTimeout(() => {
+      setShowDeclineReasons(false);
+      onClose();
+    }, 100);
   };
 
   return (
     <>
       <Modal visible={visible} onClose={onClose} dismissOnBackdrop={false} noAnimation={true}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Emergency Alert</Text>
+          <Pressable onPress={onClose} style={styles.closeButton}>
+            <Icon name="close" size={24} color={colors.textPrimary} />
+          </Pressable>
+        </View>
+        
         <ScrollView 
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
@@ -206,9 +216,16 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
       <BottomSheet
         visible={showDeclineReasons}
         onClose={() => setShowDeclineReasons(false)}
+        snapPoints={[0.6]}
+        dismissOnBackdrop={false}
       >
         <View style={styles.reasonsContainer}>
-          <Text style={styles.reasonsTitle}>Why can't you respond?</Text>
+          <View style={styles.reasonsHeader}>
+            <Text style={styles.reasonsTitle}>Why can't you respond?</Text>
+            <Pressable onPress={() => setShowDeclineReasons(false)} style={styles.reasonsCloseButton}>
+              <Icon name="close" size={20} color={colors.textSecondary} />
+            </Pressable>
+          </View>
           {declineReasons.map((reason) => (
             <Button
               key={reason.id}
@@ -229,14 +246,38 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
 };
 
 const styles = StyleSheet.create({
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: {
+    fontSize: fontSizes.lg,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   scrollView: {
-    maxHeight: SCREEN_HEIGHT * 0.85,
+    maxHeight: SCREEN_HEIGHT * 0.75,
+    zIndex: 1,
   },
   scrollContent: {
     flexGrow: 1,
   },
   container: {
     paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
   },
   header: {
     alignItems: 'center',
@@ -309,13 +350,29 @@ const styles = StyleSheet.create({
   },
   reasonsContainer: {
     paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    minHeight: 300,
+  },
+  reasonsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
   reasonsTitle: {
     fontSize: fontSizes.xl,
     fontWeight: '600',
     color: colors.textPrimary,
-    marginBottom: spacing.lg,
+    flex: 1,
     textAlign: 'center',
+  },
+  reasonsCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   reasonButton: {
     marginBottom: spacing.md,

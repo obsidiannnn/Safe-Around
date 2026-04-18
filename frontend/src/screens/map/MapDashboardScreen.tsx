@@ -529,17 +529,19 @@ export const MapDashboardScreen = () => {
       )}
 
       {responderAlert && (
-        <ResponderAlertModal
-          visible={showResponderModal}
-          onClose={() => {
-            setShowResponderModal(false);
-            setResponderAlert(null);
-            setActiveVictimLocation(null);
-            setActiveVictimAlertId(null);
-          }}
-          alert={responderAlert}
-          distance={responderDistance}
-        />
+        <View style={styles.modalOverlay}>
+          <ResponderAlertModal
+            visible={showResponderModal}
+            onClose={() => {
+              setShowResponderModal(false);
+              setResponderAlert(null);
+              setActiveVictimLocation(null);
+              setActiveVictimAlertId(null);
+            }}
+            alert={responderAlert}
+            distance={responderDistance}
+          />
+        </View>
       )}
     </View>
   );
@@ -749,6 +751,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.3,
     textTransform: 'uppercase',
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9999,
   },
 });
 

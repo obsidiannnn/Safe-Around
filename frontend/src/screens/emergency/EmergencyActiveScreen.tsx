@@ -224,120 +224,120 @@ export const EmergencyActiveScreen = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.lg) }]}>
-        <View style={styles.headerTopRow}>
-          <View style={styles.liveBadge}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveBadgeText}>SOS LIVE</Text>
-          </View>
-          <Button variant="ghost" size="small" onPress={() => loadAlertDetails(true)} icon="refresh">
-            Refresh
-          </Button>
-        </View>
-
-        <Animated.View style={[styles.heroIcon, animatedStyle]}>
-          <Icon name="warning-amber" size={72} color={colors.surface} />
-        </Animated.View>
-        <Text style={styles.title}>Emergency Alert Active</Text>
-        <Text style={styles.subtitle}>
-          Live location is being shared and the search radius expands automatically until help is found.
-        </Text>
-        <Text style={styles.timer}>{formatElapsed(elapsedTime)}</Text>
-      </View>
-
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => loadAlertDetails(true)} />
-        }
+      <ScrollView 
+        style={styles.fullScrollView}
+        contentContainerStyle={styles.fullScrollContent}
         showsVerticalScrollIndicator={false}
+        bounces={true}
       >
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Current search radius</Text>
-            <Text style={styles.summaryValue}>{currentRadius}m</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Emergency line</Text>
-            <Text style={styles.summaryValue}>{emergencyNumber}</Text>
-          </View>
-        </View>
-
-        <View style={styles.metaCard}>
-          <View style={styles.metaRow}>
-            <Icon name="place" size={18} color={colors.primary} />
-            <Text style={styles.metaText}>
-              Started at {currentAlert ? formatDateTime(currentAlert.createdAt) : 'just now'}
-            </Text>
-          </View>
-          <View style={styles.metaRow}>
-            <Icon name="shield" size={18} color={colors.primary} />
-            <Text style={styles.metaText}>
-              Status: {currentAlert?.status === 'responding' ? 'Responder on the way' : 'Searching nearby responders'}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.timelineCard}>
-          <Text style={styles.sectionTitle}>Search expansion</Text>
-          {timeline.map((step, index) => (
-            <View key={step.radius} style={styles.timelineRow}>
-              <View style={styles.timelineRail}>
-                <Icon
-                  name={
-                    step.status === 'completed'
-                      ? 'check-circle'
-                      : step.status === 'active'
-                      ? 'radio-button-checked'
-                      : 'radio-button-unchecked'
-                  }
-                  size={22}
-                  color={
-                    step.status === 'completed'
-                      ? colors.success
-                      : step.status === 'active'
-                      ? colors.warning
-                      : colors.textSecondary
-                  }
-                />
-                {index < timeline.length - 1 && <View style={styles.timelineLine} />}
-              </View>
-
-              <View style={styles.timelineContent}>
-                <Text style={styles.timelineTitle}>
-                  T+{step.offsetSeconds}s: {step.radius}m search
-                </Text>
-                <Text style={styles.timelineDescription}>{step.helperText}</Text>
-              </View>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.lg) }]}>
+          <View style={styles.headerTopRow}>
+            <View style={styles.liveBadge}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveBadgeText}>SOS LIVE</Text>
             </View>
-          ))}
+            <Button variant="ghost" size="small" onPress={() => loadAlertDetails(true)} icon="refresh">
+              Refresh
+            </Button>
+          </View>
+
+          <Animated.View style={[styles.heroIcon, animatedStyle]}>
+            <Icon name="warning-amber" size={72} color={colors.surface} />
+          </Animated.View>
+          <Text style={styles.title}>Emergency Alert Active</Text>
+          <Text style={styles.subtitle}>
+            Live location is being shared and the search radius expands automatically until help is found.
+          </Text>
+          <Text style={styles.timer}>{formatElapsed(elapsedTime)}</Text>
         </View>
 
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Icon name="groups" size={26} color={colors.secondary} />
-            <Text style={styles.statValue}>{respondersCount}</Text>
-            <Text style={styles.statLabel}>Responders</Text>
+        <View style={styles.contentSection}>
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>Current search radius</Text>
+              <Text style={styles.summaryValue}>{currentRadius}m</Text>
+            </View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>Emergency line</Text>
+              <Text style={styles.summaryValue}>{emergencyNumber}</Text>
+            </View>
           </View>
-          <View style={styles.statCard}>
-            <Icon name="notifications-active" size={26} color={colors.warning} />
-            <Text style={styles.statValue}>{usersNotified}</Text>
-            <Text style={styles.statLabel}>Users notified</Text>
-          </View>
-        </View>
 
-        <View style={styles.calloutCard}>
-          <View style={styles.calloutText}>
-            <Text style={styles.calloutTitle}>National emergency support</Text>
-            <Text style={styles.calloutDescription}>
-              If you need direct escalation in India, call {emergencyNumber}. The app will keep expanding the alert radius in parallel.
-            </Text>
+          <View style={styles.metaCard}>
+            <View style={styles.metaRow}>
+              <Icon name="place" size={18} color={colors.primary} />
+              <Text style={styles.metaText}>
+                Started at {currentAlert ? formatDateTime(currentAlert.createdAt) : 'just now'}
+              </Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Icon name="shield" size={18} color={colors.primary} />
+              <Text style={styles.metaText}>
+                Status: {currentAlert?.status === 'responding' ? 'Responder on the way' : 'Searching nearby responders'}
+              </Text>
+            </View>
           </View>
-          <Button variant="outline" size="small" onPress={handleCallEmergency} icon="call">
-            {callButtonLabel}
-          </Button>
+
+          <View style={styles.timelineCard}>
+            <Text style={styles.sectionTitle}>Search expansion</Text>
+            {timeline.map((step, index) => (
+              <View key={step.radius} style={styles.timelineRow}>
+                <View style={styles.timelineRail}>
+                  <Icon
+                    name={
+                      step.status === 'completed'
+                        ? 'check-circle'
+                        : step.status === 'active'
+                        ? 'radio-button-checked'
+                        : 'radio-button-unchecked'
+                    }
+                    size={22}
+                    color={
+                      step.status === 'completed'
+                        ? colors.success
+                        : step.status === 'active'
+                        ? colors.warning
+                        : colors.textSecondary
+                    }
+                  />
+                  {index < timeline.length - 1 && <View style={styles.timelineLine} />}
+                </View>
+
+                <View style={styles.timelineContent}>
+                  <Text style={styles.timelineTitle}>
+                    T+{step.offsetSeconds}s: {step.radius}m search
+                  </Text>
+                  <Text style={styles.timelineDescription}>{step.helperText}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Icon name="groups" size={26} color={colors.secondary} />
+              <Text style={styles.statValue}>{respondersCount}</Text>
+              <Text style={styles.statLabel}>Responders</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Icon name="notifications-active" size={26} color={colors.warning} />
+              <Text style={styles.statValue}>{usersNotified}</Text>
+              <Text style={styles.statLabel}>Users notified</Text>
+            </View>
+          </View>
+
+          <View style={styles.calloutCard}>
+            <View style={styles.calloutText}>
+              <Text style={styles.calloutTitle}>National emergency support</Text>
+              <Text style={styles.calloutDescription}>
+                If you need direct escalation in India, call {emergencyNumber}. The app will keep expanding the alert radius in parallel.
+              </Text>
+            </View>
+            <Button variant="outline" size="small" onPress={handleCallEmergency} icon="call">
+              {callButtonLabel}
+            </Button>
+          </View>
         </View>
       </ScrollView>
 
@@ -372,6 +372,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#A51230',
+  },
+  fullScrollView: {
+    flex: 1,
+  },
+  fullScrollContent: {
+    flexGrow: 1,
   },
   header: {
     paddingHorizontal: spacing.xl,
@@ -425,6 +431,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.surface,
     textAlign: 'center',
+  },
+  contentSection: {
+    flex: 1,
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: spacing.xl,
+    paddingBottom: spacing['3xl'],
   },
   scroll: {
     flex: 1,
