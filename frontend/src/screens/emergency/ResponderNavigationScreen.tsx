@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Vibration, Linking, Alert, Platform } from 'react-native';
+import { View, StyleSheet, Vibration, Linking, Alert as NativeAlert, Platform } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -126,12 +126,12 @@ export const ResponderNavigationScreen = () => {
   }, []);
 
   const handleConfirmArrival = () => {
-    Alert.alert('Arrival confirmed', 'The requester can now see that you have arrived nearby.');
+    NativeAlert.alert('Arrival confirmed', 'The requester can now see that you have arrived nearby.');
     navigation.goBack();
   };
 
   const handleCancelResponse = () => {
-    Alert.alert('Cancel response', 'If you can no longer help, please contact the requester or emergency services directly.', [
+    NativeAlert.alert('Cancel response', 'If you can no longer help, please contact the requester or emergency services directly.', [
       { text: 'Keep Helping', style: 'cancel' },
       { text: 'Leave Response', style: 'destructive', onPress: () => navigation.goBack() },
     ]);
@@ -139,7 +139,7 @@ export const ResponderNavigationScreen = () => {
 
   const handleOpenGoogleMaps = useCallback(async () => {
     if (!victimLocation) {
-      Alert.alert('Route unavailable', 'We could not find the person’s live destination yet.');
+      NativeAlert.alert('Route unavailable', 'We could not find the person’s live destination yet.');
       return;
     }
 

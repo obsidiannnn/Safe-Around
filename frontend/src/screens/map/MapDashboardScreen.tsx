@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, StyleSheet, Pressable, Platform, Text, Alert } from 'react-native';
+import { View, StyleSheet, Pressable, Platform, Text, Alert as NativeAlert } from 'react-native';
 import MapView, { Region, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import CrimeWebSocketService from '@/services/websocket/CrimeWebSocket';
@@ -123,7 +123,7 @@ export const MapDashboardScreen = () => {
     CrimeWebSocketService.connect(`${WEBSOCKET_URL}/ws/crime`);
 
     const handleNewCrime = (data: any) => {
-      Alert.alert(
+      NativeAlert.alert(
         '🚨 Crime Alert',
         `${data.crime_type} reported nearby`,
         [
@@ -200,7 +200,7 @@ export const MapDashboardScreen = () => {
         return;
       }
 
-      Alert.alert(
+      NativeAlert.alert(
         '✅ Help is on the way!',
         `A volunteer is ${Math.round(data.distance)}m away and will arrive in approx ${data.eta} min.`
       );
@@ -307,7 +307,7 @@ export const MapDashboardScreen = () => {
 
   const handleEmergencyTrigger = useCallback(async () => {
     if (!currentLocation) {
-      Alert.alert('Error', 'Cannot get your current location.');
+      NativeAlert.alert('Error', 'Cannot get your current location.');
       return;
     }
 
@@ -319,7 +319,7 @@ export const MapDashboardScreen = () => {
       openEmergencyActiveScreen();
     } catch (error) {
       console.warn('Error creating alert:', error);
-      Alert.alert('Error', 'Failed to trigger SOS alert.');
+      NativeAlert.alert('Error', 'Failed to trigger SOS alert.');
     }
   }, [currentLocation, createAlert, openEmergencyActiveScreen]);
 
@@ -508,7 +508,7 @@ export const MapDashboardScreen = () => {
         }}
         onReportIncident={() => {
           setShowAreaStatsCard(false);
-          Alert.alert('Report Incident', 'Incident reporting is available from the crime details screen.');
+          NativeAlert.alert('Report Incident', 'Incident reporting is available from the crime details screen.');
           navigation.navigate('CrimeDetails' as never);
         }}
       />
