@@ -27,6 +27,7 @@ func SetupRouter(
 
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
+	r.Use(middleware.SecurityHeadersMiddleware())
 	r.Use(middleware.CorsMiddleware())
 	r.Use(middleware.MetricsMiddleware())
 
@@ -55,7 +56,7 @@ func SetupRouter(
 		{
 			// Example of stricter rate limit on push triggers (10 / min)
 			notifs.POST("", middleware.RateLimit(rdb, 10, 60*time.Second), notifHandler.SendPushNotification)
-			
+
 			// Standard history fetches
 			notifs.GET("/history", notifHandler.GetNotificationHistory)
 			notifs.PUT("/:id/read", notifHandler.UpdateNotificationStatus)

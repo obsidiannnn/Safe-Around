@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Vibration, Linking, Alert } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, StyleSheet, Vibration, Linking, Alert, Platform } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { BottomSheet, Button } from '@/components/common';
+import { VolunteerRouteOverlay } from '@/components/map/VolunteerRouteOverlay';
+import { GOOGLE_MAPS_API_KEY } from '@/config/env';
 import { useLocationStore } from '@/store/locationStore';
 import { useLocation } from '@/hooks/useLocation';
 import { useRealtimeLocation } from '@/hooks/useRealtimeLocation';
@@ -21,6 +23,7 @@ export const ResponderNavigationScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const alertId = (route.params as any)?.alertId || '';
+  const mapRef = useRef<MapView>(null);
   
   const { currentLocation } = useLocationStore();
   const { calculateDistance } = useLocation();
@@ -30,6 +33,8 @@ export const ResponderNavigationScreen = () => {
   const [eta, setEta] = useState(0);
   const [showActions, setShowActions] = useState(true);
   const [hasArrived, setHasArrived] = useState(false);
+  const [isUsingGoogleRoute, setIsUsingGoogleRoute] = useState(Boolean(GOOGLE_MAPS_API_KEY));
+  const [routeError, setRouteError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadAlert = async () => {
@@ -65,6 +70,61 @@ export const ResponderNavigationScreen = () => {
     }
   }, [calculateDistance, currentLocation, hasArrived, victimLocation]);
 
+  useEffect(() => {
+    if (!currentLocation || !victimLocation) {
+      return;
+    }
+
+    mapRef.current?.fitToCoordinates(
+      [
+        {
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+        },
+        victimLocation,
+      ],
+      {
+        edgePadding: {
+          top: 180,
+          right: 60,
+          bottom: 260,
+          left: 60,
+        },
+        animated: true,
+      },
+    );
+  }, [currentLocation, victimLocation]);
+
+  const handleRouteReady = useCallback((result: any) => {
+    setIsUsingGoogleRoute(true);
+    setRouteError(null);
+
+    if (typeof result?.distance === 'number') {
+      setDistance(result.distance * 1000);
+    }
+    if (typeof result?.duration === 'number') {
+      setEta(result.duration * 60);
+    }
+
+    if (Array.isArray(result?.coordinates) && result.coordinates.length > 1) {
+      mapRef.current?.fitToCoordinates(result.coordinates, {
+        edgePadding: {
+          top: 180,
+          right: 60,
+          bottom: 260,
+          left: 60,
+        },
+        animated: true,
+      });
+    }
+  }, []);
+
+  const handleRouteError = useCallback((errorMessage: string) => {
+    setIsUsingGoogleRoute(false);
+    setRouteError(errorMessage);
+    console.warn('Google route unavailable for responder navigation:', errorMessage);
+  }, []);
+
   const handleConfirmArrival = () => {
     Alert.alert('Arrival confirmed', 'The requester can now see that you have arrived nearby.');
     navigation.goBack();
@@ -77,9 +137,50 @@ export const ResponderNavigationScreen = () => {
     ]);
   };
 
+  const handleOpenGoogleMaps = useCallback(async () => {
+    if (!victimLocation) {
+      Alert.alert('Route unavailable', 'We could not find the person’s live destination yet.');
+      return;
+    }
+
+    const destination = `${victimLocation.latitude},${victimLocation.longitude}`;
+    const urls =
+      Platform.OS === 'android'
+        ? [
+            `google.navigation:q=${destination}&mode=d`,
+            `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`,
+          ]
+        : [
+            `comgooglemaps://?daddr=${destination}&directionsmode=driving`,
+            `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`,
+          ];
+
+    for (const url of urls) {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+        return;
+      }
+    }
+
+    await Linking.openURL(urls[urls.length - 1]);
+  }, [victimLocation]);
+
+  const distanceLabel = distance >= 1000 ? `${(distance / 1000).toFixed(1)} km` : `${Math.round(distance)}m`;
+  const etaMinutes = Math.max(1, Math.ceil(eta / 60));
+  const routeStatusText = isUsingGoogleRoute
+    ? 'Live route powered by Google directions'
+    : routeError
+    ? 'Using direct fallback path while Google directions is unavailable'
+    : 'Using direct fallback path';
+  const routeAndStreamingText = isStreaming
+    ? `${routeStatusText} · Your live location is being shared`
+    : routeStatusText;
+
   return (
     <View style={styles.container}>
       <MapView
+        ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
         initialRegion={{
@@ -103,22 +204,14 @@ export const ResponderNavigationScreen = () => {
               </View>
             </Marker>
 
-            <Marker coordinate={victimLocation}>
-              <View style={styles.victimMarker}>
-                <Icon name="warning" size={24} color={colors.surface} />
-              </View>
-            </Marker>
-
-            <Polyline
-              coordinates={[
-                {
-                  latitude: currentLocation.latitude,
-                  longitude: currentLocation.longitude,
-                },
-                victimLocation,
-              ]}
-              strokeColor={colors.primary}
-              strokeWidth={3}
+            <VolunteerRouteOverlay
+              origin={{
+                latitude: currentLocation.latitude,
+                longitude: currentLocation.longitude,
+              }}
+              destination={victimLocation}
+              onReady={handleRouteReady}
+              onError={handleRouteError}
             />
           </>
         )}
@@ -126,13 +219,22 @@ export const ResponderNavigationScreen = () => {
 
       <View style={styles.topCard}>
         <View style={styles.distanceContainer}>
-          <Text style={styles.distanceValue}>{Math.round(distance)}m</Text>
+          <Text style={styles.distanceValue}>{distanceLabel}</Text>
           <Text style={styles.distanceLabel}>Distance Remaining</Text>
         </View>
         <View style={styles.etaContainer}>
-          <Text style={styles.etaValue}>{Math.ceil(eta / 60)} min</Text>
+          <Text style={styles.etaValue}>{etaMinutes} min</Text>
           <Text style={styles.etaLabel}>ETA</Text>
         </View>
+      </View>
+
+      <View style={styles.routeStatusBadge}>
+        <Icon
+          name={isUsingGoogleRoute ? 'alt-route' : 'timeline'}
+          size={16}
+          color={isUsingGoogleRoute ? colors.success : colors.warning}
+        />
+        <Text style={styles.routeStatusText}>{routeAndStreamingText}</Text>
       </View>
 
       {hasArrived && (
@@ -167,11 +269,11 @@ export const ResponderNavigationScreen = () => {
                 <Button
                   variant="outline"
                   size="medium"
-                  icon="phone"
-                  onPress={() => Alert.alert('Call unavailable', 'Direct caller contact is not available yet. Use chat or call 112 if urgent.')}
+                  icon="directions"
+                  onPress={handleOpenGoogleMaps}
                   style={styles.halfButton}
                 >
-                  Call
+                  Open Maps
                 </Button>
                 <Button
                   variant="outline"
@@ -261,7 +363,7 @@ const styles = StyleSheet.create({
   },
   arrivalBanner: {
     position: 'absolute',
-    top: 140,
+    top: 170,
     left: spacing.lg,
     right: spacing.lg,
     flexDirection: 'row',
@@ -277,21 +379,30 @@ const styles = StyleSheet.create({
     color: colors.surface,
     marginLeft: spacing.sm,
   },
+  routeStatusBadge: {
+    position: 'absolute',
+    top: 108,
+    left: spacing.lg,
+    right: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.pill,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    gap: spacing.xs,
+  },
+  routeStatusText: {
+    fontSize: fontSizes.sm,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
   responderMarker: {
     width: 40,
     height: 40,
     borderRadius: 20,
     backgroundColor: colors.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: colors.surface,
-  },
-  victimMarker: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.error,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,

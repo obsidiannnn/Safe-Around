@@ -25,17 +25,23 @@ const devHost = getDevHost();
 
 // Use __DEV__ (set by Metro bundler) rather than NODE_ENV for reliable dev vs prod detection in React Native.
 const IS_DEV = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production';
+const normalizeOptionalConfig = (value?: string) => {
+  if (!value || /^your[-_]/i.test(value)) {
+    return '';
+  }
+  return value;
+};
 
 const config = {
   dev: {
     API_URL: `http://${devHost}:8000/api/v1`,
     WEBSOCKET_URL: `ws://${devHost}:8000`,
-    GOOGLE_MAPS_API_KEY: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyBfi1CO-cAF0aJBxktzJLQYwq2IuzqXVMY',
+    GOOGLE_MAPS_API_KEY: normalizeOptionalConfig(process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY),
   },
   prod: {
     API_URL: 'https://api.safearound.app/api/v1',
     WEBSOCKET_URL: 'wss://ws.safearound.app',
-    GOOGLE_MAPS_API_KEY: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyBfi1CO-cAF0aJBxktzJLQYwq2IuzqXVMY',
+    GOOGLE_MAPS_API_KEY: normalizeOptionalConfig(process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY),
   },
 };
 

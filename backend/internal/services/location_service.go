@@ -2,7 +2,10 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"math"
+	"strconv"
 	"time"
 
 	"github.com/obsidiannnn/Safe-Around/backend/internal/models"
@@ -97,7 +100,33 @@ func (ls *LocationService) batchInsertLocations(locations []*models.UserLocation
 }
 
 func (ls *LocationService) GetCurrentLocation(userID uint) (*models.UserLocation, error) {
-	// Query database (last 5 minutes) fallback
+	// Try Redis cache first (faster and includes recently updated locations)
+	key := fmt.Sprintf("location:user_%d", userID)
+	ctx := context.Background()
+
+	if ls.redis != nil {
+		if exists, _ := ls.redis.Exists(ctx, key).Result(); exists == 1 {
+			data, err := ls.redis.HGetAll(ctx, key).Result()
+			if err == nil && len(data) > 0 {
+				lat, latErr := strconv.ParseFloat(data["lat"], 64)
+				lng, lngErr := strconv.ParseFloat(data["lng"], 64)
+				ts, tsErr := strconv.ParseInt(data["ts"], 10, 64)
+
+				if latErr == nil && lngErr == nil && tsErr == nil {
+					return &models.UserLocation{
+						UserID: userID,
+						Location: models.Location{
+							Latitude:  lat,
+							Longitude: lng,
+						},
+						RecordedAt: time.Unix(ts, 0),
+					}, nil
+				}
+			}
+		}
+	}
+
+	// Fallback to database (last 5 minutes)
 	var location models.UserLocation
 	err := ls.db.Where("user_id = ? AND recorded_at > ?", userID, time.Now().Add(-5*time.Minute)).
 		Order("recorded_at DESC").
@@ -132,6 +161,11 @@ func (ls *LocationService) GetNearbyUsers(lat, lng float64, radius int) ([]uint,
 }
 
 func (ls *LocationService) GetNearbyUserLocations(lat, lng float64, radius int, excludeUserID uint) ([]NearbyUserLocation, error) {
+	cacheKey := nearbyUsersCacheKey(lat, lng, radius, excludeUserID)
+	if users, ok := ls.getCachedNearbyUsers(cacheKey); ok {
+		return users, nil
+	}
+
 	query := `
 	WITH latest_locations AS (
 		SELECT DISTINCT ON (user_id)
@@ -159,10 +193,17 @@ func (ls *LocationService) GetNearbyUserLocations(lat, lng float64, radius int, 
 
 	var users []NearbyUserLocation
 	err := ls.db.Raw(query, excludeUserID, lng, lat, radius, lng, lat).Scan(&users).Error
+	if err == nil {
+		ls.cacheNearbyUsers(cacheKey, users)
+	}
 	return users, err
 }
 
 func (ls *LocationService) cacheLocation(userID uint, loc models.UserLocation) {
+	if ls.redis == nil {
+		return
+	}
+
 	key := fmt.Sprintf("location:user_%d", userID)
 	data := map[string]interface{}{
 		"lat": loc.Location.Latitude,
@@ -171,4 +212,50 @@ func (ls *LocationService) cacheLocation(userID uint, loc models.UserLocation) {
 	}
 	ls.redis.HSet(context.Background(), key, data)
 	ls.redis.Expire(context.Background(), key, time.Hour)
+}
+
+func nearbyUsersCacheKey(lat, lng float64, radius int, excludeUserID uint) string {
+	return fmt.Sprintf(
+		"location:nearby:%0.4f:%0.4f:%d:%d",
+		roundLocationCoord(lat, 4),
+		roundLocationCoord(lng, 4),
+		radius,
+		excludeUserID,
+	)
+}
+
+func roundLocationCoord(value float64, decimals int) float64 {
+	pow := math.Pow10(decimals)
+	return math.Round(value*pow) / pow
+}
+
+func (ls *LocationService) getCachedNearbyUsers(cacheKey string) ([]NearbyUserLocation, bool) {
+	if ls.redis == nil {
+		return nil, false
+	}
+
+	cached, err := ls.redis.Get(context.Background(), cacheKey).Result()
+	if err != nil || cached == "" {
+		return nil, false
+	}
+
+	var users []NearbyUserLocation
+	if err := json.Unmarshal([]byte(cached), &users); err != nil {
+		return nil, false
+	}
+
+	return users, true
+}
+
+func (ls *LocationService) cacheNearbyUsers(cacheKey string, users []NearbyUserLocation) {
+	if ls.redis == nil {
+		return
+	}
+
+	encoded, err := json.Marshal(users)
+	if err != nil {
+		return
+	}
+
+	ls.redis.Set(context.Background(), cacheKey, encoded, 5*time.Second)
 }

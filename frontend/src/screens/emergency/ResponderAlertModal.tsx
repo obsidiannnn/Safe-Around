@@ -58,8 +58,7 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
   };
 
   const handleDecline = (reasonId: string) => {
-    // TODO: Submit decline reason for analytics
-    console.log('Declined with reason:', reasonId);
+    console.info('Responder declined alert', { alertId: alert.id, reasonId });
     setShowDeclineReasons(false);
     onClose();
   };

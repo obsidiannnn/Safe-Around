@@ -36,6 +36,7 @@ export const MapDashboardScreen = () => {
   const navigation = useNavigation();
   const mapRef = useRef<MapView>(null);
   const areaStatsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAreaStatsCenterRef = useRef<{ latitude: number; longitude: number } | null>(null);
   const { currentLocation, startTracking, isTracking } = useLocation();
   const { user } = useAuthStore();
   const { mapType, setMapType, currentStats, setCurrentStats } = useMapStore();
@@ -154,10 +155,19 @@ export const MapDashboardScreen = () => {
         [
           { 
             text: 'I AM COMING', 
-            onPress: () => {
-              setActiveVictimLocation(data.location);
-              setActiveVictimAlertId(String(data.alert_id));
-              respondToAlert(data.alert_id);
+            onPress: async () => {
+              try {
+                setActiveVictimLocation(data.location);
+                setActiveVictimAlertId(String(data.alert_id));
+                await respondToAlert(String(data.alert_id));
+                (navigation.getParent() as any)?.navigate('Emergency', {
+                  screen: 'ResponderNavigation',
+                  params: { alertId: String(data.alert_id) },
+                });
+              } catch (error) {
+                console.warn('Unable to accept emergency alert from map:', error);
+                Alert.alert('Could not accept alert', 'We could not open the helper route right now. Please try again.');
+              }
             },
             style: 'default' 
           },
@@ -227,11 +237,20 @@ export const MapDashboardScreen = () => {
   }, [setCurrentStats]);
 
   const scheduleAreaStatsFetch = useCallback((lat: number, lng: number, delayMs = 600) => {
+    const nextCenter = { latitude: lat, longitude: lng };
+    if (
+      lastAreaStatsCenterRef.current &&
+      getDistanceMeters(lastAreaStatsCenterRef.current, nextCenter) < 120
+    ) {
+      return;
+    }
+
     if (areaStatsDebounceRef.current) {
       clearTimeout(areaStatsDebounceRef.current);
     }
 
     areaStatsDebounceRef.current = setTimeout(() => {
+      lastAreaStatsCenterRef.current = nextCenter;
       fetchAreaStats(lat, lng);
     }, delayMs);
   }, [fetchAreaStats]);
@@ -703,3 +722,20 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
 });
+
+function getDistanceMeters(
+  origin: { latitude: number; longitude: number },
+  destination: { latitude: number; longitude: number }
+) {
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+  const earthRadius = 6371000;
+  const dLat = toRadians(destination.latitude - origin.latitude);
+  const dLng = toRadians(destination.longitude - origin.longitude);
+  const lat1 = toRadians(origin.latitude);
+  const lat2 = toRadians(destination.latitude);
+
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+
+  return 2 * earthRadius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}

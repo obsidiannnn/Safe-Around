@@ -28,6 +28,10 @@ func (h *GeofencingHandler) CheckDangerZone(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid lat/lng parameters"})
 		return
 	}
+	if err := validateCoordinates(lat, lng); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	zone, err := h.geoSvc.CheckDangerZone(lat, lng)
 	if err != nil {
@@ -48,9 +52,21 @@ func (h *GeofencingHandler) GetNearbyUsers(c *gin.Context) {
 	lngStr := c.Query("lng")
 	radiusStr := c.DefaultQuery("radius", "1000")
 
-	lat, _ := strconv.ParseFloat(latStr, 64)
-	lng, _ := strconv.ParseFloat(lngStr, 64)
-	radius, _ := strconv.Atoi(radiusStr)
+	lat, err1 := strconv.ParseFloat(latStr, 64)
+	lng, err2 := strconv.ParseFloat(lngStr, 64)
+	radius, err3 := strconv.Atoi(radiusStr)
+	if err1 != nil || err2 != nil || err3 != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid lat/lng/radius parameters"})
+		return
+	}
+	if err := validateCoordinates(lat, lng); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := validateRadius(radius, 50, 10000); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	users, err := h.geoSvc.GetNearbyUsers(lat, lng, radius)
 	if err != nil {

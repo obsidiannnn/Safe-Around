@@ -82,6 +82,10 @@ func (h *AuthHandler) SendOTP(c *gin.Context) {
 	}
 
 	input.Phone = normalizePhone(input.Phone)
+	if err := validatePhoneNumber(input.Phone); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	// If this is explicitly from the Signup flow, block if they already have a password
 	if c.Query("type") == "signup" {
@@ -122,6 +126,10 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 	}
 
 	input.Phone = normalizePhone(input.Phone)
+	if err := validatePhoneNumber(input.Phone); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	isValid, err := h.twilio.VerifyOTP(input.Phone, input.OTP, verifySID)
 	if err != nil || !isValid {
@@ -268,6 +276,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	input.Phone = normalizePhone(input.Phone)
+	if err := validatePhoneNumber(input.Phone); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	ctx := context.Background()
 	rlKey := "rl:login:" + input.Phone

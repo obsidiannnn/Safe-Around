@@ -44,6 +44,10 @@ func (h *LocationHandler) UpdateLocation(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if err := validateCoordinates(req.Latitude, req.Longitude); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	loc := models.UserLocation{
 		Location:       models.Location{Latitude: req.Latitude, Longitude: req.Longitude},
@@ -110,6 +114,14 @@ func (h *LocationHandler) GetNearbyUsers(c *gin.Context) {
 
 	if err1 != nil || err2 != nil || err3 != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid lat/lng/radius parameters"})
+		return
+	}
+	if err := validateCoordinates(lat, lng); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := validateRadius(radius, 50, 10000); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 

@@ -29,6 +29,14 @@ func (h *RouteHandler) GetSafeRoutes(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if err := validateCoordinates(req.Origin.Latitude, req.Origin.Longitude); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid origin coordinates"})
+		return
+	}
+	if err := validateCoordinates(req.Destination.Latitude, req.Destination.Longitude); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid destination coordinates"})
+		return
+	}
 
 	// Validate mode
 	switch req.Mode {

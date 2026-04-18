@@ -18,27 +18,28 @@ func CorsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
 
+		if origin == "" {
+			setCorsHeaders(c, "")
+			if c.Request.Method == http.MethodOptions {
+				c.AbortWithStatus(http.StatusNoContent)
+				return
+			}
+			c.Next()
+			return
+		}
+
 		// Check if the request origin is in the whitelist
 		allowed := isAllowedOrigin(origin, allowedOrigins)
 		if allowed {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
 		} else {
-			// Reject cross-origin requests from unknown origins in production;
-			// in development allow all for convenience.
-			if gin.Mode() != gin.DebugMode {
-				c.Next()
-				return
-			}
-			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error": "origin is not allowed",
+			})
+			return
 		}
 
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Allow-Headers",
-			"Content-Type, Content-Length, Authorization, Accept, Origin, X-Request-ID, X-Requested-With, Cache-Control")
-		c.Writer.Header().Set("Access-Control-Expose-Headers",
-			"Content-Length, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-Request-ID")
-		c.Writer.Header().Set("Access-Control-Max-Age", "43200") // 12 hours
+		setCorsHeaders(c, origin)
 
 		// Respond to pre-flight
 		if c.Request.Method == http.MethodOptions {
@@ -48,6 +49,20 @@ func CorsMiddleware() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func setCorsHeaders(c *gin.Context, origin string) {
+	if origin != "" {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+		c.Writer.Header().Set("Vary", "Origin")
+	}
+	c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+	c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+	c.Writer.Header().Set("Access-Control-Allow-Headers",
+		"Content-Type, Content-Length, Authorization, Accept, Origin, X-Request-ID, X-Requested-With, Cache-Control")
+	c.Writer.Header().Set("Access-Control-Expose-Headers",
+		"Content-Length, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-Request-ID")
+	c.Writer.Header().Set("Access-Control-Max-Age", "43200") // 12 hours
 }
 
 func buildAllowedOrigins() []string {
