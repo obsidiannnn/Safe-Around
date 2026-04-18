@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Vibration, Linking, Alert as NativeAlert, Platform } from 'react-native';
 import { Text } from 'react-native-paper';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, CommonActions } from '@react-navigation/native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { BottomSheet, Button } from '@/components/common';
@@ -126,7 +126,7 @@ export const ResponderNavigationScreen = () => {
   }, []);
 
   const handleConfirmArrival = () => {
-    NativeAlert.alert('Arrival confirmed', 'The requester can now see that you have arrived nearby.');
+    // Simply go back to the previous screen (EmergencyDashboard)
     navigation.goBack();
   };
 

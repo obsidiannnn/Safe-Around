@@ -208,15 +208,37 @@ export const MapDashboardScreen = () => {
 
     const handleRoomClosed = (data: any) => {
       const roomId = String(data?.room_id ?? '');
+      const reason = String(data?.reason ?? 'closed');
+      
       if (!roomId) {
         return;
       }
 
       if (activeVictimAlertId && roomId === `alert_${activeVictimAlertId}`) {
-        setActiveVictimLocation(null);
-        setActiveVictimAlertId(null);
+        // Close the responder modal first
         setShowResponderModal(false);
-        setResponderAlert(null);
+        
+        // Show professional message based on reason
+        const message = reason === 'resolved' || reason === 'safe'
+          ? 'The person is safe now. Thank you for your willingness to help!'
+          : reason === 'cancelled'
+          ? 'The emergency alert has been cancelled.'
+          : 'The emergency alert has been closed.';
+        
+        NativeAlert.alert(
+          'Alert Closed',
+          message,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                setActiveVictimLocation(null);
+                setActiveVictimAlertId(null);
+                setResponderAlert(null);
+              }
+            }
+          ]
+        );
       }
     };
 

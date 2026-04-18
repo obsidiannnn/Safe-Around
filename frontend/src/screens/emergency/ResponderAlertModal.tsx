@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Dimensions, Alert as NativeAlert, ScrollView, Linking, Platform, Pressable } from 'react-native';
 import { Text } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, CommonActions } from '@react-navigation/native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Modal, Button, BottomSheet } from '@/components/common';
@@ -78,21 +78,30 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
       
       onClose();
       
-      // Navigate to in-app responder navigation screen first
+      // Navigate to ResponderNavigation screen using CommonActions
       try {
-        const parentNavigation = (navigation as any).getParent?.();
-        if (parentNavigation?.navigate) {
-          parentNavigation.navigate('Emergency', {
-            screen: 'ResponderNavigation',
-            params: { alertId: alert.id },
-          });
-        } else {
-          (navigation as any).navigate('ResponderNavigation', { alertId: alert.id });
-        }
+        navigation.dispatch(
+          CommonActions.navigate({
+            name: 'Main',
+            params: {
+              screen: 'Emergency',
+              params: {
+                screen: 'ResponderNavigation',
+                params: { alertId: alert.id },
+              },
+            },
+          })
+        );
       } catch (navError) {
-        // If in-app navigation fails, fallback to Google Maps
         console.warn('In-app navigation failed, opening Google Maps:', navError);
-        openGoogleMapsNavigation();
+        // If navigation fails, show an alert and open Google Maps as fallback
+        NativeAlert.alert(
+          'Navigation Issue', 
+          'Opening Google Maps for navigation instead.',
+          [
+            { text: 'OK', onPress: openGoogleMapsNavigation }
+          ]
+        );
       }
     } catch (error) {
       console.warn('Error responding to alert:', error);
@@ -162,8 +171,10 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
                   latitudeDelta: 0.01,
                   longitudeDelta: 0.01,
                 }}
-                scrollEnabled={false}
-                zoomEnabled={false}
+                scrollEnabled={true}
+                zoomEnabled={true}
+                rotateEnabled={false}
+                pitchEnabled={false}
               >
                 <Marker
                   coordinate={{
@@ -175,7 +186,25 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
                     <Icon name="warning" size={24} color={colors.surface} />
                   </View>
                 </Marker>
+                
+                {currentLocation && (
+                  <Marker
+                    coordinate={{
+                      latitude: currentLocation.latitude,
+                      longitude: currentLocation.longitude,
+                    }}
+                  >
+                    <View style={styles.userMarker}>
+                      <Icon name="my-location" size={16} color={colors.surface} />
+                    </View>
+                  </Marker>
+                )}
               </MapView>
+              
+              <View style={styles.mapHint}>
+                <Icon name="zoom-out-map" size={14} color={colors.textSecondary} />
+                <Text style={styles.mapHintText}>Pinch to zoom</Text>
+              </View>
             </View>
 
             <View style={styles.disclaimer}>
@@ -216,30 +245,37 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
       <BottomSheet
         visible={showDeclineReasons}
         onClose={() => setShowDeclineReasons(false)}
-        snapPoints={[0.6]}
+        snapPoints={[0.8]}
         dismissOnBackdrop={false}
       >
-        <View style={styles.reasonsContainer}>
-          <View style={styles.reasonsHeader}>
-            <Text style={styles.reasonsTitle}>Why can't you respond?</Text>
-            <Pressable onPress={() => setShowDeclineReasons(false)} style={styles.reasonsCloseButton}>
-              <Icon name="close" size={20} color={colors.textSecondary} />
-            </Pressable>
+        <ScrollView 
+          style={styles.reasonsScrollView}
+          contentContainerStyle={styles.reasonsScrollContent}
+          showsVerticalScrollIndicator={true}
+          bounces={true}
+        >
+          <View style={styles.reasonsContainer}>
+            <View style={styles.reasonsHeader}>
+              <Text style={styles.reasonsTitle}>Why can't you respond?</Text>
+              <Pressable onPress={() => setShowDeclineReasons(false)} style={styles.reasonsCloseButton}>
+                <Icon name="close" size={20} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+            {declineReasons.map((reason) => (
+              <Button
+                key={reason.id}
+                variant="outline"
+                size="large"
+                fullWidth
+                icon={reason.icon}
+                onPress={() => handleDecline(reason.id)}
+                style={styles.reasonButton}
+              >
+                {reason.label}
+              </Button>
+            ))}
           </View>
-          {declineReasons.map((reason) => (
-            <Button
-              key={reason.id}
-              variant="outline"
-              size="large"
-              fullWidth
-              icon={reason.icon}
-              onPress={() => handleDecline(reason.id)}
-              style={styles.reasonButton}
-            >
-              {reason.label}
-            </Button>
-          ))}
-        </View>
+        </ScrollView>
       </BottomSheet>
     </>
   );
@@ -312,9 +348,37 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     overflow: 'hidden',
     marginBottom: spacing.lg,
+    position: 'relative',
   },
   map: {
     flex: 1,
+  },
+  mapHint: {
+    position: 'absolute',
+    bottom: spacing.sm,
+    right: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.sm,
+    gap: spacing.xs,
+  },
+  mapHintText: {
+    fontSize: fontSizes.xs,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  userMarker: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.secondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.surface,
   },
   alertMarker: {
     width: 40,
@@ -348,10 +412,18 @@ const styles = StyleSheet.create({
   actionButton: {
     marginBottom: spacing.sm,
   },
+  reasonsScrollView: {
+    flex: 1,
+    maxHeight: SCREEN_HEIGHT * 0.6,
+  },
+  reasonsScrollContent: {
+    flexGrow: 1,
+    paddingBottom: spacing.xl,
+  },
   reasonsContainer: {
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
-    minHeight: 300,
+    minHeight: 400,
   },
   reasonsHeader: {
     flexDirection: 'row',

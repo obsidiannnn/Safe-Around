@@ -21,6 +21,7 @@ func SetupRouter(
 	routeHandler *handlers.RouteHandler,
 	profileHandler *handlers.ProfileHandler,
 	geofencingHandler *handlers.GeofencingHandler,
+	feedbackHandler *handlers.FeedbackHandler,
 	rdb *redis.Client,
 ) *gin.Engine {
 	r := gin.New()
@@ -113,6 +114,15 @@ func SetupRouter(
 			users.GET("/contacts", profileHandler.GetContacts)
 			users.POST("/contacts", profileHandler.AddContact)
 			users.DELETE("/contacts/:id", profileHandler.DeleteContact)
+			users.GET("/:id/ratings", feedbackHandler.GetUserRatings)
+			users.GET("/top-rated", feedbackHandler.GetTopRatedUsers)
+		}
+
+		// Feedback domain
+		feedback := api.Group("/feedback")
+		feedback.Use(middleware.AuthRequired())
+		{
+			feedback.POST("", feedbackHandler.SubmitFeedback)
 		}
 
 		// Geofencing domain

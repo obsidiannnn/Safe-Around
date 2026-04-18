@@ -1,9 +1,11 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatCard } from '@/components/profile/StatCard';
+import { RatingDisplay, RatingBreakdown } from '@/components/profile/RatingDisplay';
 import { useAuthStore } from '@/store/authStore';
 import { useNavigation } from '@react-navigation/native';
+import { feedbackService, UserRatingStats } from '@/services/api/feedbackService';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
 
@@ -21,6 +23,27 @@ interface ProfileOverviewTabProps {
 export const ProfileOverviewTab: React.FC<ProfileOverviewTabProps> = ({ stats }) => {
   const { user } = useAuthStore();
   const navigation = useNavigation();
+  const [ratingStats, setRatingStats] = useState<UserRatingStats | null>(null);
+  const [loadingRatings, setLoadingRatings] = useState(true);
+
+  useEffect(() => {
+    const loadRatings = async () => {
+      if (!user?.id) return;
+
+      try {
+        setLoadingRatings(true);
+        const ratings = await feedbackService.getUserRatings(user.id);
+        setRatingStats(ratings);
+      } catch (error) {
+        console.warn('Failed to load user ratings:', error);
+      } finally {
+        setLoadingRatings(false);
+      }
+    };
+
+    loadRatings();
+  }, [user?.id]);
+
   const trustLabel = stats.trustScore >= 80 ? 'HIGH TRUST LEVEL' : stats.trustScore >= 50 ? 'GROWING TRUST LEVEL' : 'SET UP YOUR TRUST PROFILE';
 
   const quickActions = [
@@ -62,6 +85,60 @@ export const ProfileOverviewTab: React.FC<ProfileOverviewTabProps> = ({ stats })
             <StatCard icon="shield-outline" value={`${stats.trustScore}%`} label="Trust Rating" variant="success" />
             <StatCard icon="people-outline" value={stats.emergencyContacts} label="Emergency Contacts" variant="warning" />
           </View>
+        </View>
+      </View>
+
+      {/* User Rating Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Helper Rating</Text>
+        <View style={styles.card}>
+          {loadingRatings ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.loadingText}>Loading ratings...</Text>
+            </View>
+          ) : ratingStats && ratingStats.total_ratings > 0 ? (
+            <>
+              <View style={styles.ratingHeader}>
+                <View style={styles.ratingMainInfo}>
+                  <Text style={styles.ratingValue}>{ratingStats.average_rating.toFixed(1)}</Text>
+                  <View style={styles.ratingStarsContainer}>
+                    <RatingDisplay
+                      averageRating={ratingStats.average_rating}
+                      totalRatings={ratingStats.total_ratings}
+                      showStars={true}
+                      size="large"
+                    />
+                  </View>
+                  <Text style={styles.ratingCount}>
+                    Based on {ratingStats.total_ratings} rating{ratingStats.total_ratings !== 1 ? 's' : ''}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.separator} />
+              
+              <View style={styles.breakdownSection}>
+                <Text style={styles.breakdownTitle}>Rating Breakdown</Text>
+                <RatingBreakdown
+                  fiveStarCount={ratingStats.five_star_count}
+                  fourStarCount={ratingStats.four_star_count}
+                  threeStarCount={ratingStats.three_star_count}
+                  twoStarCount={ratingStats.two_star_count}
+                  oneStarCount={ratingStats.one_star_count}
+                  totalRatings={ratingStats.total_ratings}
+                />
+              </View>
+            </>
+          ) : (
+            <View style={styles.noRatingsContainer}>
+              <Ionicons name="star-outline" size={48} color={colors.textSecondary} />
+              <Text style={styles.noRatingsTitle}>No ratings yet</Text>
+              <Text style={styles.noRatingsText}>
+                Help others in emergencies to receive ratings and build your helper reputation.
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -259,5 +336,64 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
+    gap: spacing.md,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  ratingHeader: {
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+  },
+  ratingMainInfo: {
+    alignItems: 'center',
+  },
+  ratingValue: {
+    fontSize: 48,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  ratingStarsContainer: {
+    marginBottom: spacing.sm,
+  },
+  ratingCount: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  breakdownSection: {
+    paddingTop: spacing.md,
+  },
+  breakdownTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  noRatingsContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl * 2,
+    paddingHorizontal: spacing.lg,
+  },
+  noRatingsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  noRatingsText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

@@ -59,7 +59,7 @@ type AlertBroadcaster interface {
 	BroadcastEmergencyAlert(alert *models.EmergencyAlert, recipientUserIDs []uint)
 	BroadcastResponderAccepted(alertID uuid.UUID, response *models.AlertResponse, targetUserID uint)
 	BroadcastRadiusExpanded(alertID uuid.UUID, oldRadius, newRadius, usersNotified int, recipientUserIDs []uint)
-	CloseRoom(roomID string)
+	CloseRoom(roomID string, reason string)
 }
 
 type Location struct {
@@ -307,7 +307,7 @@ func (h *Hub) BroadcastLocationUpdate(alertID uuid.UUID, userID uuid.UUID, locat
 	})
 }
 
-func (h *Hub) CloseRoom(roomID string) {
+func (h *Hub) CloseRoom(roomID string, reason string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -317,6 +317,7 @@ func (h *Hub) CloseRoom(roomID string) {
 			Event: "room_closed",
 			Data: map[string]interface{}{
 				"room_id": roomID,
+				"reason":  reason,
 			},
 		}
 		msgBytes, _ := json.Marshal(closeMsg)
