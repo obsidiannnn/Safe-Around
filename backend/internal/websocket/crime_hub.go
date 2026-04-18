@@ -178,8 +178,9 @@ func (h *CrimeHub) BroadcastNearbyUsersUpdated(userID uint, latitude, longitude 
 	})
 }
 
-func (h *CrimeHub) CloseRoom(roomID string) {
+func (h *CrimeHub) CloseRoom(roomID string, reason string) {
 	h.broadcastEvent("room_closed", map[string]interface{}{
 		"room_id": roomID,
+		"reason":  reason,
 	})
 }

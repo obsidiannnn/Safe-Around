@@ -511,7 +511,7 @@ func (s *AlertService) ResolveAlert(ctx context.Context, alertID uuid.UUID, reso
 
 	// Close WebSocket room
 	if s.websocketHub != nil {
-		s.websocketHub.CloseRoom("alert_" + alertID.String())
+		s.websocketHub.CloseRoom("alert_"+alertID.String(), "resolved")
 	}
 
 	return nil
@@ -549,7 +549,7 @@ func (s *AlertService) CancelAlert(ctx context.Context, alertID uuid.UUID, cance
 	s.notificationService.NotifyAllParticipants(alertID, "Alert cancelled by the requester")
 
 	if s.websocketHub != nil {
-		s.websocketHub.CloseRoom("alert_" + alertID.String())
+		s.websocketHub.CloseRoom("alert_"+alertID.String(), "cancelled")
 	}
 
 	return nil
