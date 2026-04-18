@@ -101,11 +101,14 @@ func (c *Client) SendNotification(token, title, body string, data map[string]str
 }
 
 type expoPushRequest struct {
-	To    string            `json:"to"`
-	Title string            `json:"title"`
-	Body  string            `json:"body"`
-	Data  map[string]string `json:"data,omitempty"`
-	Sound string            `json:"sound,omitempty"`
+	To         string            `json:"to"`
+	Title      string            `json:"title"`
+	Body       string            `json:"body"`
+	Data       map[string]string `json:"data,omitempty"`
+	Sound      string            `json:"sound,omitempty"`
+	Priority   string            `json:"priority,omitempty"`
+	ChannelID  string            `json:"channelId,omitempty"`
+	CategoryID string            `json:"categoryId,omitempty"`
 }
 
 type expoPushResponse struct {
@@ -124,12 +127,26 @@ func isExpoPushToken(token string) bool {
 }
 
 func (c *Client) sendExpoNotification(token, title, body string, data map[string]string) (string, error) {
+	category := strings.TrimSpace(data["category"])
+	channelID := "general-alerts"
+	priority := "default"
+	categoryID := ""
+
+	if category == "EMERGENCY_ALERT" {
+		channelID = "emergency-alerts"
+		priority = "high"
+		categoryID = "EMERGENCY_ALERT"
+	}
+
 	payload := expoPushRequest{
-		To:    token,
-		Title: title,
-		Body:  body,
-		Data:  data,
-		Sound: "default",
+		To:         token,
+		Title:      title,
+		Body:       body,
+		Data:       data,
+		Sound:      "default",
+		Priority:   priority,
+		ChannelID:  channelID,
+		CategoryID: categoryID,
 	}
 
 	bodyBytes, err := json.Marshal(payload)
@@ -194,7 +211,7 @@ func (c *Client) executeAPI(payload Payload) (*Response, error) {
 	// Wrapper via Circuit Breaker
 	result, err := c.cb.Execute(func() (interface{}, error) {
 		body, _ := json.Marshal(payload)
-		
+
 		req, err := http.NewRequest("POST", c.baseURL, bytes.NewBuffer(body))
 		if err != nil {
 			return nil, err
@@ -205,7 +222,7 @@ func (c *Client) executeAPI(payload Payload) (*Response, error) {
 
 		client := &http.Client{Timeout: 5 * time.Second}
 		httpResp, err := client.Do(req)
-		
+
 		if err != nil {
 			return nil, err
 		}

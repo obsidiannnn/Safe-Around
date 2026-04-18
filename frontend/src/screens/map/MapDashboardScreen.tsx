@@ -14,7 +14,7 @@ import { MapTypeSwitch } from '@/components/map/MapTypeSwitch';
 import { NearbyUsersLayer } from '@/components/map/NearbyUsersLayer';
 import { DangerZoneAlert } from '@/components/location/DangerZoneAlert';
 import { BackgroundLocationIndicator } from '@/components/location/BackgroundLocationIndicator';
-import { API_URL, GOOGLE_MAPS_API_KEY } from '@/config/env';
+import { API_URL, WEBSOCKET_URL, GOOGLE_MAPS_API_KEY } from '@/config/env';
 import { useMapStore } from '@/store/mapStore';
 import { useAuthStore } from '@/store/authStore';
 import { useLocation } from '@/hooks/useLocation';
@@ -23,7 +23,7 @@ import { heatmapService } from '@/services/api/heatmapService';
 import { DangerZone } from '@/types/models';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
-import { useNavigation } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import CrimeHeatmapOverlay from '@/components/map/CrimeHeatmapOverlay';
 import { useAlertStore } from '@/store/alertStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -34,6 +34,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming } fr
 export const MapDashboardScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const isFocused = useIsFocused();
   const mapRef = useRef<MapView>(null);
   const areaStatsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAreaStatsCenterRef = useRef<{ latitude: number; longitude: number } | null>(null);
@@ -65,7 +66,8 @@ export const MapDashboardScreen = () => {
     west: 0,
   });
 
-  const { createAlert, activeAlert, respondersCount } = useAlertStore();
+  const { createAlert, respondToAlert, activeAlert, respondersCount } = useAlertStore();
+  const { priorityAlerts } = useSettingsStore();
 
   const openEmergencyActiveScreen = useCallback(() => {
     (navigation.getParent() as any)?.navigate('Emergency', { screen: 'EmergencyActive' });
@@ -113,6 +115,8 @@ export const MapDashboardScreen = () => {
   }, [currentLocation]);
 
   useEffect(() => {
+    CrimeWebSocketService.connect(`${WEBSOCKET_URL}/ws/crime`);
+
     const handleNewCrime = (data: any) => {
       Alert.alert(
         '🚨 Crime Alert',
@@ -130,6 +134,48 @@ export const MapDashboardScreen = () => {
         ]
       );
       setHeatmapKey(prev => prev + 1);
+    };
+
+    const handleEmergencyAlert = (data: any) => {
+      if (!isFocused) return;
+      if (!priorityAlerts) return;
+
+      const authUserId = String(useAuthStore.getState().user?.id ?? '');
+      const sourceUserId = String(data.user?.user_id ?? '');
+      const recipientIds = Array.isArray(data.recipient_user_ids)
+        ? data.recipient_user_ids.map((id: unknown) => String(id))
+        : [];
+      const liveAlert = useAlertStore.getState().activeAlert;
+
+      if (sourceUserId === authUserId) return;
+      if (recipientIds.length > 0 && !recipientIds.includes(authUserId)) return;
+      if (liveAlert?.id === data.alert_id || useAlertStore.getState().isAlertActive) return;
+
+      Alert.alert(
+        '🆘 HELP NEEDED',
+        'A person is in danger nearby. Can you help?',
+        [
+          {
+            text: 'I AM COMING',
+            onPress: async () => {
+              try {
+                setActiveVictimLocation(data.location);
+                setActiveVictimAlertId(String(data.alert_id));
+                await respondToAlert(String(data.alert_id));
+                (navigation.getParent() as any)?.navigate('Emergency', {
+                  screen: 'ResponderNavigation',
+                  params: { alertId: String(data.alert_id) },
+                });
+              } catch (error) {
+                console.warn('Unable to accept emergency alert from map:', error);
+                Alert.alert('Could not accept alert', 'We could not open the helper route right now. Please try again.');
+              }
+            },
+            style: 'default'
+          },
+          { text: 'I Can\'t Help', style: 'cancel' }
+        ]
+      );
     };
 
     const handleResponderAccepted = (data: any) => {
@@ -163,15 +209,17 @@ export const MapDashboardScreen = () => {
     };
 
     CrimeWebSocketService.on('crime_added', handleNewCrime);
+    CrimeWebSocketService.on('emergency_alert', handleEmergencyAlert);
     CrimeWebSocketService.on('responder_accepted', handleResponderAccepted);
     CrimeWebSocketService.on('room_closed', handleRoomClosed);
 
     return () => {
       CrimeWebSocketService.off('crime_added', handleNewCrime);
+      CrimeWebSocketService.off('emergency_alert', handleEmergencyAlert);
       CrimeWebSocketService.off('responder_accepted', handleResponderAccepted);
       CrimeWebSocketService.off('room_closed', handleRoomClosed);
     };
-  }, [activeVictimAlertId]);
+  }, [activeVictimAlertId, isFocused, navigation, priorityAlerts, respondToAlert]);
 
   useEffect(() => {
     if (!activeAlert) {

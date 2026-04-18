@@ -6,7 +6,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { ErrorBoundary } from './src/components/common/ErrorBoundary';
-import { LoadingOverlay } from './src/components/common/LoadingOverlay';
 import { OfflineBar } from './src/components/common/OfflineBar';
 import { theme } from './src/theme/theme';
 import { initializeApp } from './src/utils/initializeApp';
@@ -40,13 +39,7 @@ export default function App() {
   }, []);
 
   if (isInitializing) {
-    return (
-      <LoadingOverlay
-        visible={true}
-        message="Preparing your live protection network"
-        onLayout={() => SplashScreen.hideAsync()}
-      />
-    );
+    return null;
   }
 
   return (

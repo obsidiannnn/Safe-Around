@@ -3,6 +3,9 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
+const EMERGENCY_CHANNEL_ID = 'emergency-alerts';
+const GENERAL_CHANNEL_ID = 'general-alerts';
+
 export enum NotificationCategory {
   EMERGENCY_ALERT = 'EMERGENCY_ALERT',
   DANGER_ZONE = 'DANGER_ZONE',
@@ -18,10 +21,10 @@ export enum NotificationCategory {
 class NotificationService {
   private static instance: NotificationService;
   private token: string | null = null;
+  private initialized = false;
 
   private constructor() {
-    this.setNotificationHandler();
-    this.setupNotificationCategories();
+    void this.initialize();
   }
 
   static getInstance(): NotificationService {
@@ -29,6 +32,14 @@ class NotificationService {
       NotificationService.instance = new NotificationService();
     }
     return NotificationService.instance;
+  }
+
+  private async initialize(): Promise<void> {
+    if (this.initialized) return;
+    this.initialized = true;
+    this.setNotificationHandler();
+    await this.setupNotificationCategories();
+    await this.setupNotificationChannels();
   }
 
   setNotificationHandler(): void {
@@ -50,6 +61,8 @@ class NotificationService {
   }
 
   async requestPermission(): Promise<boolean> {
+    await this.initialize();
+
     if (!Device.isDevice) {
       console.warn('Notifications only work on physical devices');
       return false;
@@ -67,6 +80,8 @@ class NotificationService {
   }
 
   async getToken(): Promise<string | null> {
+    await this.initialize();
+
     if (this.token) return this.token;
 
     try {
@@ -76,7 +91,9 @@ class NotificationService {
         return null;
       }
 
-      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+      const projectId =
+        Constants.easConfig?.projectId ??
+        Constants.expoConfig?.extra?.eas?.projectId;
       const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       if (!projectId || !uuidPattern.test(projectId)) {
         console.warn('Push token registration skipped because the Expo projectId is not configured as a valid EAS UUID.');
@@ -98,30 +115,69 @@ class NotificationService {
     data: any,
     category: NotificationCategory = NotificationCategory.ALERT_STATUS
   ): Promise<string> {
+    await this.initialize();
+
+    const isEmergency = category === NotificationCategory.EMERGENCY_ALERT;
     return await Notifications.scheduleNotificationAsync({
       content: {
         title,
         body,
         data: { ...data, category },
-        sound: category === NotificationCategory.EMERGENCY_ALERT ? 'default' : undefined,
-        priority: category === NotificationCategory.EMERGENCY_ALERT 
+        sound: isEmergency ? 'default' : undefined,
+        priority: isEmergency
           ? Notifications.AndroidNotificationPriority.MAX 
           : Notifications.AndroidNotificationPriority.HIGH,
+        categoryIdentifier: isEmergency ? NotificationCategory.EMERGENCY_ALERT : undefined,
+        ...(Platform.OS === 'android'
+          ? { channelId: this.getChannelId(category) }
+          : {}),
       },
       trigger: null,
     });
   }
 
   async cancelNotification(id: string): Promise<void> {
+    await this.initialize();
     await Notifications.cancelScheduledNotificationAsync(id);
   }
 
   async cancelAllNotifications(): Promise<void> {
+    await this.initialize();
     await Notifications.cancelAllScheduledNotificationsAsync();
   }
 
   async setBadgeCount(count: number): Promise<void> {
+    await this.initialize();
     await Notifications.setBadgeCountAsync(count);
+  }
+
+  private getChannelId(category: NotificationCategory): string {
+    return category === NotificationCategory.EMERGENCY_ALERT
+      ? EMERGENCY_CHANNEL_ID
+      : GENERAL_CHANNEL_ID;
+  }
+
+  private async setupNotificationChannels(): Promise<void> {
+    if (Platform.OS !== 'android') return;
+
+    await Notifications.setNotificationChannelAsync(EMERGENCY_CHANNEL_ID, {
+      name: 'Emergency alerts',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 300, 200, 300],
+      enableVibrate: true,
+      sound: 'default',
+      lightColor: '#D32F2F',
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    });
+
+    await Notifications.setNotificationChannelAsync(GENERAL_CHANNEL_ID, {
+      name: 'General alerts',
+      importance: Notifications.AndroidImportance.HIGH,
+      enableVibrate: true,
+      vibrationPattern: [0, 200],
+      lightColor: '#2563EB',
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+    });
   }
 
   private async setupNotificationCategories(): Promise<void> {

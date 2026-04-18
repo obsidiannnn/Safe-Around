@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from '@/types/navigation';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
@@ -9,6 +9,8 @@ import { borderRadius, spacing } from '@/theme/spacing';
 import { MapNavigator } from './MapNavigator';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Notifications from 'expo-notifications';
+import { AppState, Platform } from 'react-native';
 import CrimeWebSocketService from '@/services/websocket/CrimeWebSocket';
 import { WEBSOCKET_URL } from '@/config/env';
 import { useAuthStore } from '@/store/authStore';
@@ -19,6 +21,8 @@ import { useLocation } from '@/hooks/useLocation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { ResponderAlertModal } from '@/screens/emergency/ResponderAlertModal';
 import { Alert, Location } from '@/types/models';
+import { notificationService, NotificationCategory } from '@/services/notifications/notificationService';
+import { notificationApiService } from '@/services/api/notificationService';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -27,11 +31,15 @@ export const MainNavigator = () => {
   const { isAlertActive, createAlert, activeAlert } = useAlertStore();
   const { currentLocation } = useLocation();
   const { shakeToSOS, priorityAlerts } = useSettingsStore();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const [incomingAlert, setIncomingAlert] = useState<Alert | null>(null);
   const [incomingDistance, setIncomingDistance] = useState(0);
   const latestLocationRef = useRef(currentLocation);
   const latestIncomingAlertIdRef = useRef<string | null>(null);
+  const appStateRef = useRef(AppState.currentState);
+  const pushRegistrationInFlightRef = useRef(false);
+  const registeredTokenRef = useRef<string | null>(null);
+  const registeredUserIdRef = useRef<string | null>(null);
   
   // Global Shake Detection for Emergency SOS
   useShakeDetection({
@@ -57,6 +65,123 @@ export const MainNavigator = () => {
     latestIncomingAlertIdRef.current = incomingAlert?.id ?? null;
   }, [incomingAlert]);
 
+  const presentIncomingAlert = useCallback((payload: any) => {
+    if (!priorityAlerts) {
+      return;
+    }
+
+    const authUserId = String(useAuthStore.getState().user?.id ?? '');
+    const sourceUserId = String(payload?.user?.user_id ?? payload?.user_id ?? '');
+    const recipientIds = Array.isArray(payload?.recipient_user_ids)
+      ? payload.recipient_user_ids.map((id: unknown) => String(id))
+      : [];
+    const alertId = String(payload?.alert_id ?? '');
+
+    if (!alertId || !authUserId || sourceUserId === authUserId) {
+      return;
+    }
+    if (recipientIds.length > 0 && !recipientIds.includes(authUserId)) {
+      return;
+    }
+    if (useAlertStore.getState().activeAlert?.id === alertId || useAlertStore.getState().isAlertActive) {
+      return;
+    }
+    if (latestIncomingAlertIdRef.current === alertId) {
+      return;
+    }
+
+    const latitude = Number(payload?.location?.latitude ?? payload?.latitude);
+    const longitude = Number(payload?.location?.longitude ?? payload?.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return;
+    }
+
+    const location = { latitude, longitude };
+    const createdAt =
+      typeof payload?.created_at === 'string'
+        ? payload.created_at
+        : new Date().toISOString();
+    const distanceFromPayload = Number(
+      payload?.distance ??
+      payload?.distance_m ??
+      payload?.distance_meters ??
+      0
+    );
+
+    setIncomingDistance(
+      latestLocationRef.current
+        ? Math.round(getDistanceMeters(latestLocationRef.current, location))
+        : Math.max(0, Math.round(distanceFromPayload))
+    );
+    setIncomingAlert({
+      id: alertId,
+      userId: sourceUserId,
+      type: payload?.alert_type === 'check_in' || payload?.alert_type === 'safe_zone'
+        ? payload.alert_type
+        : 'panic',
+      status: 'active',
+      location,
+      currentRadius: Number(payload?.current_radius || 100),
+      usersNotified: Number(payload?.users_notified || 0),
+      createdAt,
+    });
+  }, [priorityAlerts]);
+
+  const syncPushRegistration = useCallback(async () => {
+    if (!isAuthenticated || !user?.id || pushRegistrationInFlightRef.current) {
+      return;
+    }
+
+    pushRegistrationInFlightRef.current = true;
+    try {
+      const permissionGranted = await notificationService.requestPermission();
+      if (!permissionGranted) {
+        return;
+      }
+
+      const token = await notificationService.getToken();
+      if (!token) {
+        return;
+      }
+
+      const normalizedUserId = String(user.id);
+      if (registeredTokenRef.current === token && registeredUserIdRef.current === normalizedUserId) {
+        return;
+      }
+
+      await notificationApiService.registerToken(
+        token,
+        Platform.OS === 'ios' ? 'ios' : 'android'
+      );
+      registeredTokenRef.current = token;
+      registeredUserIdRef.current = normalizedUserId;
+      console.log('Push token synced for authenticated user.');
+    } catch (error) {
+      console.warn('Push token sync skipped for now:', error);
+    } finally {
+      pushRegistrationInFlightRef.current = false;
+    }
+  }, [isAuthenticated, user?.id]);
+
+  useEffect(() => {
+    void syncPushRegistration();
+  }, [syncPushRegistration]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      appStateRef.current = nextAppState;
+      if (nextAppState === 'active') {
+        void syncPushRegistration();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [isAuthenticated, syncPushRegistration]);
+
   useEffect(() => {
     if (!isAuthenticated) {
       return;
@@ -65,43 +190,7 @@ export const MainNavigator = () => {
     CrimeWebSocketService.connect(`${WEBSOCKET_URL}/ws/crime`);
 
     const handleEmergencyAlert = (data: any) => {
-      if (!priorityAlerts) return;
-
-      const authUserId = String(useAuthStore.getState().user?.id ?? '');
-      const sourceUserId = String(data.user?.user_id ?? '');
-      const recipientIds = Array.isArray(data.recipient_user_ids)
-        ? data.recipient_user_ids.map((id: unknown) => String(id))
-        : [];
-      const liveAlert = useAlertStore.getState().activeAlert;
-
-      if (!authUserId || sourceUserId === authUserId) return;
-      if (recipientIds.length > 0 && !recipientIds.includes(authUserId)) return;
-      if (liveAlert?.id === data.alert_id || useAlertStore.getState().isAlertActive) return;
-
-      const location = {
-        latitude: Number(data.location?.latitude),
-        longitude: Number(data.location?.longitude),
-      };
-
-      if (!Number.isFinite(location.latitude) || !Number.isFinite(location.longitude)) {
-        return;
-      }
-
-      setIncomingDistance(
-        latestLocationRef.current
-          ? Math.round(getDistanceMeters(latestLocationRef.current, location))
-          : Math.max(0, Math.round(Number(data.distance) || 0))
-      );
-      setIncomingAlert({
-        id: String(data.alert_id),
-        userId: sourceUserId,
-        type: 'panic',
-        status: 'active',
-        location,
-        currentRadius: Number(data.current_radius || 100),
-        usersNotified: Number(data.users_notified || 0),
-        createdAt: typeof data.created_at === 'string' ? data.created_at : new Date().toISOString(),
-      });
+      presentIncomingAlert(data);
     };
 
     const handleRoomClosed = (data: any) => {
@@ -127,7 +216,53 @@ export const MainNavigator = () => {
       CrimeWebSocketService.off('room_closed', handleRoomClosed);
       CrimeWebSocketService.disconnect();
     };
-  }, [isAuthenticated, priorityAlerts]);
+  }, [isAuthenticated, presentIncomingAlert]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    const handleNotificationPayload = (rawData: Record<string, unknown> | undefined | null) => {
+      if (!rawData) {
+        return;
+      }
+
+      const category = String(rawData.category ?? '');
+      if (category === NotificationCategory.EMERGENCY_ALERT) {
+        presentIncomingAlert(rawData);
+      }
+    };
+
+    let isMounted = true;
+    const foregroundSubscription = Notifications.addNotificationReceivedListener((notification) => {
+      if (appStateRef.current === 'active') {
+        handleNotificationPayload(notification.request.content.data as Record<string, unknown>);
+      }
+    });
+
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      handleNotificationPayload(response.notification.request.content.data as Record<string, unknown>);
+      void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
+    });
+
+    void Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        if (isMounted && response) {
+          handleNotificationPayload(response.notification.request.content.data as Record<string, unknown>);
+          void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
+        }
+      })
+      .catch((error) => {
+        console.warn('Unable to inspect the last notification response:', error);
+      });
+
+    return () => {
+      isMounted = false;
+      foregroundSubscription.remove();
+      responseSubscription.remove();
+    };
+  }, [isAuthenticated, presentIncomingAlert]);
 
   useEffect(() => {
     if (activeAlert) {

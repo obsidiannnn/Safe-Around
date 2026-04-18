@@ -19,7 +19,7 @@ module.exports = () => ({
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
     splash: {
-      image: './assets/native-splash.png',
+      image: './assets/splash-blank.png',
       resizeMode: 'contain',
       backgroundColor: '#F2F6FF',
     },
