@@ -79,6 +79,7 @@ func main() {
 	_ = services.NewHeatmapService(db, rdb, nil) // keep heatmap tile service available if needed
 	locationSvc := services.NewLocationService(db, rdb, geoSvc)
 	routeSvc := services.NewRouteService(db, rdb)
+	feedbackSvc := services.NewFeedbackService(db)
 
 	// 5. Setup Handlers
 	authHandler := handlers.NewAuthHandler(userRepo, sessionRepo, rdb, twilioClient)
@@ -91,9 +92,10 @@ func main() {
 	routeHandler := handlers.NewRouteHandler(routeSvc)
 	profileHandler := handlers.NewProfileHandler(db, rdb)
 	geofencingHandler := handlers.NewGeofencingHandler(geoSvc)
+	feedbackHandler := handlers.NewFeedbackHandler(feedbackSvc)
 
 	// 6. Setup Routes
-	r := routes.SetupRouter(authHandler, healthHandler, notifHandler, alertHandler, heatmapHandler, wsHandler, locationHandler, routeHandler, profileHandler, geofencingHandler, rdb)
+	r := routes.SetupRouter(authHandler, healthHandler, notifHandler, alertHandler, heatmapHandler, wsHandler, locationHandler, routeHandler, profileHandler, geofencingHandler, feedbackHandler, rdb)
 
 	srv := &http.Server{
 		Addr:    "0.0.0.0:" + cfg.Server.Port,

@@ -6,6 +6,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { Button, Input, Avatar } from '@/components/common';
 import { alertService } from '@/services/api/alertService';
+import { feedbackService } from '@/services/api/feedbackService';
 import { useAlertStore } from '@/store/alertStore';
 import { AlertDetails } from '@/types/models';
 import { colors } from '@/theme/colors';
@@ -106,8 +107,37 @@ export const EmergencyResolutionScreen = () => {
   const handleSubmitRating = async () => {
     try {
       setIsClosing(true);
-      console.log('Resolution feedback captured:', { rating, summaryNote, feedback, wasHelpful, alertId });
+
+      // Submit feedback if user provided any
+      if (rating > 0 || summaryNote.trim() || feedback.trim() || wasHelpful !== null) {
+        // Get responder ID from the first responder if available
+        const responderId = details?.responders?.[0]?.userId 
+          ? parseInt(details.responders[0].userId, 10) 
+          : undefined;
+
+        await feedbackService.submitFeedback({
+          alertId: alertId!,
+          responderId,
+          rating: rating || 3, // Default to 3 if not provided
+          feedback: feedback.trim() || undefined,
+          summaryNote: summaryNote.trim() || undefined,
+          wasHelpful: wasHelpful ?? undefined,
+          feedbackType: 'resolution',
+        });
+
+        console.log('Feedback submitted successfully');
+      }
+
       navigation.navigate('EmergencyDashboard' as never);
+    } catch (error) {
+      console.error('Failed to submit feedback:', error);
+      Alert.alert(
+        'Feedback Error',
+        'We could not save your feedback, but your incident is still closed. You can continue.',
+        [
+          { text: 'OK', onPress: () => navigation.navigate('EmergencyDashboard' as never) }
+        ]
+      );
     } finally {
       setIsClosing(false);
     }
