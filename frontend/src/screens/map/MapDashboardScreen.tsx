@@ -160,6 +160,7 @@ export const MapDashboardScreen = () => {
       const alertData: Alert = {
         id: String(data.alert_id),
         userId: sourceUserId,
+        type: 'panic',
         location: {
           latitude: data.location.latitude,
           longitude: data.location.longitude,
@@ -167,7 +168,6 @@ export const MapDashboardScreen = () => {
         status: 'active',
         createdAt: new Date().toISOString(),
         usersNotified: data.users_notified || 0,
-        user: data.user || { name: 'Unknown User' },
       };
 
       // Calculate distance if current location is available
@@ -551,7 +551,7 @@ export const MapDashboardScreen = () => {
       )}
 
       {responderAlert && (
-        <View style={styles.modalOverlay}>
+        <View pointerEvents="box-none" style={styles.modalOverlay}>
           <ResponderAlertModal
             visible={showResponderModal}
             onClose={() => {

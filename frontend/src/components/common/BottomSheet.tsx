@@ -20,6 +20,7 @@ interface BottomSheetProps {
   children: ReactNode;
   snapPoints?: number[];
   dismissOnBackdrop?: boolean;
+  showBackdrop?: boolean;
 }
 
 /**
@@ -32,6 +33,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   children,
   snapPoints = [0.5, 0.9],
   dismissOnBackdrop = true,
+  showBackdrop = true,
 }) => {
   const insets = useSafeAreaInsets();
   const translateY = useSharedValue(SCREEN_HEIGHT);
@@ -82,12 +84,14 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
       <View style={styles.container}>
-        <Animated.View style={[styles.backdrop, backdropStyle]}>
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={dismissOnBackdrop ? onClose : undefined}
-          />
-        </Animated.View>
+        {showBackdrop ? (
+          <Animated.View style={[styles.backdrop, backdropStyle]}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={dismissOnBackdrop ? onClose : undefined}
+            />
+          </Animated.View>
+        ) : null}
 
         <GestureDetector gesture={gesture}>
           <Animated.View

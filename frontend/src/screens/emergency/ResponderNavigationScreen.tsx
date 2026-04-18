@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Vibration, Linking, Alert as NativeAlert, Platform } from 'react-native';
 import { Text } from 'react-native-paper';
-import { useNavigation, useRoute, CommonActions } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { BottomSheet, Button } from '@/components/common';
@@ -126,8 +126,18 @@ export const ResponderNavigationScreen = () => {
   }, []);
 
   const handleConfirmArrival = () => {
-    // Simply go back to the previous screen (EmergencyDashboard)
-    navigation.goBack();
+    setShowActions(false);
+    
+    // Navigate back to Emergency tab's dashboard
+    const parentNav = navigation.getParent();
+    if (parentNav) {
+      parentNav.navigate('Emergency', {
+        screen: 'EmergencyDashboard',
+      });
+    } else {
+      // Fallback: just go back
+      navigation.goBack();
+    }
   };
 
   const handleCancelResponse = () => {
@@ -258,6 +268,7 @@ export const ResponderNavigationScreen = () => {
         visible={showActions}
         onClose={() => setShowActions(false)}
         snapPoints={[0.25]}
+        showBackdrop={false}
       >
         <View style={styles.actionsContainer}>
           <Text style={styles.actionsTitle}>Quick Actions</Text>

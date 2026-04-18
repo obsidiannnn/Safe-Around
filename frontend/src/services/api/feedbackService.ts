@@ -63,8 +63,10 @@ export const feedbackService = {
       feedback_type: data.feedbackType || 'resolution',
     });
 
-    if (!response.data.data && response.data.feedback_id) {
-      return { feedback_id: response.data.feedback_id };
+    const legacyFeedbackId = (response.data as ApiResponse<{ feedback_id: number }> & { feedback_id?: number }).feedback_id;
+
+    if (!response.data.data && legacyFeedbackId) {
+      return { feedback_id: legacyFeedbackId };
     }
 
     return response.data.data!;
