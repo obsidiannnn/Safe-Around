@@ -171,8 +171,10 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
                   latitudeDelta: 0.01,
                   longitudeDelta: 0.01,
                 }}
-                scrollEnabled={false}
-                zoomEnabled={false}
+                scrollEnabled={true}
+                zoomEnabled={true}
+                rotateEnabled={false}
+                pitchEnabled={false}
               >
                 <Marker
                   coordinate={{
@@ -184,7 +186,25 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
                     <Icon name="warning" size={24} color={colors.surface} />
                   </View>
                 </Marker>
+                
+                {currentLocation && (
+                  <Marker
+                    coordinate={{
+                      latitude: currentLocation.latitude,
+                      longitude: currentLocation.longitude,
+                    }}
+                  >
+                    <View style={styles.userMarker}>
+                      <Icon name="my-location" size={16} color={colors.surface} />
+                    </View>
+                  </Marker>
+                )}
               </MapView>
+              
+              <View style={styles.mapHint}>
+                <Icon name="zoom-out-map" size={14} color={colors.textSecondary} />
+                <Text style={styles.mapHintText}>Pinch to zoom</Text>
+              </View>
             </View>
 
             <View style={styles.disclaimer}>
@@ -328,9 +348,37 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     overflow: 'hidden',
     marginBottom: spacing.lg,
+    position: 'relative',
   },
   map: {
     flex: 1,
+  },
+  mapHint: {
+    position: 'absolute',
+    bottom: spacing.sm,
+    right: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.sm,
+    gap: spacing.xs,
+  },
+  mapHintText: {
+    fontSize: fontSizes.xs,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  userMarker: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.secondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.surface,
   },
   alertMarker: {
     width: 40,
