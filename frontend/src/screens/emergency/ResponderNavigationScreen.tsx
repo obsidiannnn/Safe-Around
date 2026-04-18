@@ -144,27 +144,37 @@ export const ResponderNavigationScreen = () => {
     }
 
     const destination = `${victimLocation.latitude},${victimLocation.longitude}`;
-    const urls =
-      Platform.OS === 'android'
-        ? [
-            `google.navigation:q=${destination}&mode=d`,
-            `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`,
-          ]
-        : [
-            `comgooglemaps://?daddr=${destination}&directionsmode=driving`,
-            `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`,
-          ];
+    const origin = currentLocation 
+      ? `${currentLocation.latitude},${currentLocation.longitude}`
+      : '';
+    
+    const urls = Platform.select({
+      ios: [
+        `comgooglemaps://?saddr=${origin}&daddr=${destination}&directionsmode=driving`,
+        `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`,
+      ],
+      android: [
+        `google.navigation:q=${destination}&mode=d`,
+        `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`,
+      ],
+    }) || [];
 
     for (const url of urls) {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-        return;
+      try {
+        const supported = await Linking.canOpenURL(url);
+        if (supported) {
+          await Linking.openURL(url);
+          return;
+        }
+      } catch (error) {
+        console.warn('Failed to open URL:', url, error);
       }
     }
 
-    await Linking.openURL(urls[urls.length - 1]);
-  }, [victimLocation]);
+    // Fallback to web Google Maps
+    const fallbackUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+    await Linking.openURL(fallbackUrl);
+  }, [currentLocation, victimLocation]);
 
   const distanceLabel = distance >= 1000 ? `${(distance / 1000).toFixed(1)} km` : `${Math.round(distance)}m`;
   const etaMinutes = Math.max(1, Math.ceil(eta / 60));

@@ -76,22 +76,24 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
       setIsResponding(true);
       await respondToAlert(alert.id);
       
-      // Open Google Maps navigation
-      openGoogleMapsNavigation();
-      
       onClose();
       
-      // Navigate to responder navigation screen
-      const parentNavigation = (navigation as any).getParent?.();
-      if (parentNavigation?.navigate) {
-        parentNavigation.navigate('Emergency', {
-          screen: 'ResponderNavigation',
-          params: { alertId: alert.id },
-        });
-        return;
+      // Navigate to in-app responder navigation screen first
+      try {
+        const parentNavigation = (navigation as any).getParent?.();
+        if (parentNavigation?.navigate) {
+          parentNavigation.navigate('Emergency', {
+            screen: 'ResponderNavigation',
+            params: { alertId: alert.id },
+          });
+        } else {
+          (navigation as any).navigate('ResponderNavigation', { alertId: alert.id });
+        }
+      } catch (navError) {
+        // If in-app navigation fails, fallback to Google Maps
+        console.warn('In-app navigation failed, opening Google Maps:', navError);
+        openGoogleMapsNavigation();
       }
-
-      (navigation as any).navigate('ResponderNavigation', { alertId: alert.id });
     } catch (error) {
       console.warn('Error responding to alert:', error);
       NativeAlert.alert('Could not respond', 'We could not accept this alert right now.');

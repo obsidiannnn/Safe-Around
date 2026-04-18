@@ -19,19 +19,26 @@
 - This removes the spring animation and makes the modal appear instantly
 - Provides a cleaner, more professional appearance
 
-### 3. ✅ Google Maps Navigation
-**Problem**: Clicking "I'm On My Way" didn't provide navigation to the emergency location.
+### 3. ✅ Fixed Duplicate Popups
+**Problem**: Two popup messages appeared at the same time - the ugly Alert.alert and the ResponderAlertModal.
 
 **Solution**:
-- Integrated Google Maps navigation using `Linking` API
-- Added `openGoogleMapsNavigation()` function that:
-  - Gets the helper's current location
-  - Opens Google Maps with turn-by-turn navigation to the alert location
-  - Supports both iOS and Android with platform-specific URLs
-  - Falls back to web Google Maps if the app isn't installed
-- Navigation opens automatically when the helper clicks "I'm On My Way"
+- Completely integrated ResponderAlertModal into MapDashboardScreen
+- Removed the old Alert.alert popup that showed "HELP NEEDED"
+- Now only the detailed ResponderAlertModal appears when emergency alerts are received
+- Added proper state management for showing/hiding the modal
+- Created Alert object from WebSocket data for the modal
 
-### 4. ✅ Button Logic Improvements
+### 4. ✅ In-App Navigation Priority with Google Maps Fallback
+**Problem**: Navigation should prioritize in-app map, use Google Maps as fallback only.
+
+**Solution**:
+- **ResponderAlertModal**: When "I'm On My Way" is clicked, first tries to navigate to ResponderNavigationScreen
+- **ResponderNavigationScreen**: Provides in-app navigation with route overlay and turn-by-turn guidance
+- **Google Maps Fallback**: If in-app navigation fails or user clicks "Open Maps", opens Google Maps with proper origin and destination
+- **Enhanced Google Maps URLs**: Now includes both origin and destination for better navigation experience
+
+### 5. ✅ Button Logic Improvements
 **Problem**: Buttons could be clicked multiple times during loading, causing issues.
 
 **Solution**:
@@ -39,7 +46,7 @@
 - Prevents multiple clicks while the response is being processed
 - Improves reliability and prevents duplicate responses
 
-### 5. ✅ UI/UX Improvements
+### 6. ✅ UI/UX Improvements
 - Added `flex: 1` to info text to prevent text overflow
 - Improved spacing and padding for better readability
 - Made the modal more responsive to different screen sizes
@@ -47,15 +54,28 @@
 ## Technical Details
 
 ### Files Modified
-1. **frontend/src/screens/emergency/ResponderAlertModal.tsx**
-   - Added ScrollView wrapper
-   - Integrated Google Maps navigation
-   - Removed animation
-   - Improved button states
+1. **frontend/src/screens/map/MapDashboardScreen.tsx**
+   - ✅ Added ResponderAlertModal integration
+   - ✅ Added state management for modal visibility
+   - ✅ Enhanced WebSocket emergency alert handler to create Alert objects
+   - ✅ Added distance calculation for emergency alerts
+   - ✅ Removed duplicate Alert.alert popup
 
-2. **backend/internal/middleware/cors.go**
-   - Fixed WebSocket CORS blocking issue
-   - Added WebSocket upgrade detection to bypass CORS
+2. **frontend/src/screens/emergency/ResponderAlertModal.tsx**
+   - ✅ Added ScrollView wrapper
+   - ✅ Integrated Google Maps navigation
+   - ✅ Removed animation
+   - ✅ Improved button states
+   - ✅ Enhanced navigation priority logic
+
+3. **frontend/src/screens/emergency/ResponderNavigationScreen.tsx**
+   - ✅ Enhanced Google Maps integration with origin and destination
+   - ✅ Improved error handling for navigation URLs
+   - ✅ Better fallback to web Google Maps
+
+4. **backend/internal/middleware/cors.go**
+   - ✅ Fixed WebSocket CORS blocking issue
+   - ✅ Added WebSocket upgrade detection to bypass CORS
 
 ### New Dependencies Used
 - `Linking` from React Native (for opening Google Maps)
@@ -83,7 +103,12 @@ https://www.google.com/maps/dir/?api=1&origin={origin}&destination={destination}
 
 - [x] Modal appears without animation
 - [x] Content is scrollable on all screen sizes
-- [x] "I'm On My Way" button opens Google Maps navigation
+- [x] Only one modal appears (no duplicate popups)
+- [x] ResponderAlertModal is properly integrated in MapDashboardScreen
+- [x] "I'm On My Way" button navigates to ResponderNavigationScreen first
+- [x] ResponderNavigationScreen provides in-app navigation
+- [x] "Open Maps" button opens Google Maps with origin and destination
+- [x] Google Maps fallback works when in-app navigation fails
 - [x] Navigation works on both iOS and Android
 - [x] Buttons are disabled during loading
 - [x] "Decline" button shows reasons bottom sheet
@@ -92,17 +117,20 @@ https://www.google.com/maps/dir/?api=1&origin={origin}&destination={destination}
 
 ## User Flow
 
-1. **Helper receives emergency alert** → Modal appears instantly (no animation)
+1. **Helper receives emergency alert** → ResponderAlertModal appears instantly (no animation, no duplicate popups)
 2. **Helper reviews information** → Can scroll to see all details
 3. **Helper clicks "I'm On My Way"** → 
    - Response is sent to backend
-   - Google Maps opens with navigation to emergency location
-   - Helper is navigated to ResponderNavigation screen
-4. **Helper follows navigation** → Arrives at emergency location
+   - Navigates to ResponderNavigationScreen (in-app navigation)
+   - Shows route overlay and turn-by-turn guidance
+   - Helper can click "Open Maps" for Google Maps if needed
+4. **Helper follows navigation** → Arrives at emergency location using in-app map or Google Maps
 
 ## Notes
 
 - The modal now provides a much cleaner, more professional experience
-- Navigation integration makes it easier for helpers to respond quickly
+- Navigation prioritizes in-app experience with Google Maps as fallback
 - Scrolling ensures all information is accessible regardless of screen size
 - The changes maintain backward compatibility with existing code
+- No more duplicate popups - clean single modal experience
+- Enhanced Google Maps integration with proper origin and destination
