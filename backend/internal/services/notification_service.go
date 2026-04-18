@@ -19,6 +19,11 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	notificationCategoryEmergencyAlert = "EMERGENCY_ALERT"
+	notificationCategoryAlertStatus    = "ALERT_STATUS"
+)
+
 // --- Interface ---
 
 type NotificationService interface {
@@ -194,10 +199,15 @@ func (s *notifService) SendEmergencyAlert(userID uint, alert *models.EmergencyAl
 		Title:            "🚨 Emergency Alert Nearby",
 		Body:             "Someone near you needs urgent help. Please respond.",
 		Data: map[string]interface{}{
-			"alert_id":   alert.ID.String(),
-			"alert_type": alert.AlertType,
-			"latitude":   alert.AlertLocation.Latitude,
-			"longitude":  alert.AlertLocation.Longitude,
+			"alert_id":       alert.ID.String(),
+			"alert_type":     alert.AlertType,
+			"category":       notificationCategoryEmergencyAlert,
+			"user_id":        alert.UserID,
+			"latitude":       alert.AlertLocation.Latitude,
+			"longitude":      alert.AlertLocation.Longitude,
+			"current_radius": alert.CurrentRadius,
+			"users_notified": alert.UsersNotified,
+			"created_at":     alert.CreatedAt.UTC().Format(time.RFC3339),
 		},
 		Priority: "critical",
 		AlertID:  &alert.ID,
@@ -219,6 +229,7 @@ func (s *notifService) NotifyResponderAccepted(userID uint, response *models.Ale
 		Body:             fmt.Sprintf("A responder is %d meters away (~%d min ETA)", int(response.DistanceMeters), response.EstimatedArrivalMinutes),
 		Data: map[string]interface{}{
 			"alert_id":    response.AlertID,
+			"category":    notificationCategoryAlertStatus,
 			"distance_m":  response.DistanceMeters,
 			"eta_minutes": response.EstimatedArrivalMinutes,
 		},
@@ -240,8 +251,14 @@ func (s *notifService) NotifyAllParticipants(alertID uuid.UUID, message string) 
 			NotificationType: "alert_update",
 			Title:            "Alert Update",
 			Body:             message,
-			Priority:         "high",
-			AlertID:          &alertID,
+			Data: map[string]interface{}{
+				"alert_id": alertID.String(),
+				"category": notificationCategoryAlertStatus,
+				"room_id":  fmt.Sprintf("alert_%s", alertID.String()),
+				"message":  message,
+			},
+			Priority: "high",
+			AlertID:  &alertID,
 		}
 	}
 	return nil
@@ -272,11 +289,16 @@ func (s *notifService) NotifyEmergencyContacts(userID uint, alert *models.Emerge
 				Title:            "🚨 Emergency: " + user.Name,
 				Body:             user.Name + " is in danger! Tap to see live location.",
 				Data: map[string]interface{}{
-					"alert_id":     alert.ID.String(),
-					"latitude":     alert.AlertLocation.Latitude,
-					"longitude":    alert.AlertLocation.Longitude,
-					"victim_name":  user.Name,
-					"victim_phone": user.Phone,
+					"alert_id":       alert.ID.String(),
+					"category":       notificationCategoryEmergencyAlert,
+					"user_id":        alert.UserID,
+					"latitude":       alert.AlertLocation.Latitude,
+					"longitude":      alert.AlertLocation.Longitude,
+					"current_radius": alert.CurrentRadius,
+					"users_notified": alert.UsersNotified,
+					"created_at":     alert.CreatedAt.UTC().Format(time.RFC3339),
+					"victim_name":    user.Name,
+					"victim_phone":   user.Phone,
 				},
 				Priority: "critical",
 				AlertID:  &alert.ID,

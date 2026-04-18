@@ -1,15 +1,18 @@
 import React from 'react';
-import { LoadingOverlay } from '@/components/common/LoadingOverlay';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { colors } from '@/theme/colors';
 
-/**
- * Lightweight branded loading screen while auth/session state is restoring.
- * Navigation is handled by AppNavigator once auth loading completes.
- */
-export const SplashScreen = () => {
-  return (
-    <LoadingOverlay
-      visible={true}
-      message="Restoring your secure session"
-    />
-  );
-};
+export const SplashScreen = () => (
+  <View style={styles.container}>
+    <ActivityIndicator size="small" color={colors.primary} />
+  </View>
+);
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});

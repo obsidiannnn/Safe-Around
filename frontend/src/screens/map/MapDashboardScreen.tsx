@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, StyleSheet, Pressable, Platform, Text, Alert } from 'react-native';
+import { View, StyleSheet, Pressable, Platform, Text, Alert as NativeAlert } from 'react-native';
 import MapView, { Region, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import CrimeWebSocketService from '@/services/websocket/CrimeWebSocket';
@@ -14,7 +14,7 @@ import { MapTypeSwitch } from '@/components/map/MapTypeSwitch';
 import { NearbyUsersLayer } from '@/components/map/NearbyUsersLayer';
 import { DangerZoneAlert } from '@/components/location/DangerZoneAlert';
 import { BackgroundLocationIndicator } from '@/components/location/BackgroundLocationIndicator';
-import { API_URL, GOOGLE_MAPS_API_KEY } from '@/config/env';
+import { API_URL, WEBSOCKET_URL, GOOGLE_MAPS_API_KEY } from '@/config/env';
 import { useMapStore } from '@/store/mapStore';
 import { useAuthStore } from '@/store/authStore';
 import { useLocation } from '@/hooks/useLocation';
@@ -23,17 +23,20 @@ import { heatmapService } from '@/services/api/heatmapService';
 import { DangerZone } from '@/types/models';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
-import { useNavigation } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import CrimeHeatmapOverlay from '@/components/map/CrimeHeatmapOverlay';
 import { useAlertStore } from '@/store/alertStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { Alert } from '@/types/models';
 import { VolunteerRouteOverlay } from '@/components/map/VolunteerRouteOverlay';
 import { EmergencyTriggerModal } from '@/screens/emergency/EmergencyTriggerModal';
+import { ResponderAlertModal } from '@/screens/emergency/ResponderAlertModal';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 
 export const MapDashboardScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const isFocused = useIsFocused();
   const mapRef = useRef<MapView>(null);
   const areaStatsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAreaStatsCenterRef = useRef<{ latitude: number; longitude: number } | null>(null);
@@ -58,6 +61,9 @@ export const MapDashboardScreen = () => {
   const [selectedPlace, setSelectedPlace] = useState<{ name: string; location: { latitude: number; longitude: number } } | null>(null);
   const [activeVictimLocation, setActiveVictimLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [activeVictimAlertId, setActiveVictimAlertId] = useState<string | null>(null);
+  const [showResponderModal, setShowResponderModal] = useState(false);
+  const [responderAlert, setResponderAlert] = useState<Alert | null>(null);
+  const [responderDistance, setResponderDistance] = useState(0);
   const [mapBounds, setMapBounds] = useState({
     north: 0,
     south: 0,
@@ -65,7 +71,8 @@ export const MapDashboardScreen = () => {
     west: 0,
   });
 
-  const { createAlert, activeAlert, respondersCount } = useAlertStore();
+  const { createAlert, respondToAlert, activeAlert, respondersCount } = useAlertStore();
+  const { priorityAlerts } = useSettingsStore();
 
   const openEmergencyActiveScreen = useCallback(() => {
     (navigation.getParent() as any)?.navigate('Emergency', { screen: 'EmergencyActive' });
@@ -113,8 +120,10 @@ export const MapDashboardScreen = () => {
   }, [currentLocation]);
 
   useEffect(() => {
+    CrimeWebSocketService.connect(`${WEBSOCKET_URL}/ws/crime`);
+
     const handleNewCrime = (data: any) => {
-      Alert.alert(
+      NativeAlert.alert(
         '🚨 Crime Alert',
         `${data.crime_type} reported nearby`,
         [
@@ -132,6 +141,53 @@ export const MapDashboardScreen = () => {
       setHeatmapKey(prev => prev + 1);
     };
 
+    const handleEmergencyAlert = (data: any) => {
+      if (!isFocused) return;
+      if (!priorityAlerts) return;
+
+      const authUserId = String(useAuthStore.getState().user?.id ?? '');
+      const sourceUserId = String(data.user?.user_id ?? '');
+      const recipientIds = Array.isArray(data.recipient_user_ids)
+        ? data.recipient_user_ids.map((id: unknown) => String(id))
+        : [];
+      const liveAlert = useAlertStore.getState().activeAlert;
+
+      if (sourceUserId === authUserId) return;
+      if (recipientIds.length > 0 && !recipientIds.includes(authUserId)) return;
+      if (liveAlert?.id === data.alert_id || useAlertStore.getState().isAlertActive) return;
+
+      // Create Alert object for ResponderAlertModal
+      const alertData: Alert = {
+        id: String(data.alert_id),
+        userId: sourceUserId,
+        location: {
+          latitude: data.location.latitude,
+          longitude: data.location.longitude,
+        },
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        usersNotified: data.users_notified || 0,
+        user: data.user || { name: 'Unknown User' },
+      };
+
+      // Calculate distance if current location is available
+      let distance = 0;
+      if (currentLocation) {
+        const distanceMeters = getDistanceMeters(
+          currentLocation,
+          { latitude: data.location.latitude, longitude: data.location.longitude }
+        );
+        distance = Math.round(distanceMeters);
+      }
+
+      // Set state for ResponderAlertModal
+      setResponderAlert(alertData);
+      setResponderDistance(distance);
+      setActiveVictimLocation(data.location);
+      setActiveVictimAlertId(String(data.alert_id));
+      setShowResponderModal(true);
+    };
+
     const handleResponderAccepted = (data: any) => {
       const authUserId = String(useAuthStore.getState().user?.id ?? '');
       const liveAlert = useAlertStore.getState().activeAlert;
@@ -144,7 +200,7 @@ export const MapDashboardScreen = () => {
         return;
       }
 
-      Alert.alert(
+      NativeAlert.alert(
         '✅ Help is on the way!',
         `A volunteer is ${Math.round(data.distance)}m away and will arrive in approx ${data.eta} min.`
       );
@@ -159,24 +215,30 @@ export const MapDashboardScreen = () => {
       if (activeVictimAlertId && roomId === `alert_${activeVictimAlertId}`) {
         setActiveVictimLocation(null);
         setActiveVictimAlertId(null);
+        setShowResponderModal(false);
+        setResponderAlert(null);
       }
     };
 
     CrimeWebSocketService.on('crime_added', handleNewCrime);
+    CrimeWebSocketService.on('emergency_alert', handleEmergencyAlert);
     CrimeWebSocketService.on('responder_accepted', handleResponderAccepted);
     CrimeWebSocketService.on('room_closed', handleRoomClosed);
 
     return () => {
       CrimeWebSocketService.off('crime_added', handleNewCrime);
+      CrimeWebSocketService.off('emergency_alert', handleEmergencyAlert);
       CrimeWebSocketService.off('responder_accepted', handleResponderAccepted);
       CrimeWebSocketService.off('room_closed', handleRoomClosed);
     };
-  }, [activeVictimAlertId]);
+  }, [activeVictimAlertId, isFocused, navigation, priorityAlerts, respondToAlert]);
 
   useEffect(() => {
     if (!activeAlert) {
       setActiveVictimLocation(null);
       setActiveVictimAlertId(null);
+      setShowResponderModal(false);
+      setResponderAlert(null);
     }
   }, [activeAlert]);
 
@@ -245,7 +307,7 @@ export const MapDashboardScreen = () => {
 
   const handleEmergencyTrigger = useCallback(async () => {
     if (!currentLocation) {
-      Alert.alert('Error', 'Cannot get your current location.');
+      NativeAlert.alert('Error', 'Cannot get your current location.');
       return;
     }
 
@@ -257,7 +319,7 @@ export const MapDashboardScreen = () => {
       openEmergencyActiveScreen();
     } catch (error) {
       console.warn('Error creating alert:', error);
-      Alert.alert('Error', 'Failed to trigger SOS alert.');
+      NativeAlert.alert('Error', 'Failed to trigger SOS alert.');
     }
   }, [currentLocation, createAlert, openEmergencyActiveScreen]);
 
@@ -446,7 +508,7 @@ export const MapDashboardScreen = () => {
         }}
         onReportIncident={() => {
           setShowAreaStatsCard(false);
-          Alert.alert('Report Incident', 'Incident reporting is available from the crime details screen.');
+          NativeAlert.alert('Report Incident', 'Incident reporting is available from the crime details screen.');
           navigation.navigate('CrimeDetails' as never);
         }}
       />
@@ -464,6 +526,22 @@ export const MapDashboardScreen = () => {
             navigation.navigate('SafeRoute' as never);
           }}
         />
+      )}
+
+      {responderAlert && (
+        <View style={styles.modalOverlay}>
+          <ResponderAlertModal
+            visible={showResponderModal}
+            onClose={() => {
+              setShowResponderModal(false);
+              setResponderAlert(null);
+              setActiveVictimLocation(null);
+              setActiveVictimAlertId(null);
+            }}
+            alert={responderAlert}
+            distance={responderDistance}
+          />
+        </View>
       )}
     </View>
   );
@@ -673,6 +751,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.3,
     textTransform: 'uppercase',
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9999,
   },
 });
 

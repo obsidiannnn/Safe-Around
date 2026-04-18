@@ -16,6 +16,12 @@ func CorsMiddleware() gin.HandlerFunc {
 	allowedOrigins := buildAllowedOrigins()
 
 	return func(c *gin.Context) {
+		// Skip CORS for WebSocket upgrade requests
+		if c.Request.Header.Get("Upgrade") == "websocket" {
+			c.Next()
+			return
+		}
+
 		origin := c.Request.Header.Get("Origin")
 
 		if origin == "" {

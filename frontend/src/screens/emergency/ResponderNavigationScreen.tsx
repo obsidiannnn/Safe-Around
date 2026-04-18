@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Vibration, Linking, Alert, Platform } from 'react-native';
+import { View, StyleSheet, Vibration, Linking, Alert as NativeAlert, Platform } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -126,12 +126,12 @@ export const ResponderNavigationScreen = () => {
   }, []);
 
   const handleConfirmArrival = () => {
-    Alert.alert('Arrival confirmed', 'The requester can now see that you have arrived nearby.');
+    NativeAlert.alert('Arrival confirmed', 'The requester can now see that you have arrived nearby.');
     navigation.goBack();
   };
 
   const handleCancelResponse = () => {
-    Alert.alert('Cancel response', 'If you can no longer help, please contact the requester or emergency services directly.', [
+    NativeAlert.alert('Cancel response', 'If you can no longer help, please contact the requester or emergency services directly.', [
       { text: 'Keep Helping', style: 'cancel' },
       { text: 'Leave Response', style: 'destructive', onPress: () => navigation.goBack() },
     ]);
@@ -139,32 +139,42 @@ export const ResponderNavigationScreen = () => {
 
   const handleOpenGoogleMaps = useCallback(async () => {
     if (!victimLocation) {
-      Alert.alert('Route unavailable', 'We could not find the person’s live destination yet.');
+      NativeAlert.alert('Route unavailable', 'We could not find the person’s live destination yet.');
       return;
     }
 
     const destination = `${victimLocation.latitude},${victimLocation.longitude}`;
-    const urls =
-      Platform.OS === 'android'
-        ? [
-            `google.navigation:q=${destination}&mode=d`,
-            `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`,
-          ]
-        : [
-            `comgooglemaps://?daddr=${destination}&directionsmode=driving`,
-            `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`,
-          ];
+    const origin = currentLocation 
+      ? `${currentLocation.latitude},${currentLocation.longitude}`
+      : '';
+    
+    const urls = Platform.select({
+      ios: [
+        `comgooglemaps://?saddr=${origin}&daddr=${destination}&directionsmode=driving`,
+        `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`,
+      ],
+      android: [
+        `google.navigation:q=${destination}&mode=d`,
+        `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`,
+      ],
+    }) || [];
 
     for (const url of urls) {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-        return;
+      try {
+        const supported = await Linking.canOpenURL(url);
+        if (supported) {
+          await Linking.openURL(url);
+          return;
+        }
+      } catch (error) {
+        console.warn('Failed to open URL:', url, error);
       }
     }
 
-    await Linking.openURL(urls[urls.length - 1]);
-  }, [victimLocation]);
+    // Fallback to web Google Maps
+    const fallbackUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+    await Linking.openURL(fallbackUrl);
+  }, [currentLocation, victimLocation]);
 
   const distanceLabel = distance >= 1000 ? `${(distance / 1000).toFixed(1)} km` : `${Math.round(distance)}m`;
   const etaMinutes = Math.max(1, Math.ceil(eta / 60));

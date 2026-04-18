@@ -10,7 +10,8 @@ export const useNotifications = () => {
 
   useEffect(() => {
     checkPermission();
-    setupNotificationListeners();
+    const cleanup = setupNotificationListeners();
+    return cleanup;
   }, []);
 
   const checkPermission = async () => {
@@ -49,6 +50,14 @@ export const useNotifications = () => {
       handleNotificationTap(data);
     });
 
+    void Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        if (response) {
+          handleNotificationTap(response.notification.request.content.data);
+        }
+      })
+      .catch(() => undefined);
+
     return () => {
       foregroundSubscription.remove();
       responseSubscription.remove();
@@ -60,7 +69,10 @@ export const useNotifications = () => {
 
     switch (category) {
       case NotificationCategory.EMERGENCY_ALERT:
-        (navigation as any).navigate('ResponderNavigation', { alertId: alert_id });
+        (navigation as any).navigate('Emergency', {
+          screen: 'ResponderNavigation',
+          params: { alertId: alert_id },
+        });
         break;
       case NotificationCategory.DANGER_ZONE:
         (navigation as any).navigate('CrimeDetails', { zoneId: zone_id });

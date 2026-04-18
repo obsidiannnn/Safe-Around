@@ -1,42 +1,61 @@
-import { io, Socket } from 'socket.io-client';
 import { Alert } from 'react-native';
 import { WEBSOCKET_URL } from '@/config/env';
 
 class RealtimeHeatmapService {
-  private socket: Socket | null = null;
+  private socket: WebSocket | null = null;
   private listeners: Map<string, Function[]> = new Map();
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private reconnectDelay = 1000;
 
   connect() {
-    this.socket = io(WEBSOCKET_URL, {
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionDelay: 1000,
-    });
+    const wsUrl = `${WEBSOCKET_URL}/ws/crime`;
+    this.socket = new WebSocket(wsUrl);
 
-    this.socket.on('connect', () => {
+    this.socket.onopen = () => {
       console.log('✅ Connected to real-time crime updates');
-    });
+      this.reconnectDelay = 1000; // Reset reconnect delay on successful connection
+    };
 
-    this.socket.on('crime_added', (data: any) => {
-      console.log('🚨 New crime detected:', data);
-      this.emit('crime_added', data);
-      
-      // Show an immediate visual notification to the user
-      Alert.alert(
-        '🚨 Safety Alert',
-        `A new ${data.crime_type} has been reported in the area. Stay vigilant.`,
-        [{ text: 'OK' }]
-      );
-    });
+    this.socket.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        const { event: eventType, data } = message;
 
-    this.socket.on('heatmap_refresh', (data: any) => {
-      console.log('🗺️ Heatmap update received');
-      this.emit('heatmap_refresh', data);
-    });
+        if (eventType === 'crime_added') {
+          console.log('🚨 New crime detected:', data);
+          this.emit('crime_added', data);
+          
+          // Show an immediate visual notification to the user
+          Alert.alert(
+            '🚨 Safety Alert',
+            `A new ${data.crime_type} has been reported in the area. Stay vigilant.`,
+            [{ text: 'OK' }]
+          );
+        } else if (eventType === 'heatmap_refresh') {
+          console.log('🗺️ Heatmap update received');
+          this.emit('heatmap_refresh', data);
+        } else if (eventType === 'connected') {
+          console.log('📡 WebSocket handshake complete');
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+
+    this.socket.onerror = (error) => {
+      console.warn('WebSocket connection unavailable; realtime updates will retry in the background.', error);
+    };
     
-    this.socket.on('disconnect', () => {
+    this.socket.onclose = () => {
       console.log('❌ Disconnected from crime updates');
-    });
+      // Auto-reconnect
+      this.reconnectTimeout = setTimeout(() => {
+        console.log('🔄 Attempting to reconnect...');
+        this.connect();
+      }, this.reconnectDelay);
+      // Exponential backoff (max 30 seconds)
+      this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000);
+    };
   }
 
   on(event: string, callback: Function) {
@@ -58,8 +77,12 @@ class RealtimeHeatmapService {
   }
 
   disconnect() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
     if (this.socket) {
-      this.socket.disconnect();
+      this.socket.close();
       this.socket = null;
     }
   }
