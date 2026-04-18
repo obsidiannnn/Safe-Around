@@ -18,7 +18,7 @@ type GeofencingService struct {
 	notificationService NotificationService
 }
 
-const responderFreshnessWindow = "2 minutes"
+const responderFreshnessWindow = "5 minutes"
 
 func NewGeofencingService(db *gorm.DB, rdb *redis.Client, notifSvc NotificationService) *GeofencingService {
 	return &GeofencingService{

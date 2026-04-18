@@ -31,6 +31,11 @@ type SMSRequest struct {
 	Message string `json:"message" binding:"required"`
 }
 
+type RegisterTokenRequest struct {
+	Token    string `json:"token" binding:"required"`
+	Platform string `json:"platform" binding:"required"`
+}
+
 // SendPushNotification handles admin-triggered external Push events
 func (h *NotificationHandler) SendPushNotification(c *gin.Context) {
 	var req PushNotificationRequest
@@ -48,6 +53,33 @@ func (h *NotificationHandler) SendPushNotification(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, SuccessResponse(gin.H{"message": "notification dispatched to queue/fcm"}))
+}
+
+func (h *NotificationHandler) RegisterDeviceToken(c *gin.Context) {
+	userIDRaw, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, ErrorResponse("UNAUTHORIZED", "missing user context"))
+		return
+	}
+
+	var req RegisterTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse("BAD_REQUEST", err.Error()))
+		return
+	}
+
+	if req.Platform != "android" && req.Platform != "ios" {
+		c.JSON(http.StatusBadRequest, ErrorResponse("BAD_REQUEST", "platform must be ios or android"))
+		return
+	}
+
+	if err := h.notifService.RegisterDeviceToken(userIDRaw.(uint), req.Token, req.Platform); err != nil {
+		logger.Error("Failed to register device token", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, ErrorResponse("INTERNAL_ERROR", "failed to register device token"))
+		return
+	}
+
+	c.JSON(http.StatusOK, SuccessResponse(gin.H{"message": "device token registered"}))
 }
 
 // GetNotificationHistory returns a user's notification timeline with pagination

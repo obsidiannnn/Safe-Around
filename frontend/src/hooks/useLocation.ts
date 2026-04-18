@@ -22,7 +22,12 @@ export const useLocation = () => {
     setHeading,
   } = useLocationStore();
   const { isAlertActive } = useAlertStore();
-  const { locationSharingMode } = useSettingsStore();
+  const { locationSharingMode, priorityAlerts } = useSettingsStore();
+
+  const canSyncLocation = () =>
+    locationSharingMode === 'always' || (
+      locationSharingMode === 'alerts_only' && (isAlertActive || priorityAlerts)
+    );
 
   const startTracking = async () => {
     const hasPermission = await locationService.requestPermissions();
@@ -34,6 +39,9 @@ export const useLocation = () => {
     if (location) {
       setCurrentLocation(location);
       addToHistory(location);
+      if (canSyncLocation()) {
+        locationApiService.updateLocation(location);
+      }
     }
 
     setIsTracking(true);
@@ -87,15 +95,35 @@ export const useLocation = () => {
 
       // Sync to backend
       const now = Date.now();
-      const canShareLocation = locationSharingMode === 'always' || (locationSharingMode === 'alerts_only' && isAlertActive);
-      if (canShareLocation && now - lastSyncTime > SYNC_INTERVALMs) {
+      if (canSyncLocation() && now - lastSyncTime > SYNC_INTERVALMs) {
         locationApiService.updateLocation(location);
         lastSyncTime = now;
       }
     });
 
-    return () => subscription.remove();
-  }, [isTracking, isAlertActive, locationSharingMode]);
+    const freshnessInterval = setInterval(async () => {
+      if (!canSyncLocation()) {
+        return;
+      }
+
+      const location = await locationService.getCurrentLocation();
+      if (!location) {
+        return;
+      }
+
+      setCurrentLocation(location);
+      const now = Date.now();
+      if (now - lastSyncTime > 60_000) {
+        locationApiService.updateLocation(location);
+        lastSyncTime = now;
+      }
+    }, 60_000);
+
+    return () => {
+      subscription.remove();
+      clearInterval(freshnessInterval);
+    };
+  }, [isTracking, isAlertActive, locationSharingMode, priorityAlerts]);
 
   return {
     currentLocation,

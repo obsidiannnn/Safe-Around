@@ -54,6 +54,7 @@ func SetupRouter(
 		notifs := api.Group("/notifications")
 		notifs.Use(middleware.AuthRequired())
 		{
+			notifs.POST("/register-token", notifHandler.RegisterDeviceToken)
 			// Example of stricter rate limit on push triggers (10 / min)
 			notifs.POST("", middleware.RateLimit(rdb, 10, 60*time.Second), notifHandler.SendPushNotification)
 

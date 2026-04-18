@@ -19,9 +19,9 @@ module.exports = () => ({
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
     splash: {
-      image: './assets/splash-icon.png',
+      image: './assets/native-splash.png',
       resizeMode: 'contain',
-      backgroundColor: '#D32F2F',
+      backgroundColor: '#F2F6FF',
     },
     ios: {
       supportsTablet: false,
