@@ -19,6 +19,7 @@ import (
 	customWS "github.com/obsidiannnn/Safe-Around/backend/internal/websocket"
 	"github.com/obsidiannnn/Safe-Around/backend/pkg/fcm"
 	"github.com/obsidiannnn/Safe-Around/backend/pkg/logger"
+	"github.com/obsidiannnn/Safe-Around/backend/pkg/maps"
 	"github.com/obsidiannnn/Safe-Around/backend/pkg/twilio"
 	"go.uber.org/zap"
 )
@@ -65,6 +66,9 @@ func main() {
 	// 3. External Integrations
 	fcmClient := fcm.NewClient(os.Getenv("FCM_SERVER_KEY"))
 	twilioClient := twilio.NewClient(os.Getenv("TWILIO_ACCOUNT_SID"), os.Getenv("TWILIO_AUTH_TOKEN"))
+	
+	// Initialize Google Maps client for location search
+	mapsClient := maps.NewClient(os.Getenv("GOOGLE_MAPS_API_KEY"))
 
 	// 4. Setup Repositories & Services
 	userRepo := repository.NewUserRepo(db)
@@ -89,13 +93,14 @@ func main() {
 	heatmapHandler := handlers.NewHeatmapHandler(db, rdb)
 	wsHandler := handlers.HandleWebSocket(crimeHub)
 	locationHandler := handlers.NewLocationHandler(locationSvc, crimeHub)
+	locationSearchHandler := handlers.NewLocationSearchHandler(mapsClient)
 	routeHandler := handlers.NewRouteHandler(routeSvc)
 	profileHandler := handlers.NewProfileHandler(db, rdb)
 	geofencingHandler := handlers.NewGeofencingHandler(geoSvc)
 	feedbackHandler := handlers.NewFeedbackHandler(feedbackSvc)
 
 	// 6. Setup Routes
-	r := routes.SetupRouter(authHandler, healthHandler, notifHandler, alertHandler, heatmapHandler, wsHandler, locationHandler, routeHandler, profileHandler, geofencingHandler, feedbackHandler, rdb)
+	r := routes.SetupRouter(authHandler, healthHandler, notifHandler, alertHandler, heatmapHandler, wsHandler, locationHandler, locationSearchHandler, routeHandler, profileHandler, geofencingHandler, feedbackHandler, rdb)
 
 	srv := &http.Server{
 		Addr:    "0.0.0.0:" + cfg.Server.Port,
