@@ -3,8 +3,8 @@ services:
   - type: web
     name: safearound-backend
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
     envVars:
       - key: SERVER_PORT
         value: 8000
@@ -46,8 +46,8 @@ services:
   - type: worker
     name: safearound-crime-pipeline
     runtime: docker
-    dockerfilePath: ./crime-pipeline/Dockerfile
-    dockerContext: ./crime-pipeline
+    dockerfilePath: crime-pipeline/Dockerfile
+    dockerContext: crime-pipeline
     envVars:
       - key: DB_HOST
         sync: false
