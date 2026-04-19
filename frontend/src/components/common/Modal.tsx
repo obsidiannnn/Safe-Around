@@ -20,6 +20,9 @@ interface ModalProps {
   dismissOnBackdrop?: boolean;
   fullScreen?: boolean;
   noAnimation?: boolean;
+  showBackdrop?: boolean;
+  bottomOffset?: number;
+  maxHeightRatio?: number;
 }
 
 /**
@@ -33,6 +36,9 @@ export const Modal: React.FC<ModalProps> = ({
   dismissOnBackdrop = true,
   fullScreen = false,
   noAnimation = false,
+  showBackdrop = true,
+  bottomOffset = 0,
+  maxHeightRatio = 0.68,
 }) => {
   const insets = useSafeAreaInsets();
   const translateY = useSharedValue(noAnimation ? 0 : SCREEN_HEIGHT);
@@ -71,24 +77,71 @@ export const Modal: React.FC<ModalProps> = ({
 
   if (!visible) return null;
 
+  if (noAnimation) {
+    return (
+      <View style={styles.inlineRoot} pointerEvents="box-none">
+        {showBackdrop ? (
+          <Pressable
+            style={[styles.inlineBackdrop, styles.backdrop]}
+            onPress={dismissOnBackdrop ? onClose : undefined}
+          />
+        ) : null}
+
+        <View
+          pointerEvents="box-none"
+          style={[
+            styles.inlineContainer,
+            fullScreen ? styles.inlineFullScreen : null,
+          ]}
+        >
+          <View
+            style={[
+              styles.modal,
+              fullScreen
+                ? [styles.fullScreen, { paddingBottom: 0 }]
+                : [
+                    styles.bottomSheet,
+                    {
+                      paddingBottom: Math.max(insets.bottom, 20),
+                      marginBottom: bottomOffset,
+                      maxHeight: SCREEN_HEIGHT * maxHeightRatio,
+                    },
+                  ],
+            ]}
+          >
+            {!fullScreen && <View style={styles.handle} />}
+            {children}
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <RNModal transparent visible={visible} animationType="none" onRequestClose={onClose} statusBarTranslucent={false}>
-      <View style={[styles.container, noAnimation && styles.containerNoBackdrop]}>
-        {opacity.value > 0 && (
+      <View style={styles.container}>
+        {showBackdrop ? (
           <Animated.View style={[styles.backdrop, backdropStyle]}>
             <Pressable
               style={StyleSheet.absoluteFill}
               onPress={dismissOnBackdrop ? onClose : undefined}
             />
           </Animated.View>
-        )}
+        ) : null}
 
         <Animated.View
           style={[
             styles.modal,
             fullScreen
               ? [styles.fullScreen, { paddingBottom: 0 }]
-              : [styles.bottomSheet, { paddingBottom: Math.max(insets.bottom, 80) }],
+              : [
+                  styles.bottomSheet,
+                  {
+                    paddingBottom: Math.max(insets.bottom, 20),
+                    marginBottom: bottomOffset,
+                    maxHeight: SCREEN_HEIGHT * maxHeightRatio,
+                  },
+                ],
             modalStyle,
           ]}
         >
@@ -105,8 +158,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
-  containerNoBackdrop: {
-    backgroundColor: 'transparent',
+  inlineRoot: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1000,
+    elevation: 1000,
+  },
+  inlineBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  inlineContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  inlineFullScreen: {
+    justifyContent: 'flex-start',
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -120,7 +185,6 @@ const styles = StyleSheet.create({
   bottomSheet: {
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
-    maxHeight: SCREEN_HEIGHT * 0.75,
   },
   fullScreen: {
     height: SCREEN_HEIGHT,

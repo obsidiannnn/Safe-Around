@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Vibration, Linking, Alert as NativeAlert, Platform } from 'react-native';
 import { Text } from 'react-native-paper';
-import { useNavigation, useRoute, CommonActions } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { BottomSheet, Button } from '@/components/common';
@@ -29,6 +29,7 @@ export const ResponderNavigationScreen = () => {
   const { calculateDistance } = useLocation();
   const { isStreaming } = useRealtimeLocation(alertId);
   const [victimLocation, setVictimLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [alertStatus, setAlertStatus] = useState<string>('active');
   const [distance, setDistance] = useState(0);
   const [eta, setEta] = useState(0);
   const [showActions, setShowActions] = useState(true);
@@ -43,6 +44,7 @@ export const ResponderNavigationScreen = () => {
       try {
         const details = await alertService.getAlertDetails(alertId);
         setVictimLocation(details.alert.location);
+        setAlertStatus(details.alert.status);
       } catch (error) {
         console.warn('Failed to load responder destination:', error);
       }
@@ -50,6 +52,35 @@ export const ResponderNavigationScreen = () => {
 
     loadAlert();
   }, [alertId]);
+
+  // Poll alert status every 3 seconds to check if it's cancelled/resolved
+  useEffect(() => {
+    if (!alertId) return;
+
+    const pollAlertStatus = async () => {
+      try {
+        const details = await alertService.getAlertDetails(alertId);
+        setAlertStatus(details.alert.status);
+        
+        // If alert is cancelled or resolved, close navigation screen
+        if (details.alert.status === 'cancelled' || details.alert.status === 'resolved') {
+          const parentNav = navigation.getParent();
+          if (parentNav) {
+            parentNav.navigate('Emergency', {
+              screen: 'EmergencyDashboard',
+            });
+          } else {
+            navigation.goBack();
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to poll alert status:', error);
+      }
+    };
+
+    const interval = setInterval(pollAlertStatus, 3000);
+    return () => clearInterval(interval);
+  }, [alertId, navigation]);
 
   useEffect(() => {
     if (currentLocation && victimLocation) {
@@ -126,8 +157,18 @@ export const ResponderNavigationScreen = () => {
   }, []);
 
   const handleConfirmArrival = () => {
-    // Simply go back to the previous screen (EmergencyDashboard)
-    navigation.goBack();
+    setShowActions(false);
+    
+    // Navigate back to Emergency tab's dashboard
+    const parentNav = navigation.getParent();
+    if (parentNav) {
+      parentNav.navigate('Emergency', {
+        screen: 'EmergencyDashboard',
+      });
+    } else {
+      // Fallback: just go back
+      navigation.goBack();
+    }
   };
 
   const handleCancelResponse = () => {
@@ -227,6 +268,16 @@ export const ResponderNavigationScreen = () => {
         )}
       </MapView>
 
+      {/* Alert Cancelled/Resolved Banner */}
+      {(alertStatus === 'cancelled' || alertStatus === 'resolved') && (
+        <View style={styles.alertClosedBanner}>
+          <Icon name="info" size={24} color={colors.surface} />
+          <Text style={styles.alertClosedText}>
+            {alertStatus === 'cancelled' ? 'Alert was cancelled' : 'Person is safe now'}
+          </Text>
+        </View>
+      )}
+
       <View style={styles.topCard}>
         <View style={styles.distanceContainer}>
           <Text style={styles.distanceValue}>{distanceLabel}</Text>
@@ -258,6 +309,7 @@ export const ResponderNavigationScreen = () => {
         visible={showActions}
         onClose={() => setShowActions(false)}
         snapPoints={[0.25]}
+        showBackdrop={false}
       >
         <View style={styles.actionsContainer}>
           <Text style={styles.actionsTitle}>Quick Actions</Text>
@@ -384,6 +436,24 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
   },
   arrivalText: {
+    fontSize: fontSizes.md,
+    fontWeight: '600',
+    color: colors.surface,
+    marginLeft: spacing.sm,
+  },
+  alertClosedBanner: {
+    position: 'absolute',
+    top: 170,
+    left: spacing.lg,
+    right: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.warning,
+    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+  },
+  alertClosedText: {
     fontSize: fontSizes.md,
     fontWeight: '600',
     color: colors.surface,

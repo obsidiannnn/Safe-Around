@@ -171,11 +171,13 @@ export const EmergencyActiveScreen = () => {
       return;
     }
 
+    setIsCompleting(true);
+    
     try {
-      setIsCompleting(true);
       await resolveAlert(currentAlert.id);
       replaceWithResolution(currentAlert.id);
     } catch (error) {
+      // Try to check if alert was already resolved
       try {
         const latestAlert = await alertService.getAlert(currentAlert.id);
         if (latestAlert.status === 'resolved' || latestAlert.status === 'cancelled') {
@@ -183,10 +185,11 @@ export const EmergencyActiveScreen = () => {
           return;
         }
       } catch {
-        // Keep the user-facing fallback below if the alert could not be reloaded.
+        // If we can't verify, just navigate away - don't trap the user
       }
 
-      Alert.alert('Unable to finish SOS', 'We could not close this SOS yet. Please try again.');
+      // Navigate away regardless of API failure - don't trap user
+      replaceWithResolution(currentAlert.id);
     } finally {
       setIsCompleting(false);
     }
@@ -197,11 +200,13 @@ export const EmergencyActiveScreen = () => {
       return;
     }
 
+    setIsCompleting(true);
+    
     try {
-      setIsCompleting(true);
       await cancelAlert(currentAlert.id);
       replaceWithDashboard();
     } catch (error) {
+      // Try to check if alert was already cancelled
       try {
         const latestAlert = await alertService.getAlert(currentAlert.id);
         if (latestAlert.status === 'cancelled' || latestAlert.status === 'resolved') {
@@ -209,10 +214,11 @@ export const EmergencyActiveScreen = () => {
           return;
         }
       } catch {
-        // Keep the user-facing fallback below if the alert could not be reloaded.
+        // If we can't verify, just navigate away - don't trap the user
       }
 
-      Alert.alert('Unable to cancel alert', 'This SOS could not be cancelled right now. Please refresh and try again.');
+      // Navigate away regardless of API failure - don't trap user
+      replaceWithDashboard();
     } finally {
       setIsCompleting(false);
     }
