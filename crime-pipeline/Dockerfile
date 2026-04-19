@@ -15,11 +15,14 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download spaCy model
-RUN python -m spacy download en_core_web_lg
+# Download spaCy model (use sm for faster builds, lg for better accuracy)
+RUN python -m spacy download en_core_web_sm
 
 # Copy application code
 COPY . .
 
-# Run the scheduler
-CMD ["python", "scheduler.py"]
+# Expose port for FastAPI health checks
+EXPOSE 8001
+
+# Run the main pipeline (includes FastAPI server + scheduler)
+CMD ["python", "crime_pipeline.py"]
