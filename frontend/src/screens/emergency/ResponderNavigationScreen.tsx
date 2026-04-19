@@ -29,6 +29,7 @@ export const ResponderNavigationScreen = () => {
   const { calculateDistance } = useLocation();
   const { isStreaming } = useRealtimeLocation(alertId);
   const [victimLocation, setVictimLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [alertStatus, setAlertStatus] = useState<string>('active');
   const [distance, setDistance] = useState(0);
   const [eta, setEta] = useState(0);
   const [showActions, setShowActions] = useState(true);
@@ -43,6 +44,7 @@ export const ResponderNavigationScreen = () => {
       try {
         const details = await alertService.getAlertDetails(alertId);
         setVictimLocation(details.alert.location);
+        setAlertStatus(details.alert.status);
       } catch (error) {
         console.warn('Failed to load responder destination:', error);
       }
@@ -50,6 +52,35 @@ export const ResponderNavigationScreen = () => {
 
     loadAlert();
   }, [alertId]);
+
+  // Poll alert status every 3 seconds to check if it's cancelled/resolved
+  useEffect(() => {
+    if (!alertId) return;
+
+    const pollAlertStatus = async () => {
+      try {
+        const details = await alertService.getAlertDetails(alertId);
+        setAlertStatus(details.alert.status);
+        
+        // If alert is cancelled or resolved, close navigation screen
+        if (details.alert.status === 'cancelled' || details.alert.status === 'resolved') {
+          const parentNav = navigation.getParent();
+          if (parentNav) {
+            parentNav.navigate('Emergency', {
+              screen: 'EmergencyDashboard',
+            });
+          } else {
+            navigation.goBack();
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to poll alert status:', error);
+      }
+    };
+
+    const interval = setInterval(pollAlertStatus, 3000);
+    return () => clearInterval(interval);
+  }, [alertId, navigation]);
 
   useEffect(() => {
     if (currentLocation && victimLocation) {
@@ -237,6 +268,16 @@ export const ResponderNavigationScreen = () => {
         )}
       </MapView>
 
+      {/* Alert Cancelled/Resolved Banner */}
+      {(alertStatus === 'cancelled' || alertStatus === 'resolved') && (
+        <View style={styles.alertClosedBanner}>
+          <Icon name="info" size={24} color={colors.surface} />
+          <Text style={styles.alertClosedText}>
+            {alertStatus === 'cancelled' ? 'Alert was cancelled' : 'Person is safe now'}
+          </Text>
+        </View>
+      )}
+
       <View style={styles.topCard}>
         <View style={styles.distanceContainer}>
           <Text style={styles.distanceValue}>{distanceLabel}</Text>
@@ -395,6 +436,24 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
   },
   arrivalText: {
+    fontSize: fontSizes.md,
+    fontWeight: '600',
+    color: colors.surface,
+    marginLeft: spacing.sm,
+  },
+  alertClosedBanner: {
+    position: 'absolute',
+    top: 170,
+    left: spacing.lg,
+    right: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.warning,
+    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+  },
+  alertClosedText: {
     fontSize: fontSizes.md,
     fontWeight: '600',
     color: colors.surface,
