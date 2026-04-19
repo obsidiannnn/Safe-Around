@@ -75,35 +75,35 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
   };
 
   const handleRespond = async () => {
+    setIsResponding(true);
+    
     try {
-      setIsResponding(true);
       await respondToAlert(alert.id);
-      onClose();
-
-      // Try in-app navigation first
-      try {
-        const parentNavigation = (navigation as any).getParent?.();
-        if (parentNavigation?.navigate) {
-          parentNavigation.navigate('Emergency', {
-            screen: 'ResponderNavigation',
-            params: { alertId: alert.id },
-          });
-        } else {
-          (navigation as any).navigate('Emergency', {
-            screen: 'ResponderNavigation',
-            params: { alertId: alert.id },
-          });
-        }
-      } catch (navigationError) {
-        console.warn('In-app navigation failed, opening Google Maps directly:', navigationError);
-        
-        // Open Google Maps immediately without confirmation
-        await openGoogleMapsNavigation();
+    } catch (error: any) {
+      // 409 means already responded - that's okay, continue with navigation
+      const is409 = error?.response?.status === 409 || error?.status === 409;
+      if (!is409) {
+        console.warn('Error responding to alert:', error);
+        // For other errors, still try to navigate (maybe they can help anyway)
       }
-    } catch (error) {
-      console.warn('Error responding to alert:', error);
+    }
+    
+    onClose();
+
+    // Navigate to ResponderNavigation screen in Emergency tab
+    try {
+      // Get the tab navigator (parent of current navigator)
+      const tabNavigator = (navigation as any).getParent?.() || navigation;
       
-      // If API fails, open Google Maps directly
+      // Navigate to Emergency tab, then to ResponderNavigation screen
+      tabNavigator.navigate('Emergency', {
+        screen: 'ResponderNavigation',
+        params: { alertId: alert.id },
+      });
+    } catch (navigationError) {
+      console.warn('In-app navigation failed, opening Google Maps directly:', navigationError);
+      
+      // Open Google Maps immediately without confirmation
       await openGoogleMapsNavigation();
     } finally {
       setIsResponding(false);
