@@ -18,6 +18,7 @@ func SetupRouter(
 	heatmapHandler *handlers.HeatmapHandler,
 	wsHandler gin.HandlerFunc,
 	locationHandler *handlers.LocationHandler,
+	locationSearchHandler *handlers.LocationSearchHandler,
 	routeHandler *handlers.RouteHandler,
 	profileHandler *handlers.ProfileHandler,
 	geofencingHandler *handlers.GeofencingHandler,
@@ -96,6 +97,8 @@ func SetupRouter(
 			location.POST("", locationHandler.UpdateLocation)
 			location.GET("/me", locationHandler.GetCurrentLocation)
 			location.GET("/nearby", locationHandler.GetNearbyUsers)
+			location.GET("/search", locationSearchHandler.SearchLocation)
+			location.GET("/reverse", locationSearchHandler.ReverseGeocode)
 		}
 
 		// Safe Route Planning
