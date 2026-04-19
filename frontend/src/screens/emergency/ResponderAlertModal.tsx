@@ -95,48 +95,16 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
           });
         }
       } catch (navigationError) {
-        console.warn('In-app navigation failed, using Google Maps fallback:', navigationError);
+        console.warn('In-app navigation failed, opening Google Maps directly:', navigationError);
         
-        // Fallback to Google Maps
-        NativeAlert.alert(
-          'Opening Google Maps',
-          'In-app navigation is unavailable. Opening Google Maps for directions.',
-          [
-            {
-              text: 'OK',
-              onPress: async () => {
-                const opened = await openGoogleMapsNavigation();
-                if (!opened) {
-                  NativeAlert.alert('Navigation Error', 'Could not open Google Maps. Please navigate manually.');
-                }
-              },
-            },
-          ]
-        );
+        // Open Google Maps immediately without confirmation
+        await openGoogleMapsNavigation();
       }
     } catch (error) {
       console.warn('Error responding to alert:', error);
       
-      // If API fails, still try to help with navigation
-      NativeAlert.alert(
-        'Response Error',
-        'Could not confirm your response, but you can still navigate to help. Open Google Maps?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Open Maps',
-            onPress: async () => {
-              const opened = await openGoogleMapsNavigation();
-              if (!opened) {
-                NativeAlert.alert('Navigation Error', 'Could not open Google Maps. Please navigate manually.');
-              }
-            },
-          },
-        ]
-      );
+      // If API fails, open Google Maps directly
+      await openGoogleMapsNavigation();
     } finally {
       setIsResponding(false);
     }
