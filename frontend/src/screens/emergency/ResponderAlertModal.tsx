@@ -92,11 +92,29 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
 
     // Navigate to ResponderNavigation screen in Emergency tab
     try {
-      // Get the tab navigator (parent of current navigator)
-      const tabNavigator = (navigation as any).getParent?.() || navigation;
+      // Try to find the tab navigator by going up the navigation tree
+      let currentNav: any = navigation;
+      let tabNavigator: any = null;
       
-      // Navigate to Emergency tab, then to ResponderNavigation screen
-      tabNavigator.navigate('Emergency', {
+      // Go up the navigation tree to find the tab navigator
+      for (let i = 0; i < 5; i++) {
+        const parent = currentNav.getParent?.();
+        if (!parent) break;
+        
+        // Check if this navigator has the Emergency route
+        const state = parent.getState?.();
+        if (state?.routes?.some((route: any) => route.name === 'Emergency')) {
+          tabNavigator = parent;
+          break;
+        }
+        
+        currentNav = parent;
+      }
+      
+      // Use the tab navigator if found, otherwise use current navigation
+      const targetNavigator = tabNavigator || navigation;
+      
+      targetNavigator.navigate('Emergency', {
         screen: 'ResponderNavigation',
         params: { alertId: alert.id },
       });
