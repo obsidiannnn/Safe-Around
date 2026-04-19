@@ -34,9 +34,9 @@ COPY --from=builder /app/safearound-api .
 
 USER safearound
 
-EXPOSE 8080
+EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:8080/health/ping || exit 1
+    CMD curl -f http://localhost:8000/health/ping || exit 1
 
 CMD ["./safearound-api"]
