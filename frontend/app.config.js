@@ -8,7 +8,7 @@ const resolveOptionalEnv = (...values) => {
 };
 
 const googleMapsApiKey = resolveOptionalEnv(process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY);
-const easProjectId = resolveOptionalEnv(process.env.EXPO_PUBLIC_EAS_PROJECT_ID, process.env.EAS_PROJECT_ID);
+const easProjectId = '7ce2c65d-8aab-4188-8404-183e8c7f2317';
 
 module.exports = () => ({
   expo: {
@@ -77,7 +77,9 @@ module.exports = () => ({
       'expo-av',
     ],
     extra: {
-      eas: easProjectId ? { projectId: easProjectId } : undefined,
+      eas: {
+        projectId: '7ce2c65d-8aab-4188-8404-183e8c7f2317',
+      },
     },
   },
 });

@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 16.0.0"
+    "version": ">= 16.0.0",
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -12,11 +13,25 @@
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_EAS_PROJECT_ID": "7ce2c65d-8aab-4188-8404-183e8c7f2317",
+        "EAS_PROJECT_ID": "7ce2c65d-8aab-4188-8404-183e8c7f2317",
+        "EXPO_PUBLIC_API_URL": "https://safearound-backend-production.up.railway.app/api/v1",
+        "EXPO_PUBLIC_WS_URL": "wss://safearound-backend-production.up.railway.app",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyBfi1CO-cAF0aJBxktzJLQYwq2IuzqXVMY"
+      },
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
+      "env": {
+        "EXPO_PUBLIC_EAS_PROJECT_ID": "7ce2c65d-8aab-4188-8404-183e8c7f2317",
+        "EAS_PROJECT_ID": "7ce2c65d-8aab-4188-8404-183e8c7f2317",
+        "EXPO_PUBLIC_API_URL": "https://safearound-backend-production.up.railway.app/api/v1",
+        "EXPO_PUBLIC_WS_URL": "wss://safearound-backend-production.up.railway.app",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyBfi1CO-cAF0aJBxktzJLQYwq2IuzqXVMY"
+      },
       "android": {
         "buildType": "apk"
       }
