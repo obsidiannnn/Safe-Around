@@ -1,15 +1,3 @@
-const resolveOptionalEnv = (...values) => {
-  const resolved = values.find((value) => typeof value === 'string' && value.trim() !== '');
-  if (!resolved) {
-    return undefined;
-  }
-
-  return /^your[-_]/i.test(resolved) ? undefined : resolved;
-};
-
-const googleMapsApiKey = resolveOptionalEnv(process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY);
-const easProjectId = resolveOptionalEnv(process.env.EXPO_PUBLIC_EAS_PROJECT_ID, process.env.EAS_PROJECT_ID);
-
 module.exports = () => ({
   expo: {
     name: 'SafeAround',
@@ -19,30 +7,13 @@ module.exports = () => ({
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
     splash: {
-      image: './assets/splash-blank.png',
+      image: './assets/icon.png',
       resizeMode: 'contain',
       backgroundColor: '#F2F6FF',
     },
     ios: {
       supportsTablet: false,
       bundleIdentifier: 'com.safearound.app',
-      infoPlist: {
-        NSLocationWhenInUseUsageDescription:
-          'SafeAround needs your location to show nearby safe zones and alert your emergency contacts.',
-        NSLocationAlwaysAndWhenInUseUsageDescription:
-          'SafeAround needs background location access to provide continuous safety monitoring.',
-        NSLocationAlwaysUsageDescription:
-          'SafeAround needs background location access to provide continuous safety monitoring and geofencing alerts.',
-        NSMotionUsageDescription:
-          'SafeAround uses motion detection for shake-to-alert emergency feature.',
-        NSCameraUsageDescription:
-          'SafeAround needs camera access to capture emergency photos.',
-        NSMicrophoneUsageDescription:
-          'SafeAround needs microphone access to record emergency audio.',
-        UIBackgroundModes: ['location', 'fetch'],
-      },
-
-      config: googleMapsApiKey ? { googleMapsApiKey } : undefined,
     },
     android: {
       package: 'com.safearound.app',
@@ -59,8 +30,6 @@ module.exports = () => ({
         'VIBRATE',
         'POST_NOTIFICATIONS',
       ],
-
-      config: googleMapsApiKey ? { googleMaps: { apiKey: googleMapsApiKey } } : undefined,
     },
     web: {
       favicon: './assets/favicon.png',
