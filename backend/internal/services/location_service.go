@@ -192,7 +192,12 @@ func (ls *LocationService) GetNearbyUserLocations(lat, lng float64, radius int, 
 	`
 
 	var users []NearbyUserLocation
+	fmt.Printf("DEBUG: GetNearbyUserLocations - excludeUserID: %d, lat: %f, lng: %f, radius: %d\n", excludeUserID, lat, lng, radius)
 	err := ls.db.Raw(query, excludeUserID, lng, lat, radius, lng, lat).Scan(&users).Error
+	fmt.Printf("DEBUG: Query returned %d users\n", len(users))
+	for i, user := range users {
+		fmt.Printf("DEBUG: User %d - ID: %d\n", i, user.UserID)
+	}
 	if err == nil {
 		ls.cacheNearbyUsers(cacheKey, users)
 	}
