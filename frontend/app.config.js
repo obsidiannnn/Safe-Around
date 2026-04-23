@@ -41,18 +41,12 @@ module.exports = () => ({
           'SafeAround needs microphone access to record emergency audio.',
         UIBackgroundModes: ['location', 'fetch'],
       },
-      minimumOsVersion: '13.0',
+
       config: googleMapsApiKey ? { googleMapsApiKey } : undefined,
     },
     android: {
       package: 'com.safearound.app',
       googleServicesFile: './google-services.json',
-      adaptiveIcon: {
-        backgroundColor: '#D32F2F',
-        foregroundImage: './assets/android-icon-foreground.png',
-        backgroundImage: './assets/android-icon-background.png',
-        monochromeImage: './assets/android-icon-monochrome.png',
-      },
       permissions: [
         'ACCESS_FINE_LOCATION',
         'ACCESS_COARSE_LOCATION',
@@ -65,7 +59,7 @@ module.exports = () => ({
         'VIBRATE',
         'POST_NOTIFICATIONS',
       ],
-      minSdkVersion: 24,
+
       config: googleMapsApiKey ? { googleMaps: { apiKey: googleMapsApiKey } } : undefined,
     },
     web: {
@@ -75,6 +69,7 @@ module.exports = () => ({
       'expo-location',
       'expo-notifications',
       'expo-camera',
+      'expo-font',
     ],
     extra: {
       eas: {
