@@ -13,7 +13,7 @@ const easProjectId = resolveOptionalEnv(process.env.EXPO_PUBLIC_EAS_PROJECT_ID, 
 module.exports = () => ({
   expo: {
     name: 'SafeAround',
-    slug: 'safearound-mobile',
+    slug: 'safearound',
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/icon.png',
