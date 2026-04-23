@@ -2,19 +2,14 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 const getDevHost = () => {
-  // If running via Expo Go, dynamically get the host machine's LAN IP
   const debuggerHost = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost || Constants.manifest2?.extra?.expoGo?.debuggerHost;
   if (debuggerHost) {
-    return debuggerHost.split(':')[0]; // Extracts '10.110.153.103'
+    return debuggerHost.split(':')[0];
   }
-  
-  // Try to extract from process.env.API_URL if available
   if (process.env.API_URL) {
     const match = process.env.API_URL.match(/http:\/\/([^:/]+)/);
     if (match) return match[1];
   }
-  
-  // Fallbacks for simulators
   if (Platform.OS === 'android') {
     return '10.0.2.2';
   }
@@ -23,8 +18,8 @@ const getDevHost = () => {
 
 const devHost = getDevHost();
 
-// Use __DEV__ (set by Metro bundler) rather than NODE_ENV for reliable dev vs prod detection in React Native.
 const IS_DEV = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production';
+
 const normalizeOptionalConfig = (value?: string) => {
   if (!value || /^your[-_]/i.test(value)) {
     return '';
@@ -32,15 +27,20 @@ const normalizeOptionalConfig = (value?: string) => {
   return value;
 };
 
+// API_URL and WS_URL come from .env files via EXPO_PUBLIC_ prefix
+// .env.development and .env.production both have these set to Railway URL
+const API_URL_FROM_ENV = process.env.EXPO_PUBLIC_API_URL || process.env.API_URL || '';
+const WS_URL_FROM_ENV = process.env.EXPO_PUBLIC_WS_URL || process.env.WS_URL || '';
+
 const config = {
   dev: {
-    API_URL: `http://${devHost}:8000/api/v1`,
-    WEBSOCKET_URL: `ws://${devHost}:8000`,
+    API_URL: API_URL_FROM_ENV || `http://${devHost}:8000/api/v1`,
+    WEBSOCKET_URL: WS_URL_FROM_ENV || `ws://${devHost}:8000`,
     GOOGLE_MAPS_API_KEY: normalizeOptionalConfig(process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY),
   },
   prod: {
-    API_URL: 'https://api.safearound.app/api/v1',
-    WEBSOCKET_URL: 'wss://ws.safearound.app',
+    API_URL: API_URL_FROM_ENV || 'https://safearound-backend-production.up.railway.app/api/v1',
+    WEBSOCKET_URL: WS_URL_FROM_ENV || 'wss://safearound-backend-production.up.railway.app',
     GOOGLE_MAPS_API_KEY: normalizeOptionalConfig(process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY),
   },
 };
