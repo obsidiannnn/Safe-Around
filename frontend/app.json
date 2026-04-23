@@ -1,6 +1,11 @@
 {
   "expo": {
     "name": "SafeAround",
-    "slug": "safearound-mobile"
+    "slug": "safearound-mobile",
+    "extra": {
+      "eas": {
+        "projectId": "458c9584-66b8-4c8c-8e51-b4c7d98f91b0"
+      }
+    }
   }
 }

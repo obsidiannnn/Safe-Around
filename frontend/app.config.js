@@ -46,6 +46,7 @@ module.exports = () => ({
     },
     android: {
       package: 'com.safearound.app',
+      googleServicesFile: './google-services.json',
       adaptiveIcon: {
         backgroundColor: '#D32F2F',
         foregroundImage: './assets/android-icon-foreground.png',
@@ -77,7 +78,9 @@ module.exports = () => ({
       'expo-av',
     ],
     extra: {
-      eas: easProjectId ? { projectId: easProjectId } : undefined,
+      eas: {
+        projectId: '7ce2c65d-8aab-4188-8404-183e8c7f2317',
+      },
     },
   },
 });
