@@ -75,7 +75,6 @@ module.exports = () => ({
       'expo-location',
       'expo-notifications',
       'expo-camera',
-      'expo-av',
     ],
     extra: {
       eas: {

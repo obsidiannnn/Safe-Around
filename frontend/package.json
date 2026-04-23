@@ -20,7 +20,6 @@
     "axios": "^1.6.0",
     "date-fns": "^3.0.0",
     "expo": "~54.0.33",
-    "expo-av": "~16.0.0",
     "expo-background-fetch": "~14.0.9",
     "expo-camera": "~17.0.10",
     "expo-device": "~8.0.10",
