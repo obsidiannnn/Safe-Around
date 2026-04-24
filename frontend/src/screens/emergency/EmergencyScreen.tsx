@@ -18,9 +18,14 @@ import { fontSizes } from '@/theme/typography';
  */
 export const EmergencyScreen = () => {
   const navigation = useNavigation();
-  const { isAlertActive, alertHistory } = useAlertStore();
+  const { isAlertActive, activeAlert, alertHistory } = useAlertStore();
   const { emergencyContacts } = useUserStore();
   const [showTriggerModal, setShowTriggerModal] = useState(false);
+
+  // Check if alert is truly active (not resolved or cancelled)
+  const isTrulyActive = isAlertActive && activeAlert && 
+    activeAlert.status !== 'resolved' && 
+    activeAlert.status !== 'cancelled';
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -30,7 +35,7 @@ export const EmergencyScreen = () => {
         <Text style={styles.subtitle}>Quick access to safety features</Text>
       </View>
 
-        {isAlertActive && (
+        {isTrulyActive && (
         <Card variant="elevated" padding="lg" style={styles.activeAlertCard}>
           <View style={styles.activeAlertHeader}>
             <Icon name="warning" size={32} color={colors.error} />
@@ -66,7 +71,7 @@ export const EmergencyScreen = () => {
           fullWidth
           icon="warning"
           onPress={() => setShowTriggerModal(true)}
-          disabled={isAlertActive}
+          disabled={isTrulyActive}
         >
           Trigger Emergency Alert
         </Button>

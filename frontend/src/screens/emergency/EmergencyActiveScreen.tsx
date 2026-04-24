@@ -229,12 +229,22 @@ export const EmergencyActiveScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView 
         style={styles.fullScrollView}
-        contentContainerStyle={styles.fullScrollContent}
+        contentContainerStyle={[
+          styles.fullScrollContent,
+          { paddingBottom: 120 + Math.max(insets.bottom, spacing.lg) }
+        ]}
         showsVerticalScrollIndicator={false}
         bounces={true}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadAlertDetails(true)}
+            tintColor={colors.surface}
+          />
+        }
       >
         <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.lg) }]}>
           <View style={styles.headerTopRow}>
@@ -444,7 +454,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     padding: spacing.xl,
-    paddingBottom: spacing['3xl'],
   },
   scroll: {
     flex: 1,
@@ -580,11 +589,20 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   actions: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
   },
   actionRow: {
     flexDirection: 'row',
@@ -593,10 +611,10 @@ const styles = StyleSheet.create({
   safeButton: {
     backgroundColor: colors.success,
     flex: 1,
-    minHeight: 48,
+    minHeight: 52,
   },
   cancelButton: {
     flex: 1,
-    minHeight: 48,
+    minHeight: 52,
   },
 });
