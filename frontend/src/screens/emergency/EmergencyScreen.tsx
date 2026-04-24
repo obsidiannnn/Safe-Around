@@ -23,9 +23,12 @@ export const EmergencyScreen = () => {
   const [showTriggerModal, setShowTriggerModal] = useState(false);
 
   // Check if alert is truly active (not resolved or cancelled)
-  const isTrulyActive = isAlertActive && activeAlert && 
-    activeAlert.status !== 'resolved' && 
-    activeAlert.status !== 'cancelled';
+  const isTrulyActive = Boolean(
+    isAlertActive &&
+    activeAlert &&
+    activeAlert.status !== 'resolved' &&
+    activeAlert.status !== 'cancelled'
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -218,4 +221,3 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
 });
-

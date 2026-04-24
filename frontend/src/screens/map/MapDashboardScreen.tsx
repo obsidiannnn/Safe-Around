@@ -23,20 +23,15 @@ import { heatmapService } from '@/services/api/heatmapService';
 import { DangerZone } from '@/types/models';
 import { colors } from '@/theme/colors';
 import { spacing, borderRadius, shadows } from '@/theme/spacing';
-import { useIsFocused, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import CrimeHeatmapOverlay from '@/components/map/CrimeHeatmapOverlay';
 import { useAlertStore } from '@/store/alertStore';
-import { useSettingsStore } from '@/store/settingsStore';
-import { Alert } from '@/types/models';
-import { VolunteerRouteOverlay } from '@/components/map/VolunteerRouteOverlay';
 import { EmergencyTriggerModal } from '@/screens/emergency/EmergencyTriggerModal';
-import { ResponderAlertModal } from '@/screens/emergency/ResponderAlertModal';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 
 export const MapDashboardScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const isFocused = useIsFocused();
   const mapRef = useRef<MapView>(null);
   const areaStatsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAreaStatsCenterRef = useRef<{ latitude: number; longitude: number } | null>(null);
@@ -59,11 +54,6 @@ export const MapDashboardScreen = () => {
   const [showDangerAlert, setShowDangerAlert] = useState(false);
   const [liveNearbyUsers, setLiveNearbyUsers] = useState(0);
   const [selectedPlace, setSelectedPlace] = useState<{ name: string; location: { latitude: number; longitude: number } } | null>(null);
-  const [activeVictimLocation, setActiveVictimLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [activeVictimAlertId, setActiveVictimAlertId] = useState<string | null>(null);
-  const [showResponderModal, setShowResponderModal] = useState(false);
-  const [responderAlert, setResponderAlert] = useState<Alert | null>(null);
-  const [responderDistance, setResponderDistance] = useState(0);
   const [mapBounds, setMapBounds] = useState({
     north: 0,
     south: 0,
@@ -71,8 +61,7 @@ export const MapDashboardScreen = () => {
     west: 0,
   });
 
-  const { createAlert, respondToAlert, activeAlert, respondersCount } = useAlertStore();
-  const { priorityAlerts } = useSettingsStore();
+  const { createAlert } = useAlertStore();
 
   const openEmergencyActiveScreen = useCallback(() => {
     (navigation.getParent() as any)?.navigate('Emergency', { screen: 'EmergencyActive' });
@@ -141,53 +130,6 @@ export const MapDashboardScreen = () => {
       setHeatmapKey(prev => prev + 1);
     };
 
-    const handleEmergencyAlert = (data: any) => {
-      if (!isFocused) return;
-      if (!priorityAlerts) return;
-
-      const authUserId = String(useAuthStore.getState().user?.id ?? '');
-      const sourceUserId = String(data.user?.user_id ?? '');
-      const recipientIds = Array.isArray(data.recipient_user_ids)
-        ? data.recipient_user_ids.map((id: unknown) => String(id))
-        : [];
-      const liveAlert = useAlertStore.getState().activeAlert;
-
-      if (sourceUserId === authUserId) return;
-      if (recipientIds.length > 0 && !recipientIds.includes(authUserId)) return;
-      if (liveAlert?.id === data.alert_id || useAlertStore.getState().isAlertActive) return;
-
-      // Create Alert object for ResponderAlertModal
-      const alertData: Alert = {
-        id: String(data.alert_id),
-        userId: sourceUserId,
-        type: 'panic',
-        location: {
-          latitude: data.location.latitude,
-          longitude: data.location.longitude,
-        },
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        usersNotified: data.users_notified || 0,
-      };
-
-      // Calculate distance if current location is available
-      let distance = 0;
-      if (currentLocation) {
-        const distanceMeters = getDistanceMeters(
-          currentLocation,
-          { latitude: data.location.latitude, longitude: data.location.longitude }
-        );
-        distance = Math.round(distanceMeters);
-      }
-
-      // Set state for ResponderAlertModal
-      setResponderAlert(alertData);
-      setResponderDistance(distance);
-      setActiveVictimLocation(data.location);
-      setActiveVictimAlertId(String(data.alert_id));
-      setShowResponderModal(true);
-    };
-
     const handleResponderAccepted = (data: any) => {
       const authUserId = String(useAuthStore.getState().user?.id ?? '');
       const liveAlert = useAlertStore.getState().activeAlert;
@@ -206,63 +148,14 @@ export const MapDashboardScreen = () => {
       );
     };
 
-    const handleRoomClosed = (data: any) => {
-      const roomId = String(data?.room_id ?? '');
-      const reason = String(data?.reason ?? 'closed');
-      
-      if (!roomId) {
-        return;
-      }
-
-      if (activeVictimAlertId && roomId === `alert_${activeVictimAlertId}`) {
-        // Close the responder modal first
-        setShowResponderModal(false);
-        
-        // Show professional message based on reason
-        const message = reason === 'resolved' || reason === 'safe'
-          ? 'The person is safe now. Thank you for your willingness to help!'
-          : reason === 'cancelled'
-          ? 'The emergency alert has been cancelled.'
-          : 'The emergency alert has been closed.';
-        
-        NativeAlert.alert(
-          'Alert Closed',
-          message,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                setActiveVictimLocation(null);
-                setActiveVictimAlertId(null);
-                setResponderAlert(null);
-              }
-            }
-          ]
-        );
-      }
-    };
-
     CrimeWebSocketService.on('crime_added', handleNewCrime);
-    CrimeWebSocketService.on('emergency_alert', handleEmergencyAlert);
     CrimeWebSocketService.on('responder_accepted', handleResponderAccepted);
-    CrimeWebSocketService.on('room_closed', handleRoomClosed);
 
     return () => {
       CrimeWebSocketService.off('crime_added', handleNewCrime);
-      CrimeWebSocketService.off('emergency_alert', handleEmergencyAlert);
       CrimeWebSocketService.off('responder_accepted', handleResponderAccepted);
-      CrimeWebSocketService.off('room_closed', handleRoomClosed);
     };
-  }, [activeVictimAlertId, isFocused, navigation, priorityAlerts, respondToAlert]);
-
-  useEffect(() => {
-    if (!activeAlert) {
-      setActiveVictimLocation(null);
-      setActiveVictimAlertId(null);
-      setShowResponderModal(false);
-      setResponderAlert(null);
-    }
-  }, [activeAlert]);
+  }, []);
 
   const fetchAreaStats = useCallback(async (lat: number, lng: number) => {
     try {
@@ -380,13 +273,6 @@ export const MapDashboardScreen = () => {
           </>
         )}
 
-        {currentLocation && activeVictimLocation && (
-          <VolunteerRouteOverlay
-            origin={currentLocation}
-            destination={activeVictimLocation}
-          />
-        )}
-
         {dangerZones.map((zone) => (
           <DangerZoneMarker
             key={zone.id}
@@ -436,7 +322,7 @@ export const MapDashboardScreen = () => {
             1000
           );
         }}
-        style={showEmergencyModal || showResponderModal ? { display: 'none' } : undefined}
+        style={showEmergencyModal ? { display: 'none' } : undefined}
       />
 
       {currentLocation && (
@@ -549,22 +435,6 @@ export const MapDashboardScreen = () => {
             navigation.navigate('SafeRoute' as never);
           }}
         />
-      )}
-
-      {responderAlert && (
-        <View pointerEvents="box-none" style={styles.modalOverlay}>
-          <ResponderAlertModal
-            visible={showResponderModal}
-            onClose={() => {
-              setShowResponderModal(false);
-              setResponderAlert(null);
-              setActiveVictimLocation(null);
-              setActiveVictimAlertId(null);
-            }}
-            alert={responderAlert}
-            distance={responderDistance}
-          />
-        </View>
       )}
     </View>
   );

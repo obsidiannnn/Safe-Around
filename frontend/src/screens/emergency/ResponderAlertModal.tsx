@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Dimensions, Alert as NativeAlert, ScrollView, Linking, Platform, Pressable } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
@@ -39,6 +39,8 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
   const insets = useSafeAreaInsets();
   const [showDeclineReasons, setShowDeclineReasons] = useState(false);
   const [isResponding, setIsResponding] = useState(false);
+  const [hasAccepted, setHasAccepted] = useState(false);
+  const [hasArrived, setHasArrived] = useState(false);
 
   const declineReasons = [
     { id: 'too-far', label: 'Too far away', icon: 'location-off' },
@@ -46,6 +48,15 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
     { id: 'busy', label: 'Currently busy', icon: 'schedule' },
     { id: 'other', label: 'Other reason', icon: 'more-horiz' },
   ];
+
+  useEffect(() => {
+    if (visible) {
+      setShowDeclineReasons(false);
+      setIsResponding(false);
+      setHasAccepted(false);
+      setHasArrived(false);
+    }
+  }, [alert.id, visible]);
 
   const openGoogleMapsNavigation = async (): Promise<boolean> => {
     const origin = currentLocation 
@@ -76,28 +87,51 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
 
   const handleRespond = async () => {
     setIsResponding(true);
-    
+    let accepted = false;
+
     try {
       await respondToAlert(alert.id);
+      accepted = true;
     } catch (error: any) {
       const is409 = error?.response?.status === 409 || error?.status === 409;
-      if (!is409) {
+      if (is409) {
+        accepted = true;
+      } else {
         console.warn('Error responding to alert:', error);
       }
     }
-    
-    // Open Google Maps immediately
-    const opened = await openGoogleMapsNavigation();
-    
-    if (!opened) {
+
+    if (accepted) {
+      setHasAccepted(true);
+      setShowDeclineReasons(false);
+
+      const opened = await openGoogleMapsNavigation();
+      if (!opened) {
+        NativeAlert.alert(
+          'Navigation Error',
+          'Could not open Google Maps. Please navigate manually.',
+          [{ text: 'OK' }]
+        );
+      }
+    } else {
       NativeAlert.alert(
-        'Navigation Error',
-        'Could not open Google Maps. Please navigate manually.',
+        'Could not respond',
+        'We could not accept this alert right now. Please try again.',
         [{ text: 'OK' }]
       );
     }
-    
+
     setIsResponding(false);
+  };
+
+  const handleArrived = () => {
+    setHasArrived(true);
+  };
+
+  const handleHelpCompleted = () => {
+    setHasArrived(false);
+    setHasAccepted(false);
+    setShowDeclineReasons(false);
     onClose();
   };
 
@@ -203,31 +237,72 @@ export const ResponderAlertModal: React.FC<ResponderAlertModalProps> = ({
           </View>
 
           <View style={styles.actions}>
-            <Button
-              variant="primary"
-              size="large"
-              fullWidth
-              onPress={handleRespond}
-              loading={isResponding}
-              disabled={isResponding}
-              icon="directions-run"
-              style={[styles.actionButton, { backgroundColor: colors.success }]}
-            >
-              I'm On My Way
-            </Button>
+            {hasAccepted ? (
+              <>
+                <View style={styles.acceptedStateCard}>
+                  <Icon name={hasArrived ? 'verified-user' : 'directions-run'} size={20} color={colors.success} />
+                  <View style={styles.acceptedStateTextWrap}>
+                    <Text style={styles.acceptedStateTitle}>
+                      {hasArrived ? 'You have arrived' : 'You are responding'}
+                    </Text>
+                    <Text style={styles.acceptedStateText}>
+                      {hasArrived
+                        ? 'Stay with the person until the situation is safe, then close this response.'
+                        : 'Navigation has started. Once you reach the person, mark yourself as arrived.'}
+                    </Text>
+                  </View>
+                </View>
 
-            <Button
-              variant="outline"
-              size="medium"
-              fullWidth
-              onPress={() => setShowDeclineReasons((value) => !value)}
-              disabled={isResponding}
-            >
-              {showDeclineReasons ? 'Hide options' : 'Decline'}
-            </Button>
+                <Button
+                  variant="outline"
+                  size="medium"
+                  fullWidth
+                  onPress={openGoogleMapsNavigation}
+                  icon="navigation"
+                >
+                  Open Navigation Again
+                </Button>
+
+                <Button
+                  variant="primary"
+                  size="large"
+                  fullWidth
+                  onPress={hasArrived ? handleHelpCompleted : handleArrived}
+                  icon={hasArrived ? 'check-circle' : 'place'}
+                  style={[styles.actionButton, { backgroundColor: colors.success }]}
+                >
+                  {hasArrived ? 'Help Completed' : "I've Arrived"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="primary"
+                  size="large"
+                  fullWidth
+                  onPress={handleRespond}
+                  loading={isResponding}
+                  disabled={isResponding}
+                  icon="directions-run"
+                  style={[styles.actionButton, { backgroundColor: colors.success }]}
+                >
+                  I'm On My Way
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="medium"
+                  fullWidth
+                  onPress={() => setShowDeclineReasons((value) => !value)}
+                  disabled={isResponding}
+                >
+                  {showDeclineReasons ? 'Hide options' : 'Decline'}
+                </Button>
+              </>
+            )}
           </View>
 
-          {showDeclineReasons ? (
+          {!hasAccepted && showDeclineReasons ? (
             <View style={styles.inlineReasonsCard}>
               <View style={styles.inlineReasonsHeader}>
                 <Text style={styles.inlineReasonsTitle}>Why can&apos;t you respond?</Text>
@@ -400,6 +475,30 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     marginBottom: spacing.sm,
+  },
+  acceptedStateCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  acceptedStateTextWrap: {
+    flex: 1,
+  },
+  acceptedStateTitle: {
+    fontSize: fontSizes.md,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  acceptedStateText: {
+    fontSize: fontSizes.sm,
+    color: colors.textSecondary,
+    lineHeight: 20,
   },
   inlineReasonsCard: {
     marginTop: spacing.lg,

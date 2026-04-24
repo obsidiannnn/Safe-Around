@@ -34,6 +34,7 @@ export const ResponderNavigationScreen = () => {
   const [eta, setEta] = useState(0);
   const [showActions, setShowActions] = useState(true);
   const [hasArrived, setHasArrived] = useState(false);
+  const [arrivalConfirmed, setArrivalConfirmed] = useState(false);
   const [isUsingGoogleRoute, setIsUsingGoogleRoute] = useState(Boolean(GOOGLE_MAPS_API_KEY));
   const [routeError, setRouteError] = useState<string | null>(null);
 
@@ -156,7 +157,7 @@ export const ResponderNavigationScreen = () => {
     console.warn('Google route unavailable for responder navigation:', errorMessage);
   }, []);
 
-  const handleConfirmArrival = () => {
+  const handleFinishHelping = () => {
     setShowActions(false);
     
     // Navigate back to Emergency tab's dashboard
@@ -171,11 +172,8 @@ export const ResponderNavigationScreen = () => {
     }
   };
 
-  const handleCancelResponse = () => {
-    NativeAlert.alert('Cancel response', 'If you can no longer help, please contact the requester or emergency services directly.', [
-      { text: 'Keep Helping', style: 'cancel' },
-      { text: 'Leave Response', style: 'destructive', onPress: () => navigation.goBack() },
-    ]);
+  const handleConfirmArrival = () => {
+    setArrivalConfirmed(true);
   };
 
   const handleOpenGoogleMaps = useCallback(async () => {
@@ -301,7 +299,9 @@ export const ResponderNavigationScreen = () => {
       {hasArrived && (
         <View style={styles.arrivalBanner}>
           <Icon name="place" size={24} color={colors.success} />
-          <Text style={styles.arrivalText}>You're very close!</Text>
+          <Text style={styles.arrivalText}>
+            {arrivalConfirmed ? 'Support in progress. Close once help is complete.' : "You're very close!"}
+          </Text>
         </View>
       )}
 
@@ -314,16 +314,38 @@ export const ResponderNavigationScreen = () => {
         <View style={styles.actionsContainer}>
           <Text style={styles.actionsTitle}>Quick Actions</Text>
 
-          {hasArrived ? (
+          {arrivalConfirmed ? (
+            <>
+              <View style={styles.helperStatusCard}>
+                <Icon name="verified-user" size={22} color={colors.success} />
+                <View style={styles.helperStatusTextContainer}>
+                  <Text style={styles.helperStatusTitle}>You have arrived</Text>
+                  <Text style={styles.helperStatusText}>
+                    Stay with the person and close this response once the situation is handled safely.
+                  </Text>
+                </View>
+              </View>
+              <Button
+                variant="primary"
+                size="large"
+                fullWidth
+                icon="check-circle"
+                onPress={handleFinishHelping}
+                style={[styles.actionButton, { backgroundColor: colors.success }]}
+              >
+                Help Completed
+              </Button>
+            </>
+          ) : hasArrived ? (
             <Button
               variant="primary"
               size="large"
               fullWidth
-              icon="check-circle"
+              icon="place"
               onPress={handleConfirmArrival}
               style={[styles.actionButton, { backgroundColor: colors.success }]}
             >
-              Confirm Arrival
+              I've Arrived
             </Button>
           ) : (
             <>
@@ -360,15 +382,6 @@ export const ResponderNavigationScreen = () => {
               </Button>
             </>
           )}
-
-          <Button
-            variant="ghost"
-            size="medium"
-            fullWidth
-            onPress={handleCancelResponse}
-          >
-            Cancel Response
-          </Button>
         </View>
       </BottomSheet>
     </View>
@@ -497,6 +510,29 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: spacing.lg,
     textAlign: 'center',
+  },
+  helperStatusCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  helperStatusTextContainer: {
+    flex: 1,
+  },
+  helperStatusTitle: {
+    fontSize: fontSizes.md,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  helperStatusText: {
+    fontSize: fontSizes.sm,
+    color: colors.textSecondary,
+    lineHeight: 20,
   },
   actionRow: {
     flexDirection: 'row',
