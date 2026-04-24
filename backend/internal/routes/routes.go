@@ -46,9 +46,9 @@ func SetupRouter(
 	// WebSockets Upgrade Endpoint
 	r.GET("/ws/crime", wsHandler)
 
-	// API Endpoints - applying global rate limit of 100 requests / minute initially
+	// API Endpoints - applying global rate limit of 1000 requests / minute for development
 	api := r.Group("/api/v1")
-	api.Use(middleware.RateLimit(rdb, 100, 60*time.Second))
+	api.Use(middleware.RateLimit(rdb, 1000, 60*time.Second))
 	{
 		SetupAuthRoutes(api, authHandler)
 
