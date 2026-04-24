@@ -234,7 +234,7 @@ export const EmergencyActiveScreen = () => {
         style={styles.fullScrollView}
         contentContainerStyle={[
           styles.fullScrollContent,
-          { paddingBottom: 120 + Math.max(insets.bottom, spacing.lg) }
+          { paddingBottom: 160 }
         ]}
         showsVerticalScrollIndicator={false}
         bounces={true}
