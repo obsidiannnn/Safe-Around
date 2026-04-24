@@ -436,6 +436,7 @@ export const MapDashboardScreen = () => {
             1000
           );
         }}
+        style={showEmergencyModal || showResponderModal ? { display: 'none' } : undefined}
       />
 
       {currentLocation && (

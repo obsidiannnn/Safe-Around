@@ -24,9 +24,10 @@ interface MapSearchBarProps {
     latitude: number;
     longitude: number;
   };
+  style?: any;
 }
 
-export const MapSearchBar: React.FC<MapSearchBarProps> = ({ onSelectLocation, topOffset, currentLocation }) => {
+export const MapSearchBar: React.FC<MapSearchBarProps> = ({ onSelectLocation, topOffset, currentLocation, style }) => {
   const ref = useRef<GooglePlacesAutocompleteRef>(null);
 
   const handleClear = () => {
@@ -35,7 +36,7 @@ export const MapSearchBar: React.FC<MapSearchBarProps> = ({ onSelectLocation, to
   };
 
   return (
-    <View style={[styles.container, { top: topOffset }]}>
+    <View style={[styles.container, { top: topOffset }, style]}>
       <GooglePlacesAutocomplete
         ref={ref}
         placeholder="Search for any place..."
