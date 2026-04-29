@@ -22,10 +22,9 @@ class NotificationService {
   private static instance: NotificationService;
   private token: string | null = null;
   private initialized = false;
+  private initializePromise: Promise<void> | null = null;
 
-  private constructor() {
-    void this.initialize();
-  }
+  private constructor() {}
 
   static getInstance(): NotificationService {
     if (!NotificationService.instance) {
@@ -36,10 +35,25 @@ class NotificationService {
 
   private async initialize(): Promise<void> {
     if (this.initialized) return;
-    this.initialized = true;
-    this.setNotificationHandler();
-    await this.setupNotificationCategories();
-    await this.setupNotificationChannels();
+    if (this.initializePromise) {
+      await this.initializePromise;
+      return;
+    }
+
+    this.initializePromise = (async () => {
+      this.setNotificationHandler();
+      try {
+        await this.setupNotificationCategories();
+        await this.setupNotificationChannels();
+        this.initialized = true;
+      } catch (error) {
+        console.warn('Notification runtime setup was skipped for now:', error);
+      } finally {
+        this.initializePromise = null;
+      }
+    })();
+
+    await this.initializePromise;
   }
 
   setNotificationHandler(): void {

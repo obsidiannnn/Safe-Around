@@ -1,13 +1,25 @@
 import { useEffect, useCallback } from 'react';
 import { useWebSocketStore } from '@/store/websocketStore';
-import { webSocketService } from '@/services/websocket/WebSocketService';
+import { webSocketService, ConnectionStatus } from '@/services/websocket/WebSocketService';
+import { useAuthStore } from '@/store/authStore';
 
 /**
  * Custom hook for WebSocket communication
  * Provides subscribe/unsubscribe and send functionality
  */
 export const useWebSocket = () => {
-  const { isConnected, connectionStatus, sendMessage } = useWebSocketStore();
+  const { isConnected, connectionStatus, sendMessage, connect } = useWebSocketStore();
+  const { isAuthenticated, accessToken } = useAuthStore();
+
+  useEffect(() => {
+    if (
+      isAuthenticated &&
+      accessToken &&
+      connectionStatus === ConnectionStatus.DISCONNECTED
+    ) {
+      connect(accessToken);
+    }
+  }, [accessToken, connect, connectionStatus, isAuthenticated]);
 
   const subscribe = useCallback((event: string, callback: (...args: any[]) => void) => {
     webSocketService.on(event, callback);
