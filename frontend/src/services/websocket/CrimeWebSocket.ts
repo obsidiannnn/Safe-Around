@@ -9,9 +9,23 @@ class CrimeWebSocketService {
     if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
       return;
     }
+    if (!serverUrl || !/^wss?:\/\//i.test(serverUrl)) {
+      console.warn('Crime websocket startup skipped because the URL is invalid.');
+      return;
+    }
     this.serverUrl = serverUrl;
     this.shouldReconnect = true;
-    this.socket = new WebSocket(serverUrl);
+    try {
+      this.socket = new WebSocket(serverUrl);
+    } catch (error) {
+      console.warn('Crime websocket could not be created right now; retry will happen later.', error);
+      this.socket = null;
+      if (this.shouldReconnect) {
+        if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = setTimeout(() => this.connect(this.serverUrl), 3000);
+      }
+      return;
+    }
 
     this.socket.onopen = () => {
       console.log('✅ Connected to crime updates via native WebSocket');

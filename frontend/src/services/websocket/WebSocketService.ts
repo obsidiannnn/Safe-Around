@@ -30,7 +30,9 @@ class WebSocketService {
   }
 
   connect(token: string): void {
-    if (this.socket?.connected) return;
+    if (this.socket && (this.socket.connected || this.status === ConnectionStatus.CONNECTING || this.status === ConnectionStatus.RECONNECTING)) {
+      return;
+    }
 
     this.token = token;
     this.updateStatus(ConnectionStatus.CONNECTING);
@@ -111,6 +113,7 @@ class WebSocketService {
   }
 
   private startHeartbeat(): void {
+    this.stopHeartbeat();
     this.pingInterval = setInterval(() => {
       if (this.socket?.connected) {
         this.socket.emit('ping');

@@ -23,6 +23,8 @@ interface WebSocketState {
   setLastMessage: (message: Message) => void;
 }
 
+let hasRegisteredStatusListener = false;
+
 export const useWebSocketStore = create<WebSocketState>((set, get) => ({
   isConnected: false,
   connectionStatus: ConnectionStatus.DISCONNECTED,
@@ -31,19 +33,22 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => ({
 
   connect: (token: string) => {
     webSocketService.connect(token);
-    
-    webSocketService.onStatusChange((status) => {
-      set({
-        connectionStatus: status,
-        isConnected: status === ConnectionStatus.CONNECTED,
-      });
 
-      if (status === ConnectionStatus.CONNECTED) {
-        messageQueue.processQueue((event, data) => {
-          webSocketService.emit(event, data);
+    if (!hasRegisteredStatusListener) {
+      hasRegisteredStatusListener = true;
+      webSocketService.onStatusChange((status) => {
+        set({
+          connectionStatus: status,
+          isConnected: status === ConnectionStatus.CONNECTED,
         });
-      }
-    });
+
+        if (status === ConnectionStatus.CONNECTED) {
+          messageQueue.processQueue((event, data) => {
+            webSocketService.emit(event, data);
+          });
+        }
+      });
+    }
   },
 
   disconnect: () => {

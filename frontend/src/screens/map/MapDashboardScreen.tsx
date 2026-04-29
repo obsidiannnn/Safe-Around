@@ -14,7 +14,7 @@ import { MapTypeSwitch } from '@/components/map/MapTypeSwitch';
 import { NearbyUsersLayer } from '@/components/map/NearbyUsersLayer';
 import { DangerZoneAlert } from '@/components/location/DangerZoneAlert';
 import { BackgroundLocationIndicator } from '@/components/location/BackgroundLocationIndicator';
-import { API_URL, WEBSOCKET_URL, GOOGLE_MAPS_API_KEY } from '@/config/env';
+import { API_URL, GOOGLE_MAPS_API_KEY } from '@/config/env';
 import { useMapStore } from '@/store/mapStore';
 import { useAuthStore } from '@/store/authStore';
 import { useLocation } from '@/hooks/useLocation';
@@ -82,7 +82,9 @@ export const MapDashboardScreen = () => {
   }));
 
   useEffect(() => {
-    startTracking();
+    void startTracking().catch((error) => {
+      console.warn('Map location tracking will retry after app startup settles:', error);
+    });
     const initLat = currentLocation?.latitude || 28.6139;
     const initLng = currentLocation?.longitude || 77.2090;
     scheduleAreaStatsFetch(initLat, initLng, 0);
@@ -109,8 +111,6 @@ export const MapDashboardScreen = () => {
   }, [currentLocation]);
 
   useEffect(() => {
-    CrimeWebSocketService.connect(`${WEBSOCKET_URL}/ws/crime`);
-
     const handleNewCrime = (data: any) => {
       NativeAlert.alert(
         '🚨 Crime Alert',

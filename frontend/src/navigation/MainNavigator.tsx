@@ -10,7 +10,7 @@ import { MapNavigator } from './MapNavigator';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
-import { AppState, Platform } from 'react-native';
+import { AppState, InteractionManager, Platform } from 'react-native';
 import CrimeWebSocketService from '@/services/websocket/CrimeWebSocket';
 import { WEBSOCKET_URL } from '@/config/env';
 import { useAuthStore } from '@/store/authStore';
@@ -23,6 +23,7 @@ import { ResponderAlertModal } from '@/screens/emergency/ResponderAlertModal';
 import { Alert, Location } from '@/types/models';
 import { notificationService, NotificationCategory } from '@/services/notifications/notificationService';
 import { notificationApiService } from '@/services/api/notificationService';
+import { AppPreparingScreen } from '@/components/common/AppPreparingScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -40,10 +41,36 @@ export const MainNavigator = () => {
   const pushRegistrationInFlightRef = useRef(false);
   const registeredTokenRef = useRef<string | null>(null);
   const registeredUserIdRef = useRef<string | null>(null);
+  const [servicesReady, setServicesReady] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setServicesReady(false);
+      return;
+    }
+
+    let isCancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const interactionTask = InteractionManager.runAfterInteractions(() => {
+      timer = setTimeout(() => {
+        if (!isCancelled) {
+          setServicesReady(true);
+        }
+      }, 650);
+    });
+
+    return () => {
+      isCancelled = true;
+      interactionTask.cancel();
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+  }, [isAuthenticated, user?.id]);
   
   // Global Shake Detection for Emergency SOS
   useShakeDetection({
-    enabled: shakeToSOS && !isAlertActive,
+    enabled: servicesReady && shakeToSOS && !isAlertActive,
     onShake: async () => {
       console.log('Global Shake Detected! Triggering Emergency SOS.');
       if (currentLocation) {
@@ -164,11 +191,14 @@ export const MainNavigator = () => {
   }, [isAuthenticated, user?.id]);
 
   useEffect(() => {
+    if (!servicesReady) {
+      return;
+    }
     void syncPushRegistration();
-  }, [syncPushRegistration]);
+  }, [servicesReady, syncPushRegistration]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !servicesReady) {
       return;
     }
 
@@ -180,10 +210,10 @@ export const MainNavigator = () => {
     });
 
     return () => subscription.remove();
-  }, [isAuthenticated, syncPushRegistration]);
+  }, [isAuthenticated, servicesReady, syncPushRegistration]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !servicesReady || !WEBSOCKET_URL) {
       return;
     }
 
@@ -216,10 +246,10 @@ export const MainNavigator = () => {
       CrimeWebSocketService.off('room_closed', handleRoomClosed);
       CrimeWebSocketService.disconnect();
     };
-  }, [isAuthenticated, presentIncomingAlert]);
+  }, [isAuthenticated, presentIncomingAlert, servicesReady]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !servicesReady) {
       return;
     }
 
@@ -262,13 +292,17 @@ export const MainNavigator = () => {
       foregroundSubscription.remove();
       responseSubscription.remove();
     };
-  }, [isAuthenticated, presentIncomingAlert]);
+  }, [isAuthenticated, presentIncomingAlert, servicesReady]);
 
   useEffect(() => {
     if (activeAlert) {
       setIncomingAlert(null);
     }
   }, [activeAlert]);
+
+  if (!servicesReady) {
+    return <AppPreparingScreen />;
+  }
 
   return (
     <>
