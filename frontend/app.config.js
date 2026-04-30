@@ -1,3 +1,5 @@
+const mapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+
 module.exports = () => ({
   expo: {
     name: 'SafeAround',
@@ -6,6 +8,8 @@ module.exports = () => ({
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
+    newArchEnabled: false,
+    jsEngine: 'jsc',
     splash: {
       image: './assets/icon.png',
       resizeMode: 'contain',
@@ -14,10 +18,22 @@ module.exports = () => ({
     ios: {
       supportsTablet: false,
       bundleIdentifier: 'com.safearound.app',
+      config: mapsApiKey
+        ? {
+            googleMapsApiKey: mapsApiKey,
+          }
+        : undefined,
     },
     android: {
       package: 'com.safearound.app',
       googleServicesFile: './google-services.json',
+      config: mapsApiKey
+        ? {
+            googleMaps: {
+              apiKey: mapsApiKey,
+            },
+          }
+        : undefined,
       permissions: [
         'ACCESS_FINE_LOCATION',
         'ACCESS_COARSE_LOCATION',

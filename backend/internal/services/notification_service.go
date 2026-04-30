@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/models"
+	"github.com/obsidiannnn/Safe-Around/backend/internal/utils"
 	"github.com/obsidiannnn/Safe-Around/backend/pkg/fcm"
 	"github.com/obsidiannnn/Safe-Around/backend/pkg/logger"
 	"github.com/obsidiannnn/Safe-Around/backend/pkg/twilio"
@@ -271,23 +272,37 @@ func (s *notifService) NotifyEmergencyContacts(userID uint, alert *models.Emerge
 	var user models.User
 	s.db.First(&user, userID)
 
-	msgText := fmt.Sprintf(
-		"EMERGENCY: %s has triggered an SOS alert. Location: https://maps.google.com/?q=%f,%f — Please check on them immediately.",
-		user.Name,
+	mapsURL := fmt.Sprintf(
+		"https://www.google.com/maps/search/?api=1&query=%f,%f",
 		alert.AlertLocation.Latitude,
 		alert.AlertLocation.Longitude,
 	)
+	msgText := fmt.Sprintf(
+		"%s may be in danger. Please help.\nLive Location: %s",
+		user.Name,
+		mapsURL,
+	)
 
+	seenPhones := map[string]struct{}{}
 	for _, contact := range contacts {
+		normalizedPhone := utils.NormalizePhone(contact.Phone)
+		if normalizedPhone == "" {
+			continue
+		}
+		if _, exists := seenPhones[normalizedPhone]; exists {
+			continue
+		}
+		seenPhones[normalizedPhone] = struct{}{}
+
 		// 1. Try to find a registered user with this phone number
 		var contactUser models.User
-		if err := s.db.Where("phone = ?", contact.Phone).First(&contactUser).Error; err == nil {
+		if err := s.db.Where("phone = ?", normalizedPhone).First(&contactUser).Error; err == nil {
 			// Found a registered user! Send in-app notification
 			s.queue <- &notificationTask{
 				UserID:           contactUser.ID,
 				NotificationType: "emergency_contact_alert",
-				Title:            "🚨 Emergency: " + user.Name,
-				Body:             user.Name + " is in danger! Tap to see live location.",
+				Title:            "🚨 " + user.Name + " needs help",
+				Body:             user.Name + " may be in danger. Tap to see live location and respond.",
 				Data: map[string]interface{}{
 					"alert_id":       alert.ID.String(),
 					"category":       notificationCategoryEmergencyAlert,
@@ -299,6 +314,7 @@ func (s *notifService) NotifyEmergencyContacts(userID uint, alert *models.Emerge
 					"created_at":     alert.CreatedAt.UTC().Format(time.RFC3339),
 					"victim_name":    user.Name,
 					"victim_phone":   user.Phone,
+					"maps_url":       mapsURL,
 				},
 				Priority: "critical",
 				AlertID:  &alert.ID,
@@ -310,7 +326,7 @@ func (s *notifService) NotifyEmergencyContacts(userID uint, alert *models.Emerge
 			if err := s.SendSMS(phone, msgText); err != nil {
 				logger.Warn("Emergency contact SMS/Call failed", zap.String("phone", phone), zap.Error(err))
 			}
-		}(contact.Phone)
+		}(normalizedPhone)
 	}
 	return nil
 }

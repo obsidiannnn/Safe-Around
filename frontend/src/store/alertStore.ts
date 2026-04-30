@@ -8,6 +8,8 @@ interface AlertState {
   alertHistory: Alert[];
   nearbyAlerts: Alert[];
   isAlertActive: boolean;
+  isHistoryLoading: boolean;
+  historyLoadedAt: number | null;
   currentRadius: number;
   respondersCount: number;
   setActiveAlert: (alert: Alert | null) => void;
@@ -21,7 +23,7 @@ interface AlertState {
   resolveAlert: (alertId: string) => Promise<void>;
   respondToAlert: (alertId: string) => Promise<void>;
   updateAlertStatus: (status: 'active' | 'resolved' | 'cancelled') => void;
-  fetchHistory: () => Promise<void>;
+  fetchHistory: (force?: boolean) => Promise<void>;
   fetchActiveAlerts: (location: { latitude: number; longitude: number }, radius: number) => Promise<void>;
 }
 
@@ -30,6 +32,8 @@ export const useAlertStore = create<AlertState>((set, get) => ({
   alertHistory: [],
   nearbyAlerts: [],
   isAlertActive: false,
+  isHistoryLoading: false,
+  historyLoadedAt: null,
   currentRadius: 100,
   respondersCount: 0,
 
@@ -121,12 +125,24 @@ export const useAlertStore = create<AlertState>((set, get) => ({
     }
   },
   
-  fetchHistory: async () => {
+  fetchHistory: async (force = false) => {
+    if (get().isHistoryLoading) {
+      return;
+    }
+
+    const cachedLoadedAt = get().historyLoadedAt;
+    if (!force && cachedLoadedAt && Date.now() - cachedLoadedAt < 15_000 && get().alertHistory.length > 0) {
+      return;
+    }
+
     try {
+      set({ isHistoryLoading: true });
       const history = await alertService.getAlertHistory();
-      set({ alertHistory: history });
+      set({ alertHistory: history, historyLoadedAt: Date.now() });
     } catch (error) {
       console.error('Error fetching alert history:', error);
+    } finally {
+      set({ isHistoryLoading: false });
     }
   },
 

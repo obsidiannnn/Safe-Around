@@ -44,6 +44,7 @@ export interface Alert {
   silentMode?: boolean;
   createdAt: string;
   resolvedAt?: string;
+  cancelledAt?: string;
 }
 
 export interface AlertTimelineEvent {

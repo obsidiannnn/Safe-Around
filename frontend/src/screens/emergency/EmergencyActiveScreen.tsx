@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Linking, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
@@ -24,6 +25,7 @@ const RADIUS_STEPS = [
 export const EmergencyActiveScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const scale = useSharedValue(1);
   const {
     activeAlert,
@@ -229,12 +231,12 @@ export const EmergencyActiveScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView 
         style={styles.fullScrollView}
         contentContainerStyle={[
           styles.fullScrollContent,
-          { paddingBottom: 160 }
+          { paddingBottom: tabBarHeight + Math.max(insets.bottom, spacing.xl) + spacing.xl }
         ]}
         showsVerticalScrollIndicator={false}
         bounces={true}
@@ -354,32 +356,32 @@ export const EmergencyActiveScreen = () => {
               {callButtonLabel}
             </Button>
           </View>
+
+          <View style={styles.actionsCard}>
+            <View style={styles.actionRow}>
+              <Button
+                variant="primary"
+                size="medium"
+                onPress={handleSafe}
+                icon="check-circle"
+                style={styles.safeButton}
+                disabled={loading || isCompleting || !currentAlert}
+              >
+                I'm Safe
+              </Button>
+              <Button
+                variant="outline"
+                size="medium"
+                onPress={handleCancel}
+                style={styles.cancelButton}
+                disabled={loading || isCompleting || !currentAlert}
+              >
+                Cancel SOS
+              </Button>
+            </View>
+          </View>
         </View>
       </ScrollView>
-
-      <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-        <View style={styles.actionRow}>
-          <Button
-            variant="primary"
-            size="medium"
-            onPress={handleSafe}
-            icon="check-circle"
-            style={styles.safeButton}
-            disabled={loading || isCompleting || !currentAlert}
-          >
-            I'm Safe
-          </Button>
-          <Button
-            variant="outline"
-            size="medium"
-            onPress={handleCancel}
-            style={styles.cancelButton}
-            disabled={loading || isCompleting || !currentAlert}
-          >
-            Cancel SOS
-          </Button>
-        </View>
-      </View>
     </SafeAreaView>
   );
 };
@@ -449,7 +451,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   contentSection: {
-    flex: 1,
     backgroundColor: colors.background,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
@@ -588,33 +589,29 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 20,
   },
-  actions: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  actionsCard: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.md,
     backgroundColor: colors.surface,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 8,
   },
   actionRow: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: spacing.md,
   },
   safeButton: {
     backgroundColor: colors.success,
-    flex: 1,
-    minHeight: 52,
+    minHeight: 50,
   },
   cancelButton: {
-    flex: 1,
-    minHeight: 52,
+    minHeight: 50,
   },
 });

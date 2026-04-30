@@ -1,5 +1,3 @@
-import * as TaskManager from 'expo-task-manager';
-import * as ExpoLocation from 'expo-location';
 import { DangerZone, Location } from '@/types/models';
 import { locationService } from './locationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
