@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
@@ -19,12 +19,12 @@ type FilterPeriod = '7days' | '30days' | 'all';
  */
 export const AlertHistoryScreen = () => {
   const navigation = useNavigation();
-  const { alertHistory, fetchHistory } = useAlertStore();
+  const { alertHistory, fetchHistory, isHistoryLoading, historyLoadedAt } = useAlertStore();
   const [filter, setFilter] = useState<FilterPeriod>('30days');
 
   useEffect(() => {
-    fetchHistory();
-  }, []);
+    void fetchHistory(true);
+  }, [fetchHistory]);
 
   const getStatusColor = (status: string): 'green' | 'red' | 'gray' => {
     switch (status) {
@@ -42,9 +42,10 @@ export const AlertHistoryScreen = () => {
   };
 
   const calculateDuration = (alert: Alert): string => {
-    if (!alert.resolvedAt) return 'Ongoing';
+    const endTimestamp = alert.resolvedAt ?? alert.cancelledAt;
+    if (!endTimestamp) return 'Ongoing';
     const start = new Date(alert.createdAt).getTime();
-    const end = new Date(alert.resolvedAt).getTime();
+    const end = new Date(endTimestamp).getTime();
     const duration = Math.floor((end - start) / 1000);
     const mins = Math.floor(duration / 60);
     const secs = duration % 60;
@@ -66,7 +67,7 @@ export const AlertHistoryScreen = () => {
     });
   }, [alertHistory, filter]);
 
-  const activeCount = filteredAlerts.filter((alert) => alert.status === 'active').length;
+  const activeCount = filteredAlerts.filter((alert) => ['active', 'responding'].includes(alert.status)).length;
 
   return (
     <View style={styles.container}>
@@ -107,6 +108,13 @@ export const AlertHistoryScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
+        {isHistoryLoading && !historyLoadedAt ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading your alert history...</Text>
+          </View>
+        ) : null}
+
         {filteredAlerts.map((alert) => (
           <Card
             key={alert.id}
@@ -150,7 +158,7 @@ export const AlertHistoryScreen = () => {
           </Card>
         ))}
 
-        {filteredAlerts.length === 0 && (
+        {filteredAlerts.length === 0 && !isHistoryLoading && (
           <View style={styles.emptyState}>
             <Icon name="history" size={64} color={colors.textSecondary} />
             <Text style={styles.emptyText}>No alert history</Text>
@@ -215,6 +223,16 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
+  },
+  loadingState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing['4xl'],
+  },
+  loadingText: {
+    marginTop: spacing.md,
+    fontSize: fontSizes.sm,
+    color: colors.textSecondary,
   },
   alertCard: {
     marginBottom: spacing.md,

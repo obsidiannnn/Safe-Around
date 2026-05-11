@@ -30,6 +30,11 @@ func NewHeatmapHandler(db *gorm.DB, redis *redis.Client) *HeatmapHandler {
 // GET /api/v1/heatmap/data
 // Returns crime data points for frontend heatmap
 func (h *HeatmapHandler) GetHeatmapData(c *gin.Context) {
+	if strings.EqualFold(c.DefaultQuery("scope", ""), "india") {
+		h.getIndiaHeatmapData(c)
+		return
+	}
+
 	// Parse bounds from query params
 	north := c.Query("north")
 	south := c.Query("south")
@@ -77,6 +82,92 @@ func (h *HeatmapHandler) GetHeatmapData(c *gin.Context) {
 		"data":    crimes,
 		"count":   len(crimes),
 	})
+}
+
+func (h *HeatmapHandler) getIndiaHeatmapData(c *gin.Context) {
+	zoomBucket := normalizeHeatmapZoomBucket(c.DefaultQuery("zoom_bucket", "india-medium"))
+	cacheKey := fmt.Sprintf("heatmap:data:india:%s", zoomBucket)
+	if cached, ok := h.getCachedJSON(c.Request.Context(), cacheKey); ok {
+		c.JSON(http.StatusOK, cached)
+		return
+	}
+
+	bucketSize, limit := indiaHeatmapQueryConfig(zoomBucket)
+
+	query := `
+		WITH weighted_crimes AS (
+			SELECT
+				ROUND(ST_Y(location::geometry)::numeric / ?) * ? AS latitude_bucket,
+				ROUND(ST_X(location::geometry)::numeric / ?) * ? AS longitude_bucket,
+				COUNT(*)::int AS incident_count,
+				MAX(severity)::int AS severity,
+				LEAST(
+					100.0,
+					GREATEST(
+						MAX(
+							GREATEST(
+								0.0,
+								CASE severity
+									WHEN 4 THEN 100.0
+									WHEN 3 THEN 76.0
+									WHEN 2 THEN 52.0
+									ELSE 30.0
+								END -
+								(
+									EXTRACT(EPOCH FROM (NOW() - occurred_at)) / 86400.0 *
+									CASE
+										WHEN crime_type IN ('murder', 'rape') THEN 0.08
+										WHEN crime_type IN ('robbery', 'kidnapping', 'assault') THEN 0.35
+										ELSE 1.6
+									END
+								)
+							)
+						),
+						SUM(severity * 18)::float / GREATEST(COUNT(*), 1)
+					)
+				) AS weight_pct
+			FROM crime_incidents
+			WHERE occurred_at > NOW() - INTERVAL '30 days'
+			  AND verified = true
+			  AND ST_Within(
+				location::geometry,
+				ST_MakeEnvelope(68.0, 6.0, 98.0, 38.5, 4326)
+			  )
+			GROUP BY latitude_bucket, longitude_bucket
+		)
+		SELECT
+			latitude_bucket::float AS latitude,
+			longitude_bucket::float AS longitude,
+			severity,
+			incident_count,
+			weight_pct
+		FROM weighted_crimes
+		WHERE weight_pct > 2
+		ORDER BY weight_pct DESC, incident_count DESC
+		LIMIT ?
+	`
+
+	var hotspots []map[string]interface{}
+	if err := h.db.Raw(
+		query,
+		bucketSize, bucketSize,
+		bucketSize, bucketSize,
+		limit,
+	).Scan(&hotspots).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load national heatmap data"})
+		return
+	}
+
+	payload := gin.H{
+		"success":      true,
+		"scope":        "india",
+		"zoom_bucket":  zoomBucket,
+		"generated_at": time.Now().UTC(),
+		"count":        len(hotspots),
+		"data":         hotspots,
+	}
+	h.cacheJSON(c.Request.Context(), cacheKey, payload, 10*time.Minute)
+	c.JSON(http.StatusOK, payload)
 }
 
 // GET /api/v1/heatmap/grid
@@ -330,6 +421,28 @@ func statsCacheKey(lat, lng float64) string {
 func roundCoord(value float64, decimals int) float64 {
 	pow := math.Pow10(decimals)
 	return math.Round(value*pow) / pow
+}
+
+func normalizeHeatmapZoomBucket(raw string) string {
+	switch strings.TrimSpace(strings.ToLower(raw)) {
+	case "india-low":
+		return "india-low"
+	case "india-high":
+		return "india-high"
+	default:
+		return "india-medium"
+	}
+}
+
+func indiaHeatmapQueryConfig(zoomBucket string) (bucketSize float64, limit int) {
+	switch zoomBucket {
+	case "india-low":
+		return 0.20, 1200
+	case "india-high":
+		return 0.045, 5000
+	default:
+		return 0.10, 2600
+	}
 }
 
 func (h *HeatmapHandler) getCachedJSON(ctx context.Context, cacheKey string) (gin.H, bool) {

@@ -4,12 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/obsidiannnn/Safe-Around/backend/internal/models"
+	"github.com/obsidiannnn/Safe-Around/backend/internal/utils"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -160,9 +166,10 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
 	userID := userIDVal.(uint)
 
 	var req struct {
-		Name              string `json:"name"`
-		Email             string `json:"email"`
-		ProfilePictureURL string `json:"profile_picture_url"`
+		Name                string `json:"name"`
+		Email               string `json:"email"`
+		ProfilePictureURL   string `json:"profile_picture_url"`
+		ClearProfilePicture bool   `json:"clear_profile_picture"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -176,7 +183,9 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
 	if req.Email != "" {
 		updates["email"] = req.Email
 	}
-	if req.ProfilePictureURL != "" {
+	if req.ClearProfilePicture {
+		updates["profile_picture_url"] = ""
+	} else if req.ProfilePictureURL != "" {
 		updates["profile_picture_url"] = req.ProfilePictureURL
 	}
 
@@ -195,6 +204,89 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
 	var updatedUser models.User
 	h.db.First(&updatedUser, userID)
 	c.JSON(http.StatusOK, gin.H{"message": "Profile updated", "user": updatedUser})
+}
+
+// POST /api/v1/users/profile/photo
+// Uploads and updates the authenticated user's profile photo.
+func (h *ProfileHandler) UploadProfilePhoto(c *gin.Context) {
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	userID := userIDVal.(uint)
+
+	file, header, err := c.Request.FormFile("photo")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "photo file is required"})
+		return
+	}
+	defer file.Close()
+
+	if header.Size > 5*1024*1024 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "photo must be 5MB or smaller"})
+		return
+	}
+
+	contentType := header.Header.Get("Content-Type")
+	if contentType == "" {
+		buffer := make([]byte, 512)
+		n, _ := file.Read(buffer)
+		contentType = http.DetectContentType(buffer[:n])
+		if seeker, ok := file.(io.Seeker); ok {
+			_, _ = seeker.Seek(0, io.SeekStart)
+		}
+	}
+
+	if !strings.HasPrefix(contentType, "image/") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "only image uploads are supported"})
+		return
+	}
+
+	uploadsDir := resolveProfileUploadsDir()
+	if err := os.MkdirAll(uploadsDir, 0o755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to prepare upload storage"})
+		return
+	}
+
+	extension := filepath.Ext(header.Filename)
+	if extension == "" {
+		if exts, _ := mime.ExtensionsByType(contentType); len(exts) > 0 {
+			extension = exts[0]
+		}
+	}
+	if extension == "" {
+		extension = ".jpg"
+	}
+
+	filename := fmt.Sprintf("user-%d-%d%s", userID, time.Now().UnixNano(), extension)
+	destination := filepath.Join(uploadsDir, filename)
+	if err := c.SaveUploadedFile(header, destination); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store uploaded photo"})
+		return
+	}
+
+	photoURL := buildPublicUploadURL(c, filename)
+	if err := h.db.Model(&models.User{}).
+		Where("id = ?", userID).
+		Update("profile_picture_url", photoURL).Error; err != nil {
+		_ = os.Remove(destination)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update profile photo"})
+		return
+	}
+
+	h.invalidateProfileCache(c.Request.Context(), userID)
+
+	var updatedUser models.User
+	if err := h.db.First(&updatedUser, userID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load updated profile"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Profile photo updated",
+		"user":    updatedUser,
+	})
 }
 
 // GET /api/v1/users/contacts
@@ -233,6 +325,7 @@ func (h *ProfileHandler) AddContact(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.Phone = utils.NormalizePhone(req.Phone)
 
 	// Max 5 contacts per user
 	var count int64
@@ -328,4 +421,20 @@ func (h *ProfileHandler) invalidateProfileCache(ctx context.Context, userID uint
 	}
 
 	h.redis.Del(ctx, profileCacheKey(userID))
+}
+
+func resolveProfileUploadsDir() string {
+	if dir := strings.TrimSpace(os.Getenv("PROFILE_UPLOAD_DIR")); dir != "" {
+		return filepath.Join(dir, "profile-pictures")
+	}
+	return filepath.Join(".", "uploads", "profile-pictures")
+}
+
+func buildPublicUploadURL(c *gin.Context, filename string) string {
+	scheme := "http"
+	if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	host := c.Request.Host
+	return fmt.Sprintf("%s://%s/uploads/profile-pictures/%s", scheme, host, filename)
 }

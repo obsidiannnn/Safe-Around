@@ -56,7 +56,7 @@ export const MainNavigator = () => {
         if (!isCancelled) {
           setServicesReady(true);
         }
-      }, 650);
+      }, 1000);
     });
 
     return () => {

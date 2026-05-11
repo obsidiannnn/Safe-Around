@@ -32,6 +32,7 @@ func SetupRouter(
 	r.Use(middleware.SecurityHeadersMiddleware())
 	r.Use(middleware.CorsMiddleware())
 	r.Use(middleware.MetricsMiddleware())
+	r.Static("/uploads", "./uploads")
 
 	// Prometheus metrics scrape endpoint (unauthenticated – secure at the network level)
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
@@ -114,6 +115,7 @@ func SetupRouter(
 		{
 			users.GET("/profile", profileHandler.GetProfile)
 			users.PUT("/profile", profileHandler.UpdateProfile)
+			users.POST("/profile/photo", profileHandler.UploadProfilePhoto)
 			users.GET("/contacts", profileHandler.GetContacts)
 			users.POST("/contacts", profileHandler.AddContact)
 			users.DELETE("/contacts/:id", profileHandler.DeleteContact)

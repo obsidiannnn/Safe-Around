@@ -62,9 +62,8 @@ func (hs *GradientHeatmapService) GenerateSmoothTile(z, x, y int) ([]byte, error
 			continue
 		}
 		
-		// Add heat with radius based on severity
-		// On high zoom levels, radius should be smaller in pixels
-		radius := float64(crime.Severity) * 20.0
+		// Keep hotspots tight and localized, with green/yellow outer bands and red cores.
+		radius := 6.0 + float64(crime.Severity)*5.0
 		intensity := float64(crime.Severity) / 4.0
 		
 		hs.addHeatPoint(densityMap, px, py, radius, intensity)
@@ -136,35 +135,58 @@ func (hs *GradientHeatmapService) addHeatPoint(densityMap [][]float64, centerX, 
 }
 
 func (hs *GradientHeatmapService) densityToGradientColor(density float64) color.RGBA {
-	// Smooth color gradient:
-	// 0.0 - 0.2: Transparent → Green
-	// 0.2 - 0.4: Green → Yellow
-	// 0.4 - 0.6: Yellow → Orange
-	// 0.6 - 1.0: Orange → Red
-	
 	if density > 1.0 {
 		density = 1.0
 	}
-	
-	var r, g, b, a uint8
-	
-	if density < 0.2 {
-		t := density / 0.2
-		r, g, b = 0, uint8(200*t), 0
-		a = uint8(150 * t)
-	} else if density < 0.5 {
-		t := (density - 0.2) / 0.3
-		r, g, b = uint8(255*t), 200, 0
-		a = 150
-	} else if density < 0.8 {
-		t := (density - 0.5) / 0.3
-		r, g, b = 255, uint8(200*(1-t)), 0
-		a = 180
-	} else {
-		t := (density - 0.8) / 0.2
-		r, g, b = 255, 0, 0
-		a = uint8(180 + 40*t)
+
+	switch {
+	case density < 0.16:
+		t := density / 0.16
+		return color.RGBA{
+			R: uint8(34 + 20*t),
+			G: uint8(197 + 18*t),
+			B: uint8(94 - 10*t),
+			A: uint8(16 + 28*t),
+		}
+	case density < 0.36:
+		t := (density - 0.16) / 0.20
+		return color.RGBA{
+			R: uint8(54 + 196*t),
+			G: uint8(215 - 11*t),
+			B: uint8(84 - 63*t),
+			A: uint8(48 + 34*t),
+		}
+	case density < 0.58:
+		t := (density - 0.36) / 0.22
+		return color.RGBA{
+			R: 250,
+			G: uint8(204 - 84*t),
+			B: uint8(21 + 1*t),
+			A: uint8(92 + 34*t),
+		}
+	case density < 0.8:
+		t := (density - 0.58) / 0.22
+		return color.RGBA{
+			R: uint8(249 - 10*t),
+			G: uint8(120 - 52*t),
+			B: uint8(22 + 12*t),
+			A: uint8(128 + 38*t),
+		}
+	case density < 0.92:
+		t := (density - 0.8) / 0.12
+		return color.RGBA{
+			R: uint8(239 - 10*t),
+			G: uint8(68 - 30*t),
+			B: uint8(34 - 6*t),
+			A: uint8(172 + 28*t),
+		}
+	default:
+		t := (density - 0.92) / 0.08
+		return color.RGBA{
+			R: uint8(220 - 20*t),
+			G: uint8(38 - 16*t),
+			B: uint8(38 - 16*t),
+			A: uint8(208 + 28*t),
+		}
 	}
-	
-	return color.RGBA{R: r, G: g, B: b, A: a}
 }

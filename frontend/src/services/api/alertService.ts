@@ -54,6 +54,7 @@ const normalizeAlert = (raw: any): Alert => ({
   silentMode: raw?.silentMode ?? raw?.silent_mode ?? false,
   createdAt: raw?.createdAt ?? raw?.created_at ?? new Date().toISOString(),
   resolvedAt: raw?.resolvedAt ?? raw?.resolved_at,
+  cancelledAt: raw?.cancelledAt ?? raw?.cancelled_at,
 });
 
 const normalizeTimelineEvent = (raw: any): AlertTimelineEvent => ({

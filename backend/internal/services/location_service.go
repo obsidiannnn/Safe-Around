@@ -26,6 +26,7 @@ type NearbyUserLocation struct {
 	Latitude   float64   `json:"latitude"`
 	Longitude  float64   `json:"longitude"`
 	RecordedAt time.Time `json:"recorded_at"`
+	PushToken  string    `json:"push_token"`
 }
 
 func NewLocationService(db *gorm.DB, redis *redis.Client, geoSvc *GeofencingService) *LocationService {
@@ -168,16 +169,18 @@ func (ls *LocationService) GetNearbyUserLocations(lat, lng float64, radius int, 
 
 	query := `
 	WITH latest_locations AS (
-		SELECT DISTINCT ON (user_id)
-			user_id,
-			ST_Y(location::geometry) AS latitude,
-			ST_X(location::geometry) AS longitude,
-			recorded_at
-		FROM user_locations
-		WHERE recorded_at > NOW() - INTERVAL '10 minutes'
-		ORDER BY user_id, recorded_at DESC
+		SELECT DISTINCT ON (ul.user_id)
+			ul.user_id,
+			ST_Y(ul.location::geometry) AS latitude,
+			ST_X(ul.location::geometry) AS longitude,
+			ul.recorded_at,
+			u.push_token
+		FROM user_locations ul
+		LEFT JOIN users u ON u.id = ul.user_id
+		WHERE ul.recorded_at > NOW() - INTERVAL '10 minutes'
+		ORDER BY ul.user_id, ul.recorded_at DESC
 	)
-	SELECT user_id, latitude, longitude, recorded_at
+	SELECT user_id, latitude, longitude, recorded_at, push_token
 	FROM latest_locations
 	WHERE user_id <> ?
 	  AND ST_DWithin(

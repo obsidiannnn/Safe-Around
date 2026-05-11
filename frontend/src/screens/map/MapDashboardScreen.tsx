@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, StyleSheet, Pressable, Platform, Text, Alert as NativeAlert } from 'react-native';
+import { View, StyleSheet, Pressable, Platform, Text, Alert as NativeAlert, ActivityIndicator, InteractionManager } from 'react-native';
 import MapView, { Region, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import CrimeWebSocketService from '@/services/websocket/CrimeWebSocket';
@@ -54,6 +54,8 @@ export const MapDashboardScreen = () => {
   const [showDangerAlert, setShowDangerAlert] = useState(false);
   const [liveNearbyUsers, setLiveNearbyUsers] = useState(0);
   const [selectedPlace, setSelectedPlace] = useState<{ name: string; location: { latitude: number; longitude: number } } | null>(null);
+  const [isMapShellReady, setIsMapShellReady] = useState(false);
+  const [areMapEnhancementsReady, setAreMapEnhancementsReady] = useState(false);
   const [mapBounds, setMapBounds] = useState({
     north: 0,
     south: 0,
@@ -81,14 +83,70 @@ export const MapDashboardScreen = () => {
     opacity: pulseOpacity.value,
   }));
 
+  const fetchAreaStats = useCallback(async (lat: number, lng: number) => {
+    try {
+      const stats = await heatmapService.getStatistics(lat, lng);
+      setCurrentStats(stats);
+    } catch (error) {
+      console.warn('Area stats temporarily unavailable; keeping the current map stats.', error);
+    }
+  }, [setCurrentStats]);
+
+  const scheduleAreaStatsFetch = useCallback((lat: number, lng: number, delayMs = 600) => {
+    const nextCenter = { latitude: lat, longitude: lng };
+    if (
+      lastAreaStatsCenterRef.current &&
+      getDistanceMeters(lastAreaStatsCenterRef.current, nextCenter) < 120
+    ) {
+      return;
+    }
+
+    if (areaStatsDebounceRef.current) {
+      clearTimeout(areaStatsDebounceRef.current);
+    }
+
+    areaStatsDebounceRef.current = setTimeout(() => {
+      lastAreaStatsCenterRef.current = nextCenter;
+      fetchAreaStats(lat, lng);
+    }, delayMs);
+  }, [fetchAreaStats]);
+
   useEffect(() => {
+    let isCancelled = false;
+    let enhancementTimer: ReturnType<typeof setTimeout> | null = null;
+    const interactionTask = InteractionManager.runAfterInteractions(() => {
+      if (isCancelled) {
+        return;
+      }
+      setIsMapShellReady(true);
+      enhancementTimer = setTimeout(() => {
+        if (!isCancelled) {
+          setAreMapEnhancementsReady(true);
+        }
+      }, 900);
+    });
+
+    return () => {
+      isCancelled = true;
+      interactionTask.cancel();
+      if (enhancementTimer) {
+        clearTimeout(enhancementTimer);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isMapShellReady) {
+      return;
+    }
+
     void startTracking().catch((error) => {
       console.warn('Map location tracking will retry after app startup settles:', error);
     });
     const initLat = currentLocation?.latitude || 28.6139;
     const initLng = currentLocation?.longitude || 77.2090;
     scheduleAreaStatsFetch(initLat, initLng, 0);
-  }, []);
+  }, [currentLocation?.latitude, currentLocation?.longitude, isMapShellReady, scheduleAreaStatsFetch, startTracking]);
 
   useEffect(() => {
     if (isInDangerZone && currentZone) {
@@ -111,6 +169,10 @@ export const MapDashboardScreen = () => {
   }, [currentLocation]);
 
   useEffect(() => {
+    if (!areMapEnhancementsReady) {
+      return;
+    }
+
     const handleNewCrime = (data: any) => {
       NativeAlert.alert(
         '🚨 Crime Alert',
@@ -155,35 +217,7 @@ export const MapDashboardScreen = () => {
       CrimeWebSocketService.off('crime_added', handleNewCrime);
       CrimeWebSocketService.off('responder_accepted', handleResponderAccepted);
     };
-  }, []);
-
-  const fetchAreaStats = useCallback(async (lat: number, lng: number) => {
-    try {
-      const stats = await heatmapService.getStatistics(lat, lng);
-      setCurrentStats(stats);
-    } catch (error) {
-      console.warn('Area stats temporarily unavailable; keeping the current map stats.', error);
-    }
-  }, [setCurrentStats]);
-
-  const scheduleAreaStatsFetch = useCallback((lat: number, lng: number, delayMs = 600) => {
-    const nextCenter = { latitude: lat, longitude: lng };
-    if (
-      lastAreaStatsCenterRef.current &&
-      getDistanceMeters(lastAreaStatsCenterRef.current, nextCenter) < 120
-    ) {
-      return;
-    }
-
-    if (areaStatsDebounceRef.current) {
-      clearTimeout(areaStatsDebounceRef.current);
-    }
-
-    areaStatsDebounceRef.current = setTimeout(() => {
-      lastAreaStatsCenterRef.current = nextCenter;
-      fetchAreaStats(lat, lng);
-    }, delayMs);
-  }, [fetchAreaStats]);
+  }, [areMapEnhancementsReady]);
 
   useEffect(() => {
     return () => {
@@ -242,6 +276,17 @@ export const MapDashboardScreen = () => {
     console.log('Danger zone pressed:', zone);
   };
 
+  if (!isMapShellReady) {
+    return (
+      <View style={styles.bootContainer}>
+        <View style={styles.bootCard}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={styles.bootText}>Preparing your safety map...</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <MapView
@@ -251,7 +296,7 @@ export const MapDashboardScreen = () => {
         mapType={mapType}
         initialRegion={region}
         onRegionChangeComplete={handleRegionChange}
-        showsUserLocation={true}
+        showsUserLocation={areMapEnhancementsReady}
         showsMyLocationButton={false}
         showsCompass={false}
         showsScale={false}
@@ -260,20 +305,22 @@ export const MapDashboardScreen = () => {
           setSelectedPlace(null);
         }}
       >
-        <CrimeHeatmapOverlay
-          key={`heatmap-${heatmapKey}`}
-          mapRef={mapRef as React.RefObject<MapView>}
-          bounds={mapBounds}
-        />
+        {areMapEnhancementsReady ? (
+          <CrimeHeatmapOverlay
+            key={`heatmap-${heatmapKey}`}
+            mapRef={mapRef as React.RefObject<MapView>}
+            bounds={mapBounds}
+          />
+        ) : null}
         
-        {currentLocation && (
+        {currentLocation && areMapEnhancementsReady && (
           <>
             <UserLocationMarker location={currentLocation} />
             <NearbyUsersLayer userLocation={currentLocation} onUsersChange={handleNearbyUsersChange} />
           </>
         )}
 
-        {dangerZones.map((zone) => (
+        {areMapEnhancementsReady && dangerZones.map((zone) => (
           <DangerZoneMarker
             key={zone.id}
             zone={zone}
@@ -308,24 +355,26 @@ export const MapDashboardScreen = () => {
         </View>
       </View>
 
-      <MapSearchBar
-        topOffset={insets.top + (Platform.OS === 'ios' ? 85 : 75)}
-        currentLocation={currentLocation || undefined}
-        onSelectLocation={(location) => {
-          setSelectedPlace(location);
-          mapRef.current?.animateToRegion(
-            {
-              ...location.location,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            },
-            1000
-          );
-        }}
-        style={showEmergencyModal ? { display: 'none' } : undefined}
-      />
+      {areMapEnhancementsReady ? (
+        <MapSearchBar
+          topOffset={insets.top + (Platform.OS === 'ios' ? 85 : 75)}
+          currentLocation={currentLocation || undefined}
+          onSelectLocation={(location) => {
+            setSelectedPlace(location);
+            mapRef.current?.animateToRegion(
+              {
+                ...location.location,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              },
+              1000
+            );
+          }}
+          style={showEmergencyModal ? { display: 'none' } : undefined}
+        />
+      ) : null}
 
-      {currentLocation && (
+      {currentLocation && areMapEnhancementsReady && (
         <Pressable
           style={[styles.nearbyBadge, { top: insets.top + 185 }]}
           onPress={() => setShowAreaStatsCard(true)}
@@ -377,10 +426,12 @@ export const MapDashboardScreen = () => {
         )}
       </View>
 
-      <CurrentLocationButton 
-        onPress={handleCenterLocation} 
-        style={{ bottom: insets.bottom + 110 }} 
-      />
+      {areMapEnhancementsReady ? (
+        <CurrentLocationButton
+          onPress={handleCenterLocation}
+          style={{ bottom: insets.bottom + 110 }}
+        />
+      ) : null}
       
       <View style={[styles.sosContainer, { bottom: insets.bottom + (Platform.OS === 'ios' ? 88 : 72) }]}>
         <Animated.View style={[styles.sosPulse, animatedPulseStyle]} />
@@ -441,6 +492,29 @@ export const MapDashboardScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  bootContainer: {
+    flex: 1,
+    backgroundColor: '#ECEFF3',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  bootCard: {
+    minWidth: 220,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
+    borderRadius: borderRadius.xl,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    ...shadows.medium,
+  },
+  bootText: {
+    marginTop: spacing.md,
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background,

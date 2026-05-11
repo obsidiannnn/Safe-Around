@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, StyleSheet, Pressable, Text } from 'react-native';
 import { GooglePlacesAutocomplete, GooglePlacesAutocompleteRef } from 'react-native-google-places-autocomplete';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { colors } from '@/theme/colors';
@@ -29,11 +29,26 @@ interface MapSearchBarProps {
 
 export const MapSearchBar: React.FC<MapSearchBarProps> = ({ onSelectLocation, topOffset, currentLocation, style }) => {
   const ref = useRef<GooglePlacesAutocompleteRef>(null);
+  const [placesTemporarilyUnavailable, setPlacesTemporarilyUnavailable] = useState(false);
 
   const handleClear = () => {
     ref.current?.clear();
     ref.current?.setAddressText('');
   };
+
+  const useFallbackSearchBar = !GOOGLE_MAPS_API_KEY || placesTemporarilyUnavailable;
+
+  if (useFallbackSearchBar) {
+    return (
+      <View style={[styles.container, { top: topOffset }, style]}>
+        <View style={styles.fallbackInputContainer}>
+          <Icon name="location-searching" size={20} color={colors.primary} style={{ marginRight: spacing.sm }} />
+          <Text style={styles.fallbackText}>Search for any place...</Text>
+          <Icon name="cancel" size={20} color={colors.textSecondary} />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { top: topOffset }, style]}>
@@ -65,7 +80,10 @@ export const MapSearchBar: React.FC<MapSearchBarProps> = ({ onSelectLocation, to
           radius: '20000', // 20km bias
           strictbounds: false, // Don't restrict, just bias
         }}
-        onFail={(error) => console.error('Google Places Dashboard Error:', error)}
+        onFail={(error) => {
+          console.warn('Places search is temporarily unavailable; keeping the search bar passive for now.', error);
+          setPlacesTemporarilyUnavailable(true);
+        }}
         keyboardShouldPersistTaps="always"
         suppressDefaultStyles={false}
         enablePoweredByContainer={false}
@@ -132,5 +150,19 @@ const styles = StyleSheet.create({
     left: spacing.lg,
     right: spacing.lg,
     zIndex: 2000,
+  },
+  fallbackInputContainer: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.pill,
+    paddingHorizontal: spacing.md,
+    height: 52,
+    alignItems: 'center',
+    flexDirection: 'row',
+    ...shadows.large,
+  },
+  fallbackText: {
+    flex: 1,
+    color: colors.textSecondary,
+    fontSize: fontSizes.md,
   },
 });

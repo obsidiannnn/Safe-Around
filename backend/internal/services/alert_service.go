@@ -35,6 +35,11 @@ type AlertService struct {
 
 const indiaEmergencyNumber = "112"
 
+const (
+	requesterOfflineAlertTTL     = 2 * time.Minute
+	postEscalationResolveDelay   = 1 * time.Minute
+)
+
 var (
 	ErrAlertSelfResponse    = errors.New("requester cannot respond to their own alert")
 	ErrAlertInactive        = errors.New("alert is no longer active")
@@ -91,6 +96,8 @@ func NewAlertService(db *gorm.DB, rdb *redis.Client, gs *GeofencingService, ns N
 }
 
 func (s *AlertService) GetAlertHistory(ctx context.Context, userID uint) ([]models.EmergencyAlert, error) {
+	_ = s.cleanupUserAlerts(ctx, userID)
+
 	var alerts []models.EmergencyAlert
 	if err := s.db.Where("user_id = ?", userID).Order("created_at DESC").Find(&alerts).Error; err != nil {
 		return nil, err
@@ -135,6 +142,12 @@ func (s *AlertService) GetAlertDetails(ctx context.Context, alertID uuid.UUID, u
 		`, alertID, userID, userID).
 		First(&alert).Error; err != nil {
 		return nil, err
+	}
+
+	if _, err := s.applyAlertAutoFinalization(ctx, &alert); err == nil {
+		_ = s.db.WithContext(ctx).
+			Where("id = ?", alertID).
+			First(&alert).Error
 	}
 
 	var timeline []models.AlertTimelineEvent
@@ -288,29 +301,42 @@ func (s *AlertService) startRadiusExpansion(alertID uuid.UUID) {
 		for {
 			select {
 			case <-ticker.C:
+				ctx := context.Background()
 				var alert models.EmergencyAlert
-				if err := s.db.First(&alert, "id = ?", alertID).Error; err != nil {
+				if err := s.db.WithContext(ctx).First(&alert, "id = ?", alertID).Error; err != nil {
 					return
 				}
 
 				// Stop expansion if not active or already has responders
-				if alert.AlertStatus != "active" {
+				if alert.AlertStatus != "active" && alert.AlertStatus != "responding" {
 					return
 				}
 
+				closed, err := s.applyAlertAutoFinalization(ctx, &alert)
+				if err != nil {
+					continue
+				}
+				if closed {
+					return
+				}
+
+				if alert.AlertStatus != "active" {
+					continue
+				}
+
 				var responderCount int64
-				s.db.Model(&models.AlertResponse{}).
+				s.db.WithContext(ctx).Model(&models.AlertResponse{}).
 					Where("alert_id = ? AND response_status = ?", alertID, "accepted").
 					Count(&responderCount)
 
 				if responderCount > 0 {
-					return
+					continue
 				}
 
 				nextRadius := alert.GetNextRadius()
 				if nextRadius == alert.CurrentRadius {
 					// Max radius reached or couldn't get next
-					return
+					continue
 				}
 
 				s.expandRadius(alertID, nextRadius)
@@ -395,6 +421,12 @@ func (s *AlertService) expandRadius(alertID uuid.UUID, newRadius int) error {
 	// Broadcast via WebSocket
 	if s.websocketHub != nil {
 		s.websocketHub.BroadcastRadiusExpanded(alertID, oldRadius, newRadius, alert.UsersNotified, recipientIDs)
+	}
+
+	if newRadius >= 1000 && responderCount == 0 {
+		if err := s.EscalateToEmergencyServices(alertID, "police"); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -561,6 +593,18 @@ func (s *AlertService) EscalateToEmergencyServices(alertID uuid.UUID, escalation
 		return err
 	}
 
+	var existingEscalation models.AlertEscalation
+	if err := s.db.
+		Where("alert_id = ? AND escalation_type = ?", alertID, escalationType).
+		Order("escalated_at DESC").
+		First(&existingEscalation).Error; err == nil {
+		if existingEscalation.EscalationStatus == "pending" || existingEscalation.EscalationStatus == "dispatched" {
+			return nil
+		}
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
 	// Create escalation record
 	escalation := &models.AlertEscalation{
 		AlertID:          alertID,
@@ -597,6 +641,132 @@ func (s *AlertService) EscalateToEmergencyServices(alertID uuid.UUID, escalation
 	})
 
 	return nil
+}
+
+func (s *AlertService) cleanupStaleAlerts(ctx context.Context) error {
+	var alerts []models.EmergencyAlert
+	if err := s.db.WithContext(ctx).
+		Where("alert_status IN ?", []string{"active", "responding"}).
+		Find(&alerts).Error; err != nil {
+		return err
+	}
+
+	for i := range alerts {
+		if _, err := s.applyAlertAutoFinalization(ctx, &alerts[i]); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *AlertService) cleanupUserAlerts(ctx context.Context, userID uint) error {
+	var alerts []models.EmergencyAlert
+	if err := s.db.WithContext(ctx).
+		Where("user_id = ? AND alert_status IN ?", userID, []string{"active", "responding"}).
+		Find(&alerts).Error; err != nil {
+		return err
+	}
+
+	for i := range alerts {
+		if _, err := s.applyAlertAutoFinalization(ctx, &alerts[i]); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *AlertService) applyAlertAutoFinalization(ctx context.Context, alert *models.EmergencyAlert) (bool, error) {
+	if alert.AlertStatus != "active" && alert.AlertStatus != "responding" {
+		return true, nil
+	}
+
+	responderCount, err := s.getAcceptedResponderCount(ctx, alert.ID)
+	if err != nil {
+		return false, err
+	}
+
+	if alert.CurrentRadius >= 1000 {
+		escalatedAt, hasEscalation, err := s.getLatestPoliceEscalationTime(ctx, alert.ID)
+		if err != nil {
+			return false, err
+		}
+
+		if hasEscalation {
+			if responderCount == 0 && time.Since(escalatedAt) >= postEscalationResolveDelay {
+				if err := s.ResolveAlert(ctx, alert.ID, alert.UserID, "emergency_services_handoff"); err != nil && !errors.Is(err, ErrAlertInactive) {
+					return false, err
+				}
+				return true, nil
+			}
+
+			return false, nil
+		}
+	}
+
+	if time.Since(alert.CreatedAt) < requesterOfflineAlertTTL {
+		return false, nil
+	}
+
+	requesterOffline, err := s.isRequesterOffline(ctx, alert.UserID)
+	if err != nil {
+		return false, err
+	}
+
+	if requesterOffline {
+		if err := s.CancelAlert(ctx, alert.ID, alert.UserID); err != nil && !errors.Is(err, ErrAlertInactive) {
+			return false, err
+		}
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (s *AlertService) getAcceptedResponderCount(ctx context.Context, alertID uuid.UUID) (int64, error) {
+	var responderCount int64
+	if err := s.db.WithContext(ctx).
+		Model(&models.AlertResponse{}).
+		Where("alert_id = ? AND response_status IN ?", alertID, []string{"accepted", "arrived", "helping"}).
+		Count(&responderCount).Error; err != nil {
+		return 0, err
+	}
+	return responderCount, nil
+}
+
+func (s *AlertService) getLatestPoliceEscalationTime(ctx context.Context, alertID uuid.UUID) (time.Time, bool, error) {
+	var escalation models.AlertEscalation
+	err := s.db.WithContext(ctx).
+		Where("alert_id = ? AND escalation_type = ? AND escalation_status IN ?", alertID, "police", []string{"pending", "dispatched"}).
+		Order("escalated_at DESC").
+		First(&escalation).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return time.Time{}, false, nil
+	}
+	if err != nil {
+		return time.Time{}, false, err
+	}
+
+	return escalation.EscalatedAt, true, nil
+}
+
+func (s *AlertService) isRequesterOffline(ctx context.Context, userID uint) (bool, error) {
+	var latestLocation models.UserLocation
+	err := s.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Order("recorded_at DESC").
+		First(&latestLocation).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	return time.Since(latestLocation.RecordedAt) >= requesterOfflineAlertTTL, nil
 }
 
 // Helpers

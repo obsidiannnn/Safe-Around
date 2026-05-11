@@ -142,6 +142,8 @@ class LocationService {
       }
     ).then((sub) => {
       subscription = sub;
+    }).catch((error) => {
+      console.warn('Location watch could not start right now:', error);
     });
 
     return {

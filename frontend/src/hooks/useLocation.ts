@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useLocationStore } from '@/store/locationStore';
 import { locationService } from '@/services/location/locationService';
 import { locationApiService } from '@/services/api/locationApiService';
@@ -24,12 +24,19 @@ export const useLocation = () => {
   const { isAlertActive } = useAlertStore();
   const { locationSharingMode, priorityAlerts } = useSettingsStore();
 
-  const canSyncLocation = () =>
-    locationSharingMode === 'always' || (
-      locationSharingMode === 'alerts_only' && (isAlertActive || priorityAlerts)
-    );
+  const canSyncLocation = useCallback(
+    () =>
+      locationSharingMode === 'always' || (
+        locationSharingMode === 'alerts_only' && (isAlertActive || priorityAlerts)
+      ),
+    [isAlertActive, locationSharingMode, priorityAlerts]
+  );
 
-  const startTracking = async () => {
+  const startTracking = useCallback(async () => {
+    if (isTracking) {
+      return;
+    }
+
     const hasPermission = await locationService.requestPermissions();
     if (!hasPermission) {
       throw new Error('Location permission denied');
@@ -45,22 +52,22 @@ export const useLocation = () => {
     }
 
     setIsTracking(true);
-  };
+  }, [addToHistory, canSyncLocation, isTracking, setCurrentLocation, setIsTracking]);
 
-  const stopTracking = () => {
+  const stopTracking = useCallback(() => {
     setIsTracking(false);
-  };
+  }, [setIsTracking]);
 
-  const getCurrentLocation = async () => {
+  const getCurrentLocation = useCallback(async () => {
     const location = await locationService.getCurrentLocation();
     if (location) {
       setCurrentLocation(location);
       return location;
     }
     return null;
-  };
+  }, [setCurrentLocation]);
 
-  const calculateDistance = (
+  const calculateDistance = useCallback((
     lat1: number,
     lon1: number,
     lat2: number,
@@ -78,7 +85,7 @@ export const useLocation = () => {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     return R * c; // Distance in meters
-  };
+  }, []);
 
   useEffect(() => {
     if (!isTracking) return;
