@@ -4,6 +4,7 @@ import { Location } from '@/types/models';
 export interface NearbyUserLocation extends Location {
   userId: string;
   recordedAt?: string;
+  pushToken?: string;
 }
 
 const NEARBY_USERS_CACHE_TTL_MS = 10_000;
@@ -89,6 +90,7 @@ export const locationApiService = {
         latitude: Number(user.latitude),
         longitude: Number(user.longitude),
         recordedAt: user.recorded_at ?? user.recordedAt,
+        pushToken: user.push_token ?? user.pushToken,
       })).filter((user: NearbyUserLocation) => Number.isFinite(user.latitude) && Number.isFinite(user.longitude));
 
       setCachedNearbyUsers(cacheKey, users);
