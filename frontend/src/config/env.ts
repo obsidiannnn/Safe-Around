@@ -22,7 +22,15 @@ const normalizeOptionalConfig = (value?: string) => {
   return value;
 };
 
-// Always use Railway URLs (production backend is live)
+// Use local backend in development, Railway in production
 export const API_URL = process.env.EXPO_PUBLIC_API_URL || RAILWAY_API_URL;
 export const WEBSOCKET_URL = process.env.EXPO_PUBLIC_WS_URL || RAILWAY_WS_URL;
 export const GOOGLE_MAPS_API_KEY = normalizeOptionalConfig(process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY);
+
+// Development WebSocket URL candidates for auto-discovery
+export const DEV_WS_URL_CANDIDATES = __DEV__ ? [
+  `ws://192.168.0.130:8001/ws/crime`,
+  `ws://${getDevHost()}:8001/ws/crime`,
+  `ws://localhost:8001/ws/crime`,
+  `ws://10.0.2.2:8001/ws/crime`,
+] : [];
